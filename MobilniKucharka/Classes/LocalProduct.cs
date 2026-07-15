@@ -4,20 +4,25 @@ namespace MobilniKucharka.Classes
 {
     public class LocalProduct
     {
-        // PrimaryKey zajišťuje rychlé vyhledávání. 
-        // Bude to buď EAN (čárový kód), nebo unikátní ID z nutridatabaze.cz
-        [PrimaryKey]
-        public string Id { get; set; } = string.Empty;
+        [PrimaryKey, AutoIncrement]
+        public int Id { get; set; }
 
-        public string Name { get; set; } = string.Empty;
+        public string Name_CS { get; set; } = string.Empty;
+        public string Name_EN { get; set; } = string.Empty;
 
-        // Nutriční hodnoty vázané standardně na 100g
-        public double Protein { get; set; }
-        public double Carbs { get; set; }
-        public double Fat { get; set; }
-        public double Sugar { get; set; }
+        // Ceny v Kč (pro přepočet budgetu)
+        public double PriceKaufland { get; set; }
+        public double PriceLidl { get; set; }
+        public double PricePenny { get; set; }
+        public double PriceTesco { get; set; }
+        public double PriceBilla { get; set; }
+        public double PriceAlbert { get; set; }
 
-        // Flag pro rozlišení původu dat při případných aktualizacích
-        public bool IsFromCsv { get; set; }
+        public string Unit { get; set; } = "g"; // g, ml, ks
+
+        // Dietní filtry
+        public bool IsVegetarian { get; set; }
+        public bool IsVegan { get; set; }
+        public bool IsLactoseFree { get; set; }
     }
 }

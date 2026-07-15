@@ -1,24 +1,29 @@
-﻿using System.Globalization;
-
-namespace MobilniKucharka
+﻿namespace MobilniKucharka
 {
     public partial class App : Application
     {
         public App()
         {
             InitializeComponent();
+            // ZDE UŽ SE NENASTAVUJE MainPage = ...
+        }
 
-            // 1. Načtení uloženého kódu jazyka (pokud není, použijeme "cs" pro češtinu)
-            string savedCultureCode = Preferences.Default.Get("AppLanguageCode", "cs");
+        // NOVÝ ZPŮSOB V .NET 9 PRO URČENÍ START Z OBRAZOVKY
+        protected override Window CreateWindow(IActivationState? activationState)
+        {
+            bool isOnboardingComplete = Preferences.Default.Get("IsOnboardingComplete", false);
 
-            // 2. Aplikování jazyka na hlavní vlákna aplikace
-            var culture = new CultureInfo(savedCultureCode);
-            Thread.CurrentThread.CurrentCulture = culture;
-            Thread.CurrentThread.CurrentUICulture = culture;
-            CultureInfo.DefaultThreadCurrentCulture = culture;
-            CultureInfo.DefaultThreadCurrentUICulture = culture;
+            Page initialPage;
+            if (isOnboardingComplete)
+            {
+                initialPage = new NavigationPage(new MainPage());
+            }
+            else
+            {
+                initialPage = new OnboardingPage();
+            }
 
-            MainPage = new NavigationPage(new MainPage());
+            return new Window(initialPage);
         }
     }
 }
