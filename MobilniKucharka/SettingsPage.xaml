@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:strings="clr-namespace:MobilniKucharka.Resources.Strings"
+             x:Class="MobilniKucharka.SettingsPage"
+             Title="{x:Static strings:AppResources.SettingsTitle}">
+
+    <VerticalStackLayout Padding="20" Spacing="25">
+
+        <!-- Výběr motivu -->
+        <VerticalStackLayout Spacing="10">
+            <Label Text="{x:Static strings:AppResources.ThemeLabel}" FontAttributes="Bold" FontSize="16"/>
+            <Picker x:Name="ThemePicker" SelectedIndexChanged="OnThemeChanged">
+                <Picker.Items>
+                    <x:String>Světlý (Light)</x:String>
+                    <x:String>Tmavý (Dark)</x:String>
+                    <x:String>Podle systému</x:String>
+                </Picker.Items>
+            </Picker>
+        </VerticalStackLayout>
+
+        <!-- Výběr jazyka -->
+        <VerticalStackLayout Spacing="10">
+            <Label Text="Jazyk aplikace" FontAttributes="Bold" FontSize="16"/>
+            <Picker x:Name="LanguagePicker" Title="Vyber jazyk" SelectedIndexChanged="OnLanguageChanged">
+                <Picker.Items>
+                    <x:String>Čeština</x:String>
+                    <x:String>English</x:String>
+                </Picker.Items>
+            </Picker>
+            <Label Text="Změna jazyka se projeví po restartu aplikace." FontSize="12" TextColor="Gray" />
+        </VerticalStackLayout>
+
+    </VerticalStackLayout>
+</ContentPage>

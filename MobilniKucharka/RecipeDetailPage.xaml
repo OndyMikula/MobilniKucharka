@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:MobilniKucharka.Classes"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+             x:Class="MobilniKucharka.RecipeDetailPage"
+             x:DataType="models:Recipe"
+             Title="Detail receptu">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="15" Padding="0,0,0,30">
+
+            <Image Source="{Binding ImageUrl}" HeightRequest="250" Aspect="AspectFill" />
+
+            <VerticalStackLayout Padding="20" Spacing="15">
+
+                <Label Text="{Binding Name}" FontSize="24" FontAttributes="Bold" />
+
+                <Border BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#2C2C2C}" StrokeShape="RoundRectangle 10" Padding="15" StrokeThickness="0">
+                    <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*,*,*">
+                        <Label Grid.Row="0" Grid.Column="0" Text="Bílkoviny" FontAttributes="Bold" HorizontalOptions="Center"/>
+                        <Label Grid.Row="1" Grid.Column="0" Text="{Binding Protein, StringFormat='{0}g'}" HorizontalOptions="Center"/>
+
+                        <Label Grid.Row="0" Grid.Column="1" Text="Sacharidy" FontAttributes="Bold" HorizontalOptions="Center"/>
+                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding Carbs, StringFormat='{0}g'}" HorizontalOptions="Center"/>
+
+                        <Label Grid.Row="0" Grid.Column="2" Text="Tuky" FontAttributes="Bold" HorizontalOptions="Center"/>
+                        <Label Grid.Row="1" Grid.Column="2" Text="{Binding Fat, StringFormat='{0}g'}" HorizontalOptions="Center"/>
+
+                        <Label Grid.Row="0" Grid.Column="3" Text="Cukry" FontAttributes="Bold" HorizontalOptions="Center"/>
+                        <Label Grid.Row="1" Grid.Column="3" Text="{Binding Sugar, StringFormat='{0}g'}" HorizontalOptions="Center"/>
+                    </Grid>
+                </Border>
+
+                <Label Text="Co budeš potřebovat:" FontSize="18" FontAttributes="Bold" Margin="0,10,0,0"/>
+                <FlexLayout BindableLayout.ItemsSource="{Binding Tools}" Wrap="Wrap" Direction="Row">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="sys:String">
+                            <Border HorizontalOptions="Start" StrokeShape="RoundRectangle 10" BackgroundColor="{AppThemeBinding Light=#E0F7FA, Dark=#004D40}" StrokeThickness="0" Padding="12,8" Margin="0,0,8,8">
+                                <Label Text="{Binding .}" TextColor="{AppThemeBinding Light=#006064, Dark=#E0F7FA}" LineBreakMode="NoWrap" />
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </FlexLayout>
+
+                <Label Text="Postup krok za krokem:" FontSize="18" FontAttributes="Bold" Margin="0,10,0,0"/>
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Steps}" Spacing="10">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="sys:String">
+                            <Grid ColumnDefinitions="30, *">
+                                <Label Text="👉" FontSize="16" Grid.Column="0" />
+                                <Label Text="{Binding .}" FontSize="16" Grid.Column="1" LineBreakMode="WordWrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+
+                <Label x:Name="SourceLinkLabel"
+                       Text="Původní recept na webu" 
+                       TextColor="{AppThemeBinding Light=Blue, Dark=#82B1FF}" 
+                       TextDecorations="Underline" 
+                       Margin="0,20,0,0">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnUrlTapped" />
+                    </Label.GestureRecognizers>
+                </Label>
+
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
