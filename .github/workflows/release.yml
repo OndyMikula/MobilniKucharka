@@ -1,0 +1,69 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from csproj
+        id: version
+        shell: pwsh
+        run: |
+          $csproj = Get-Content "MobilniKucharka/MobilniKucharka.csproj" -Raw
+          $version = [regex]::Match($csproj, '<ApplicationDisplayVersion>(.*?)</ApplicationDisplayVersion>').Groups[1].Value
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Check if this version was already released
+        id: check
+        shell: pwsh
+        run: |
+          $tag = "v${{ steps.version.outputs.version }}"
+          $exists = git tag -l $tag
+          if ($exists) {
+            echo "exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "exists=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Setup .NET
+        if: steps.check.outputs.exists == 'false'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Install MAUI Android workload
+        if: steps.check.outputs.exists == 'false'
+        run: dotnet workload install maui-android
+
+      - name: Decode keystore
+        if: steps.check.outputs.exists == 'false'
+        shell: pwsh
+        run: |
+          $bytes = [Convert]::FromBase64String("${{ secrets.ANDROID_KEYSTORE_BASE64 }}")
+          [IO.File]::WriteAllBytes("release.keystore", $bytes)
+
+      - name: Build signed APK
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          dotnet publish MobilniKucharka/MobilniKucharka.csproj -f net9.0-android -c Release `
+            -p:AndroidKeyStore=true `
+            -p:AndroidSigningKeyStore=../release.keystore `
+            -p:AndroidSigningKeyAlias=${{ secrets.ANDROID_KEY_ALIAS }} `
+            -p:AndroidSigningKeyPass=${{ secrets.ANDROID_KEY_PASSWORD }} `
+            -p:AndroidSigningStorePass=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: MobilniKucharka/bin/Release/net9.0-android/*Signed.apk
