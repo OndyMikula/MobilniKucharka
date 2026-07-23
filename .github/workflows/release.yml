@@ -42,6 +42,23 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         run: dotnet workload install maui-android
 
+      - name: Generate Secrets.cs
+        if: steps.check.outputs.exists == 'false'
+        shell: pwsh
+        run: |
+          $content = @"
+          namespace MobilniKucharka.Services
+          {
+              public static class Secrets
+              {
+                  public const string SpoonacularApiKey = "${{ secrets.SPOONACULAR_API_KEY }}";
+                  public const string NutritionixAppId = "TVUJ_NUTRITIONIX_APP_ID";
+                  public const string NutritionixApiKey = "TVUJ_NUTRITIONIX_API_KEY";
+              }
+          }
+          "@
+          Set-Content -Path "MobilniKucharka/Services/Secrets.cs" -Value $content
+
       - name: Decode keystore
         if: steps.check.outputs.exists == 'false'
         shell: pwsh
@@ -51,6 +68,7 @@ jobs:
 
       - name: Build signed APK
         if: steps.check.outputs.exists == 'false'
+        shell: pwsh
         run: |
           dotnet publish MobilniKucharka/MobilniKucharka.csproj -f net9.0-android -c Release `
             -p:AndroidKeyStore=true `
