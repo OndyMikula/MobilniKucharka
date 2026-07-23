@@ -361,3 +361,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/MobilniKucharka/Services/Secrets.cs
+/com.ondymikula.mobilnikucharka.apk

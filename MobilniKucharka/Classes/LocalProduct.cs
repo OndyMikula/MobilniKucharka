@@ -10,19 +10,20 @@ namespace MobilniKucharka.Classes
         public string Name_CS { get; set; } = string.Empty;
         public string Name_EN { get; set; } = string.Empty;
 
-        // Ceny v Kč (pro přepočet budgetu)
-        public double PriceKaufland { get; set; }
-        public double PriceLidl { get; set; }
-        public double PricePenny { get; set; }
-        public double PriceTesco { get; set; }
-        public double PriceBilla { get; set; }
-        public double PriceAlbert { get; set; }
+        // Průměrná cena (zdroj: ČSÚ, případně počáteční odhad)
+        public double PriceAverage { get; set; }
 
-        public string Unit { get; set; } = "g"; // g, ml, ks
+        // Uživatel může cenu přebít vlastní hodnotou (např. z konkrétního obchodu)
+        public bool HasManualPrice { get; set; }
+        public double ManualPrice { get; set; }
 
-        // Dietní filtry
+        public string Unit { get; set; } = "g";
+
         public bool IsVegetarian { get; set; }
         public bool IsVegan { get; set; }
         public bool IsLactoseFree { get; set; }
+
+        [Ignore]
+        public double EffectivePrice => HasManualPrice ? ManualPrice : PriceAverage;
     }
 }

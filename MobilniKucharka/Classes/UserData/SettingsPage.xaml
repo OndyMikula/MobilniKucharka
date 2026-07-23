@@ -4,32 +4,55 @@
              xmlns:strings="clr-namespace:MobilniKucharka.Resources.Strings"
              x:Class="MobilniKucharka.SettingsPage"
              Title="{x:Static strings:AppResources.SettingsTitle}">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="..." Clicked="OnDeveloperToggleClicked" />
+    </ContentPage.ToolbarItems>
 
-    <VerticalStackLayout Padding="20" Spacing="25">
+    <Grid>
+        <ScrollView>
+            <VerticalStackLayout Padding="20" Spacing="25">
 
-        <!-- Výběr motivu -->
-        <VerticalStackLayout Spacing="10">
-            <Label Text="{x:Static strings:AppResources.ThemeLabel}" FontAttributes="Bold" FontSize="16"/>
-            <Picker x:Name="ThemePicker" SelectedIndexChanged="OnThemeChanged">
-                <Picker.Items>
-                    <x:String>Světlý (Light)</x:String>
-                    <x:String>Tmavý (Dark)</x:String>
-                    <x:String>Podle systému</x:String>
-                </Picker.Items>
-            </Picker>
-        </VerticalStackLayout>
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="{x:Static strings:AppResources.ThemeLabel}" FontAttributes="Bold" FontSize="16"/>
+                    <Picker x:Name="ThemePicker" SelectedIndexChanged="OnThemeChanged">
+                        <Picker.Items>
+                            <x:String>Světlý (Light)</x:String>
+                            <x:String>Tmavý (Dark)</x:String>
+                            <x:String>Podle systému</x:String>
+                        </Picker.Items>
+                    </Picker>
+                </VerticalStackLayout>
 
-        <!-- Výběr jazyka -->
-        <VerticalStackLayout Spacing="10">
-            <Label Text="Jazyk aplikace" FontAttributes="Bold" FontSize="16"/>
-            <Picker x:Name="LanguagePicker" Title="Vyber jazyk" SelectedIndexChanged="OnLanguageChanged">
-                <Picker.Items>
-                    <x:String>Čeština</x:String>
-                    <x:String>English</x:String>
-                </Picker.Items>
-            </Picker>
-            <Label Text="Změna jazyka se projeví po restartu aplikace." FontSize="12" TextColor="Gray" />
-        </VerticalStackLayout>
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Jazyk aplikace" FontAttributes="Bold" FontSize="16"/>
+                    <Picker x:Name="LanguagePicker" Title="Vyber jazyk" SelectedIndexChanged="OnLanguageChanged">
+                        <Picker.Items>
+                            <x:String>Čeština</x:String>
+                            <x:String>English</x:String>
+                        </Picker.Items>
+                    </Picker>
+                    <Label Text="Změna jazyka se projeví po restartu aplikace." FontSize="12" TextColor="Gray" />
+                </VerticalStackLayout>
 
-    </VerticalStackLayout>
+                <VerticalStackLayout Spacing="10" Margin="0,20,0,0">
+                    <Label Text="Záloha dat" FontSize="18" FontAttributes="Bold"/>
+                    <Label Text="Exportuje všechny recepty, záložky a nastavení do jednoho souboru, který můžeš přenést na jiné zařízení." FontSize="12" TextColor="Gray"/>
+                    <Button Text="Exportovat data" Clicked="OnExportDataClicked" BackgroundColor="#2196F3" TextColor="White" CornerRadius="10"/>
+                    <Button Text="Uložit zálohu do zařízení" Clicked="OnSaveDataToDeviceClicked" BackgroundColor="#607D8B" TextColor="White" CornerRadius="10"/>
+                    <Button Text="Načíst data ze zálohy" Clicked="OnLoadDataClicked" BackgroundColor="#FF9800" TextColor="White" CornerRadius="10"/>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Grid x:Name="BackupProgressOverlay" IsVisible="False" BackgroundColor="#99000000">
+            <Border VerticalOptions="Center" HorizontalOptions="Center" WidthRequest="280" Padding="25" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}" StrokeShape="RoundRectangle 15">
+                <VerticalStackLayout Spacing="15">
+                    <Label x:Name="BackupProgressLabel" Text="Zpracovávám..." FontAttributes="Bold" HorizontalOptions="Center"/>
+                    <ProgressBar x:Name="BackupProgressBar" Progress="0" ProgressColor="#2196F3"/>
+                    <Label x:Name="BackupProgressPercentLabel" Text="0 %" FontSize="12" TextColor="Gray" HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+    </Grid>
 </ContentPage>

@@ -1,111 +1,210 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+﻿<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="MobilniKucharka.RecipeDetailPage"
+             xmlns:services="clr-namespace:MobilniKucharka.Services"
+             xmlns:local="clr-namespace:MobilniKucharka.Classes.Recipe"
+             xmlns:bookmarks="clr-namespace:MobilniKucharka.Classes.UserData.Bookmark"
+             x:Class="MobilniKucharka.Classes.Recipe.RecipeDetailPage"
+             x:DataType="services:RecipeWithCost"
              Title="Detail receptu"
              BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#121212}">
 
-    <ScrollView>
-        <VerticalStackLayout Spacing="0">
+    <Grid>
+        <ScrollView>
+            <VerticalStackLayout Spacing="0">
 
-            <!-- 1. HERO OBRÁZEK RECEPTU -->
-            <Grid HeightRequest="250">
-                <Image x:Name="RecipeImage" Aspect="AspectFill" />
+                <!-- HERO OBRAZEK RECEPTU -->
+                <Grid HeightRequest="250">
+                    <Image x:Name="RecipeImage" Aspect="AspectFill" />
 
-                <!-- Opravený gradient a VerticalOptions="End" -->
-                <BoxView VerticalOptions="End" HeightRequest="80">
-                    <BoxView.Background>
-                        <LinearGradientBrush EndPoint="0,1">
-                            <GradientStop Color="#00000000" Offset="0.0" />
-                            <GradientStop Color="#CC000000" Offset="1.0" />
-                        </LinearGradientBrush>
-                    </BoxView.Background>
-                </BoxView>
+                    <HorizontalStackLayout HorizontalOptions="End" VerticalOptions="Start" Margin="15" Spacing="10">
+                        <Border x:Name="FavoriteButton" HeightRequest="44" WidthRequest="44" StrokeShape="RoundRectangle 22" BackgroundColor="#80000000" Stroke="Transparent">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnFavoriteToggled" />
+                            </Border.GestureRecognizers>
+                            <Label x:Name="FavoriteIcon" Text="♡" FontSize="24" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center" />
+                        </Border>
 
-                <Label x:Name="RecipeNameLabel" VerticalOptions="End" Margin="20" 
-                       FontSize="24" FontAttributes="Bold" TextColor="White" />
-            </Grid>
+                        <Border HeightRequest="44" WidthRequest="44" StrokeShape="RoundRectangle 22" BackgroundColor="#80000000" Stroke="Transparent">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnOptionsMenuClicked" />
+                            </Border.GestureRecognizers>
+                            <VerticalStackLayout Spacing="3" HorizontalOptions="Center" VerticalOptions="Center">
+                                <Ellipse Fill="White" WidthRequest="5" HeightRequest="5" />
+                                <Ellipse Fill="White" WidthRequest="5" HeightRequest="5" />
+                                <Ellipse Fill="White" WidthRequest="5" HeightRequest="5" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </HorizontalStackLayout>
 
-            <VerticalStackLayout Padding="20" Spacing="25">
+                    <BoxView VerticalOptions="End" HeightRequest="100">
+                        <BoxView.Background>
+                            <LinearGradientBrush EndPoint="0,1">
+                                <GradientStop Color="#00000000" Offset="0.0" />
+                                <GradientStop Color="#CC000000" Offset="1.0" />
+                            </LinearGradientBrush>
+                        </BoxView.Background>
+                    </BoxView>
 
-                <!-- 2. NUTRIČNÍ HODNOTY (Frame nahrazen za Border) -->
-                <Grid ColumnDefinitions="*, *, *, *" ColumnSpacing="10">
-                    <Border Grid.Column="0" Padding="5" HeightRequest="65" StrokeShape="RoundRectangle 8" Stroke="Transparent" BackgroundColor="#E3F2FD">
-                        <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
-                            <Label Text="Bílkoviny" FontSize="10" TextColor="#1565C0" HorizontalOptions="Center"/>
-                            <Label x:Name="ProteinLabel" FontSize="15" FontAttributes="Bold" TextColor="#1565C0" HorizontalOptions="Center"/>
-                        </VerticalStackLayout>
-                    </Border>
-                    <Border Grid.Column="1" Padding="5" HeightRequest="65" StrokeShape="RoundRectangle 8" Stroke="Transparent" BackgroundColor="#FFF3E0">
-                        <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
-                            <Label Text="Sacharidy" FontSize="10" TextColor="#EF6C00" HorizontalOptions="Center"/>
-                            <Label x:Name="CarbsLabel" FontSize="15" FontAttributes="Bold" TextColor="#EF6C00" HorizontalOptions="Center"/>
-                        </VerticalStackLayout>
-                    </Border>
-                    <Border Grid.Column="2" Padding="5" HeightRequest="65" StrokeShape="RoundRectangle 8" Stroke="Transparent" BackgroundColor="#E8F5E9">
-                        <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
-                            <Label Text="Tuky" FontSize="10" TextColor="#2E7D32" HorizontalOptions="Center"/>
-                            <Label x:Name="FatLabel" FontSize="15" FontAttributes="Bold" TextColor="#2E7D32" HorizontalOptions="Center"/>
-                        </VerticalStackLayout>
-                    </Border>
-                    <Border Grid.Column="3" Padding="5" HeightRequest="65" StrokeShape="RoundRectangle 8" Stroke="Transparent" BackgroundColor="#FFEBEE">
-                        <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
-                            <Label Text="Cukry" FontSize="10" TextColor="#C62828" HorizontalOptions="Center"/>
-                            <Label x:Name="SugarLabel" FontSize="15" FontAttributes="Bold" TextColor="#C62828" HorizontalOptions="Center"/>
-                        </VerticalStackLayout>
-                    </Border>
+                    <VerticalStackLayout VerticalOptions="End" Margin="20" Spacing="5">
+                        <Label x:Name="RecipeNameLabel" FontSize="24" FontAttributes="Bold" TextColor="White" />
+                        <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
+                            <HorizontalStackLayout Spacing="2" VerticalOptions="Center">
+                                <HorizontalStackLayout x:Name="HeroStarsHost" Spacing="2" VerticalOptions="Center" />
+                                <Label x:Name="HeroRatingNumberLabel" TextColor="White" FontSize="16" FontAttributes="Bold" VerticalOptions="Center" Margin="5,0,0,0"/>
+                            </HorizontalStackLayout>
+                            <Label x:Name="PrepTimeLabel" TextColor="White" FontSize="14" VerticalOptions="Center" IsVisible="False"/>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
                 </Grid>
 
-                <!-- 3. NÁKUPNÍ SEZNAM -->
-                <VerticalStackLayout Spacing="10">
-                    <HorizontalStackLayout Spacing="10">
-                        <Label Text="🛒" FontSize="20"/>
-                        <Label Text="Nákupní seznam" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" />
-                        <Label x:Name="PeopleCountBadge" TextColor="Gray" FontSize="14" VerticalOptions="Center" Margin="5,0,0,0"/>
-                    </HorizontalStackLayout>
+                <VerticalStackLayout Padding="20" Spacing="25">
 
-                    <!-- Opravený BindableLayout správně vázaný na kontejner -->
-                    <Border Padding="15" StrokeShape="RoundRectangle 10" Stroke="LightGray" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
-                        <VerticalStackLayout x:Name="IngredientsLayout">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid ColumnDefinitions="*, Auto, Auto" Padding="0,8">
-                                        <Label Grid.Column="0" Text="{Binding Name}" VerticalOptions="Center" FontAttributes="Bold"/>
-                                        <Label Grid.Column="1" Text="{Binding AmountText}" Margin="10,0" VerticalOptions="Center" TextColor="Gray"/>
-                                        <Label Grid.Column="2" Text="{Binding CostText}" VerticalOptions="Center" TextColor="#4CAF50" FontAttributes="Bold"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
-                    </Border>
+                    <!-- NUTRICNI HODNOTY -->
+                    <VerticalStackLayout Spacing="4">
+                        <Grid ColumnDefinitions="*, *, *, *" ColumnSpacing="10">
+                                <Border Grid.Column="0" Padding="5" HeightRequest="65" StrokeShape="RoundRectangle 8" Stroke="Transparent" BackgroundColor="#E3F2FD">
+                                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
+                                    <Label Text="Bílkoviny" FontSize="10" TextColor="#1565C0" HorizontalOptions="Center"/>
+                                    <Label x:Name="ProteinLabel" FontSize="15" FontAttributes="Bold" TextColor="#1565C0" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="1" Padding="5" HeightRequest="65" StrokeShape="RoundRectangle 8" Stroke="Transparent" BackgroundColor="#FFF3E0">
+                                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
+                                    <Label Text="Sacharidy" FontSize="10" TextColor="#EF6C00" HorizontalOptions="Center"/>
+                                    <Label x:Name="CarbsLabel" FontSize="15" FontAttributes="Bold" TextColor="#EF6C00" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="2" Padding="5" HeightRequest="65" StrokeShape="RoundRectangle 8" Stroke="Transparent" BackgroundColor="#E8F5E9">
+                                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
+                                    <Label Text="Tuky" FontSize="10" TextColor="#2E7D32" HorizontalOptions="Center"/>
+                                    <Label x:Name="FatLabel" FontSize="15" FontAttributes="Bold" TextColor="#2E7D32" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="3" Padding="5" HeightRequest="65" StrokeShape="RoundRectangle 8" Stroke="Transparent" BackgroundColor="#FFEBEE">
+                                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
+                                    <Label Text="Cukry" FontSize="10" TextColor="#C62828" HorizontalOptions="Center"/>
+                                    <Label x:Name="SugarLabel" FontSize="15" FontAttributes="Bold" TextColor="#C62828" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                        </Grid>
+                        <Label x:Name="NutritionEstimateLabel" Text="Odhad" FontSize="11" Opacity="0.75" HorizontalOptions="End" IsVisible="False"/>
+                    </VerticalStackLayout>
 
-                    <Label x:Name="TotalPriceLabel" FontSize="16" FontAttributes="Bold" HorizontalOptions="End" TextColor="#4CAF50" Margin="0,5,5,0"/>
-                </VerticalStackLayout>
+                    <!-- POPIS RECEPTU -->
+                    <VerticalStackLayout x:Name="DescriptionSection" Spacing="8" IsVisible="False">
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="📝" FontSize="20"/>
+                            <Label Text="Popis receptu" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <Label x:Name="DescriptionLabel" FontSize="15" LineHeight="1.3" />
+                    </VerticalStackLayout>
 
-                <!-- 4. POSTUP PŘÍPRAVY -->
-                <VerticalStackLayout Spacing="10">
-                    <HorizontalStackLayout Spacing="10">
-                        <Label Text="🍳" FontSize="20"/>
-                        <Label Text="Postup přípravy" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" />
-                    </HorizontalStackLayout>
+                    <!-- NAKUPNI SEZNAM -->
+                    <VerticalStackLayout Spacing="10">
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="🛒" FontSize="20"/>
+                            <Label Text="Nákupní seznam" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" />
+                            <Label x:Name="PeopleCountBadge" TextColor="Gray" FontSize="14" VerticalOptions="Center" Margin="5,0,0,0"/>
+                        </HorizontalStackLayout>
 
-                    <Border Padding="15" StrokeShape="RoundRectangle 10" Stroke="LightGray" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
-                        <VerticalStackLayout x:Name="StepsLayout">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid ColumnDefinitions="Auto, *" Margin="0,8" VerticalOptions="Start">
-                                        <Border Grid.Column="0" WidthRequest="26" HeightRequest="26" StrokeShape="RoundRectangle 13" BackgroundColor="#2196F3" Stroke="Transparent" VerticalOptions="Start" Margin="0,2,10,0">
-                                            <Label Text="{Binding StepNumber}" TextColor="White" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" FontSize="12"/>
-                                        </Border>
-                                        <Label Grid.Column="1" Text="{Binding StepText}" FontSize="15" LineHeight="1.2" VerticalOptions="Start"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
-                    </Border>
+                        <Border Padding="15" StrokeShape="RoundRectangle 10" Stroke="LightGray" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
+                            <VerticalStackLayout x:Name="IngredientsLayout">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="services:DisplayIngredient">
+                                        <Grid ColumnDefinitions="*, Auto, Auto" Padding="0,8">
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer Tapped="OnIngredientTapped" />
+                                            </Grid.GestureRecognizers>
+                                            <Label Grid.Column="0" Text="{Binding Name}" VerticalOptions="Center" FontAttributes="Bold"/>
+                                            <Label Grid.Column="1" Text="{Binding AmountText}" Margin="10,0" VerticalOptions="Center" TextColor="Gray"/>
+                                            <Label Grid.Column="2" Text="{Binding CostText}" VerticalOptions="Center" TextColor="#4CAF50" FontAttributes="Bold"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </Border>
+                        <Label Text="Průměrné ceny (ČSÚ) — klepnutím na surovinu můžeš zadat vlastní cenu" FontSize="11" Opacity="0.75" Margin="0,5,0,0"/>
+
+                        <Label x:Name="TotalPriceLabel" FontSize="16" FontAttributes="Bold" HorizontalOptions="End" TextColor="#4CAF50" Margin="0,5,5,0"/>
+                    </VerticalStackLayout>
+
+                    <!-- POTŘEBNÉ POMŮCKY -->
+                    <VerticalStackLayout x:Name="EquipmentSection" Spacing="8" IsVisible="False">
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="🧰" FontSize="20"/>
+                            <Label Text="Potřebné pomůcky" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <FlexLayout x:Name="EquipmentFlexLayout" Wrap="Wrap" Direction="Row" AlignItems="Center" JustifyContent="Start" />
+                    </VerticalStackLayout>
+
+                    <!-- POSTUP PRIPRAVY -->
+                    <VerticalStackLayout Spacing="10">
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="🍳" FontSize="20"/>
+                            <Label Text="Postup přípravy" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+
+                        <Border Padding="15" StrokeShape="RoundRectangle 10" Stroke="LightGray" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
+                            <VerticalStackLayout x:Name="StepsLayout">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="local:DisplayStep">
+                                        <Grid ColumnDefinitions="Auto, *" Margin="0,8" VerticalOptions="Start">
+                                            <Label Grid.Column="0" Text="👉" FontSize="18" VerticalOptions="Start" Margin="0,0,10,0"/>
+                                            <Label Grid.Column="1" Text="{Binding StepText}" FontSize="15" LineHeight="1.2" VerticalOptions="Start"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <!-- HODNOCENÍ RECEPTU -->
+                    <VerticalStackLayout Spacing="8" HorizontalOptions="Center" Margin="0,10,0,20">
+                        <Label Text="Tvoje hodnocení receptu" FontSize="14" FontAttributes="Bold" TextColor="Gray" HorizontalOptions="Center"/>
+                        <HorizontalStackLayout x:Name="UserRatingStarsHost" Spacing="4" HorizontalOptions="Center" />
+                        <Slider x:Name="UserRatingSlider" Minimum="0" Maximum="5" ValueChanged="OnUserRatingSliderChanged" WidthRequest="250" HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+
                 </VerticalStackLayout>
 
             </VerticalStackLayout>
-        </VerticalStackLayout>
-    </ScrollView>
+        </ScrollView>
+
+        <!-- OVERLAY: PRIDAT DO ZALOZKY -->
+        <Grid x:Name="BookmarkOverlay" IsVisible="False" BackgroundColor="#99000000">
+            <Border VerticalOptions="End" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}" StrokeShape="RoundRectangle 20,20,0,0" Padding="20" MaximumHeightRequest="450">
+                <Grid RowDefinitions="Auto, *, Auto" RowSpacing="15">
+                    <Label Grid.Row="0" Text="Přidat do záložky" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center"/>
+
+                    <CollectionView Grid.Row="1" x:Name="BookmarkSelectionLayout" SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="bookmarks:BookmarkSelectionModel">
+                                <Grid ColumnDefinitions="Auto, *" Padding="0,8">
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsRecipeInCategory}" CheckedChanged="OnBookmarkCheckedChanged" />
+                                    <Label Grid.Column="1" Text="{Binding CategoryName}" VerticalOptions="Center" FontSize="16" Margin="10,0,0,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <Button Grid.Row="2" Text="Hotovo" Clicked="OnCloseBookmarkOverlayClicked" BackgroundColor="#2196F3" TextColor="White" CornerRadius="10" Padding="15" FontAttributes="Bold"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- OVERLAY: SMAZAT RECEPT -->
+        <Grid x:Name="DeleteOverlay" IsVisible="False" BackgroundColor="#99000000">
+            <Border VerticalOptions="Center" HorizontalOptions="Center" WidthRequest="300" Padding="20" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}" StrokeShape="RoundRectangle 15">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="Smazat recept?" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center"/>
+                    <Label Text="Tato akce je nevratná." FontSize="14" TextColor="Gray" HorizontalOptions="Center"/>
+                    <HorizontalStackLayout Spacing="10" HorizontalOptions="Center">
+                        <Button Text="Zrušit" Clicked="OnCancelDeleteClicked" BackgroundColor="LightGray" TextColor="Black" CornerRadius="10" Padding="15,10"/>
+                        <Button Text="Smazat" Clicked="OnConfirmDeleteClicked" BackgroundColor="#F44336" TextColor="White" CornerRadius="10" Padding="15,10"/>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+    </Grid>
 </ContentPage>
