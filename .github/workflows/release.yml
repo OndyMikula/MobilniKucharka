@@ -7,6 +7,8 @@ on:
 jobs:
   release:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,12 +67,6 @@ jobs:
         run: |
           $bytes = [Convert]::FromBase64String("${{ secrets.ANDROID_KEYSTORE_BASE64 }}")
           [IO.File]::WriteAllBytes("release.keystore", $bytes)
-
-      - name: Verify keystore (diagnostic)
-        if: steps.check.outputs.exists == 'false'
-        shell: pwsh
-        run: |
-          keytool -list -v -keystore release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}"
 
       - name: Build signed APK
         if: steps.check.outputs.exists == 'false'
