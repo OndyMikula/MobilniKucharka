@@ -11,23 +11,11 @@
         <VerticalStackLayout Grid.Row="0" Spacing="10" Margin="0,10,0,20">
             <Label x:Name="StepTitle" FontSize="24" FontAttributes="Bold" HorizontalOptions="Center" TextColor="{AppThemeBinding Light=#111111, Dark=#FFFFFF}" />
             <Label x:Name="StepDescription" FontSize="14" TextColor="Gray" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
-            <ProgressBar x:Name="WizardProgress" Progress="0.25" ProgressColor="#4CAF50" HeightRequest="4" Margin="0,10,0,0"/>
+            <ProgressBar x:Name="WizardProgress" Progress="0.33" ProgressColor="#4CAF50" HeightRequest="4" Margin="0,10,0,0"/>
         </VerticalStackLayout>
 
-        <!-- KROK 1: Výběr obchodu -->
-        <VerticalStackLayout x:Name="Step1_Shop" Grid.Row="1" Spacing="12" IsVisible="True" VerticalOptions="Center">
-            <Button Text="Lidl" Clicked="OnShopSelected" CommandParameter="PriceLidl" BackgroundColor="#00509d" TextColor="White" HeightRequest="55" CornerRadius="8"/>
-            <Button Text="Kaufland" Clicked="OnShopSelected" CommandParameter="PriceKaufland" BackgroundColor="#e10914" TextColor="White" HeightRequest="55" CornerRadius="8"/>
-            <Button Text="Albert" Clicked="OnShopSelected" CommandParameter="PriceAlbert" BackgroundColor="#009639" TextColor="White" HeightRequest="55" CornerRadius="8"/>
-            <Button Text="Tesco" Clicked="OnShopSelected" CommandParameter="PriceTesco" BackgroundColor="#00539f" TextColor="White" HeightRequest="55" CornerRadius="8"/>
-            <Button Text="Billa" Clicked="OnShopSelected" CommandParameter="PriceBilla" BackgroundColor="#ffcc00" TextColor="Black" HeightRequest="55" CornerRadius="8"/>
-            <Button Text="Penny" Clicked="OnShopSelected" CommandParameter="PricePenny" BackgroundColor="#d1021c" TextColor="White" HeightRequest="55" CornerRadius="8"/>
-
-            <Label x:Name="SelectedShopLabel" Margin="0,15,0,0" FontSize="16" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#4CAF50"/>
-        </VerticalStackLayout>
-
-        <!-- KROK 2: Lidé a Budget -->
-        <VerticalStackLayout x:Name="Step2_Budget" Grid.Row="1" Spacing="20" IsVisible="False" VerticalOptions="Center">
+        <!-- KROK 1: Lidé a Budget -->
+        <VerticalStackLayout x:Name="Step1_Budget" Grid.Row="1" Spacing="20" IsVisible="True">
 
             <Border Stroke="LightGray" StrokeShape="RoundRectangle 10" Padding="15" BackgroundColor="Transparent">
                 <VerticalStackLayout Spacing="10">
@@ -47,8 +35,8 @@
 
         </VerticalStackLayout>
 
-        <!-- KROK 3: Dietní potřeby -->
-        <VerticalStackLayout x:Name="Step3_Diets" Grid.Row="1" Spacing="15" IsVisible="False" VerticalOptions="Center">
+        <!-- KROK 2: Dietní potřeby -->
+        <VerticalStackLayout x:Name="Step2_Diets" Grid.Row="1" Spacing="15" IsVisible="False">
             <Label Text="Vyber své stravovací preference:" FontAttributes="Bold" FontSize="16" Margin="0,0,0,10"/>
             <HorizontalStackLayout Spacing="15">
                 <CheckBox x:Name="CheckVegetarian" />
@@ -64,8 +52,8 @@
             </HorizontalStackLayout>
         </VerticalStackLayout>
 
-        <!-- KROK 4: Spotřebiče -->
-        <VerticalStackLayout x:Name="Step4_Appliances" Grid.Row="1" Spacing="15" IsVisible="False" VerticalOptions="Center">
+        <!-- KROK 3: Spotřebiče -->
+        <VerticalStackLayout x:Name="Step3_Appliances" Grid.Row="1" Spacing="15" IsVisible="False">
             <Label Text="Jaké spotřebiče máš k dispozici?" FontAttributes="Bold" FontSize="16" Margin="0,0,0,10"/>
             <HorizontalStackLayout Spacing="15">
                 <CheckBox x:Name="CheckOven" IsChecked="True"/>

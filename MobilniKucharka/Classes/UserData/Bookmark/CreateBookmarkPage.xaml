@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:bookmarks="clr-namespace:MobilniKucharka.Classes.UserData.Bookmark"
+             x:Class="MobilniKucharka.Classes.UserData.Bookmark.CreateBookmarkPage"
+             Title="Nová záložka"
+             Shell.NavBarIsVisible="False"
+             NavigationPage.HasNavigationBar="False">
+
+    <Grid RowDefinitions="*, Auto" Padding="20">
+
+        <ScrollView Grid.Row="0" VerticalScrollBarVisibility="Never">
+            <VerticalStackLayout Spacing="25" Margin="0,15,0,0">
+                <Label Text="Nová složka" FontSize="26" FontAttributes="Bold" HorizontalOptions="Center" />
+
+                <!-- Vstup pro název -->
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Název záložky" FontAttributes="Bold" FontSize="14" TextColor="Gray" />
+                    <Entry x:Name="BookmarkNameEntry" Placeholder="Např. Rychlé večeře..." MaxLength="30" ClearButtonVisibility="WhileEditing" />
+                </VerticalStackLayout>
+
+                <!-- Výběr obrázku -->
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Obrázek složky (volitelný)" FontAttributes="Bold" FontSize="14" TextColor="Gray" />
+
+                    <Button Text="Vybrat z galerie" Clicked="OnPickImageClicked" BackgroundColor="#E0E0E0" TextColor="Black" CornerRadius="8"/>
+
+                    <!-- Náhled obrázku / Defaultní stav -->
+                    <Border StrokeShape="RoundRectangle 12" Stroke="LightGray" HeightRequest="150" HorizontalOptions="Fill">
+                        <Grid>
+                            <!-- Výchozí pozadí ukáže tento blok, pokud není fotka -->
+                            <VerticalStackLayout x:Name="DefaultStateLayout" HorizontalOptions="Center" VerticalOptions="Center" Spacing="5">
+                                <Label Text="🖼️" FontSize="30" HorizontalOptions="Center"/>
+                                <Label Text="Bude použito jednobarevné pozadí" FontSize="13" TextColor="Gray" />
+                            </VerticalStackLayout>
+
+                            <!-- Vybraný obrázek -->
+                            <Image x:Name="BookmarkImagePreview" Aspect="AspectFill" IsVisible="False" />
+                        </Grid>
+                    </Border>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Tlačítko Uložit -->
+        <Button Grid.Row="1" 
+                Text="Uložit složku" 
+                Clicked="OnSaveClicked"
+                HeightRequest="55"
+                CornerRadius="10"
+                BackgroundColor="#4CAF50"
+                TextColor="White"
+                FontAttributes="Bold"
+                Margin="0,10,0,10" />
+    </Grid>
+</ContentPage>

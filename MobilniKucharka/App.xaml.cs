@@ -1,29 +1,32 @@
-﻿namespace MobilniKucharka
+﻿using MobilniKucharka.Services;
+
+namespace MobilniKucharka;
+
+public partial class App : Application
 {
-    public partial class App : Application
+    private static BudgetPlannerService? _database;
+
+    // Tato statická vlastnost zaručí, že kdekoli v aplikaci napíšeš "App.Database",
+    // dostaneš připravenou instanci tvé hlavní služby BudgetPlannerService.
+    public static BudgetPlannerService Database
     {
-        public App()
+        get
         {
-            InitializeComponent();
-            // ZDE UŽ SE NENASTAVUJE MainPage = ...
-        }
-
-        // NOVÝ ZPŮSOB V .NET 9 PRO URČENÍ START Z OBRAZOVKY
-        protected override Window CreateWindow(IActivationState? activationState)
-        {
-            bool isOnboardingComplete = Preferences.Default.Get("IsOnboardingComplete", false);
-
-            Page initialPage;
-            if (isOnboardingComplete)
+            if (_database == null)
             {
-                initialPage = new NavigationPage(new MainPage());
+                // Vytvoříme cestu k databázovému souboru
+                var dbPath = Path.Combine(FileSystem.AppDataDirectory, "kucharka.db3");
+                _database = new BudgetPlannerService(dbPath);
             }
-            else
-            {
-                initialPage = new OnboardingPage();
-            }
-
-            return new Window(initialPage);
+            return _database;
         }
+    }
+
+    [Obsolete]
+    public App()
+    {
+        InitializeComponent();
+
+        MainPage = new AppShell(); // případně tvoje startovní stránka
     }
 }

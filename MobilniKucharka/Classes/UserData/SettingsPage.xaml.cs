@@ -1,4 +1,6 @@
-﻿using System.Globalization;
+﻿using CommunityToolkit.Maui.Storage;
+using MobilniKucharka.Services;
+using System.Globalization;
 
 namespace MobilniKucharka;
 
@@ -8,6 +10,30 @@ public partial class SettingsPage : ContentPage
     {
         InitializeComponent();
         LoadCurrentSettings();
+    }
+
+    private int _devModeTapCount = 0;
+    private DateTime _lastDevModeTapTime = DateTime.MinValue;
+
+    private async void OnDeveloperToggleClicked(object sender, EventArgs e)
+    {
+        var now = DateTime.Now;
+        if ((now - _lastDevModeTapTime).TotalSeconds > 2)
+            _devModeTapCount = 0;
+
+        _lastDevModeTapTime = now;
+        _devModeTapCount++;
+
+        if (_devModeTapCount >= 3)
+        {
+            _devModeTapCount = 0;
+
+            bool newState = !Preferences.Default.Get("IsDeveloperMode", false);
+            Preferences.Default.Set("IsDeveloperMode", newState);
+
+            await DisplayAlert("Vývojářský režim",
+                newState ? "Vývojářský režim byl aktivován." : "Vývojářský režim byl deaktivován.", "OK");
+        }
     }
 
     private void LoadCurrentSettings()
@@ -76,6 +102,98 @@ public partial class SettingsPage : ContentPage
         {
             // Pokud uživatel stornoval, vrátíme Picker na původní hodnotu
             LanguagePicker.SelectedItem = currentSavedCode == "en" ? "English" : "Čeština";
+        }
+    }
+
+    private readonly DataBackupService _backupService = new();
+
+    private async void OnExportDataClicked(object sender, EventArgs e)
+    {
+        BackupProgressOverlay.IsVisible = true;
+        BackupProgressLabel.Text = "Exportuji data...";
+
+        var progress = new Progress<double>(value =>
+        {
+            BackupProgressBar.Progress = value;
+            BackupProgressPercentLabel.Text = $"{value:P0}";
+        });
+
+        try
+        {
+            string zipPath = await _backupService.ExportAsync(progress);
+            BackupProgressOverlay.IsVisible = false;
+
+            await Share.Default.RequestAsync(new ShareFileRequest
+            {
+                Title = "Uložit zálohu Mobilní Kuchařky",
+                File = new ShareFile(zipPath)
+            });
+        }
+        catch (Exception ex)
+        {
+            BackupProgressOverlay.IsVisible = false;
+            await DisplayAlert("Chyba", $"Export se nepodařil: {ex.Message}", "OK");
+        }
+    }
+
+    private async void OnLoadDataClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            var result = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Vyber soubor zálohy (.zip)" });
+            if (result == null) return;
+
+            bool confirm = await DisplayAlert("Načíst zálohu", "Tímto se přepíší všechna aktuální data v aplikaci. Pokračovat?", "Ano", "Zrušit");
+            if (!confirm) return;
+
+            BackupProgressOverlay.IsVisible = true;
+            BackupProgressLabel.Text = "Načítám data...";
+
+            var progress = new Progress<double>(value =>
+            {
+                BackupProgressBar.Progress = value;
+                BackupProgressPercentLabel.Text = $"{value:P0}";
+            });
+
+            await _backupService.ImportAsync(result.FullPath, progress);
+
+            BackupProgressOverlay.IsVisible = false;
+            await DisplayAlert("Hotovo", "Data byla načtena. Aplikace se nyní zavře — otevři ji prosím znovu ručně.", "OK");
+            Application.Current?.Quit();
+        }
+        catch (Exception ex)
+        {
+            BackupProgressOverlay.IsVisible = false;
+            await DisplayAlert("Chyba", $"Načtení se nepodařilo: {ex.Message}", "OK");
+        }
+    }
+
+    private async void OnSaveDataToDeviceClicked(object sender, EventArgs e)
+    {
+        BackupProgressOverlay.IsVisible = true;
+        BackupProgressLabel.Text = "Exportuji data...";
+
+        var progress = new Progress<double>(value =>
+        {
+            BackupProgressBar.Progress = value;
+            BackupProgressPercentLabel.Text = $"{value:P0}";
+        });
+
+        try
+        {
+            string zipPath = await _backupService.ExportAsync(progress);
+            BackupProgressOverlay.IsVisible = false;
+
+            using var stream = File.OpenRead(zipPath);
+            var result = await FileSaver.Default.SaveAsync(Path.GetFileName(zipPath), stream, CancellationToken.None);
+
+            if (result.IsSuccessful)
+                await DisplayAlert("Hotovo", $"Záloha byla uložena do: {result.FilePath}", "OK");
+        }
+        catch (Exception ex)
+        {
+            BackupProgressOverlay.IsVisible = false;
+            await DisplayAlert("Chyba", $"Uložení se nepodařilo: {ex.Message}", "OK");
         }
     }
 }

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:bookmarks="clr-namespace:MobilniKucharka.Classes.UserData.Bookmark"
+             x:Class="MobilniKucharka.Classes.UserData.Bookmark.BookmarksPage"
+             BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#121212}">
+
+    <Grid>
+        <Grid RowDefinitions="Auto, *, Auto">
+
+            <!-- HLAVIČKA S KEBAB MENU -->
+            <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Padding="15,10,15,0">
+                <Label Grid.Column="0" Text="Záložky" FontSize="22" FontAttributes="Bold" VerticalOptions="Center"/>
+                <Border Grid.Column="1" HeightRequest="36" WidthRequest="36" BackgroundColor="Transparent" Stroke="Transparent">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnPageOptionsClicked" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="3" HorizontalOptions="Center" VerticalOptions="Center">
+                        <Ellipse Fill="{AppThemeBinding Light=Black, Dark=White}" WidthRequest="4" HeightRequest="4" />
+                        <Ellipse Fill="{AppThemeBinding Light=Black, Dark=White}" WidthRequest="4" HeightRequest="4" />
+                        <Ellipse Fill="{AppThemeBinding Light=Black, Dark=White}" WidthRequest="4" HeightRequest="4" />
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+            <!-- SEZNAM ZÁLOŽEK -->
+            <CollectionView Grid.Row="1"
+                             x:Name="BookmarksCollectionView"
+                             Margin="15"
+                             SelectionMode="None">
+                <CollectionView.ItemsLayout>
+                    <GridItemsLayout Orientation="Vertical" Span="2" HorizontalItemSpacing="15" VerticalItemSpacing="15" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="bookmarks:Bookmark">
+                        <Border StrokeShape="RoundRectangle 15" Stroke="Transparent" BackgroundColor="{Binding BackgroundColor}" HeightRequest="180">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnCategoryTapped" CommandParameter="{Binding Name}" />
+                            </Border.GestureRecognizers>
+                            <Grid>
+                                <Image Source="{Binding BackgroundImage}" Aspect="AspectFill" IsVisible="{Binding UseImageAsBackground}" />
+                                <Grid RowDefinitions="2*, 1*">
+                                    <Label Grid.Row="0" Text="{Binding Icon}" FontSize="40" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding ShowIcon}" />
+                                    <BoxView Grid.Row="1" Color="#66000000" />
+                                    <Label Grid.Row="1" Text="{Binding Name}" TextColor="White" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" />
+                                </Grid>
+
+                                <Label Text="📌" FontSize="14" IsVisible="{Binding IsPinned}" HorizontalOptions="Start" VerticalOptions="Start" Margin="8"/>
+
+                                <Border HeightRequest="28" WidthRequest="28" StrokeShape="RoundRectangle 14" BackgroundColor="#66000000" Stroke="Transparent"
+                                        HorizontalOptions="End" VerticalOptions="Start" Margin="8">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnBookmarkOptionsClicked" CommandParameter="{Binding Name}" />
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout Spacing="2" HorizontalOptions="Center" VerticalOptions="Center">
+                                        <Ellipse Fill="White" WidthRequest="3" HeightRequest="3" />
+                                        <Ellipse Fill="White" WidthRequest="3" HeightRequest="3" />
+                                        <Ellipse Fill="White" WidthRequest="3" HeightRequest="3" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <Button Grid.Row="2" 
+                Text="Vytvořit záložku" 
+                Clicked="OnCreateBookmarkClicked"
+                Margin="15,10,15,15"
+                Padding="15"
+                CornerRadius="10"
+                BackgroundColor="#2196F3"
+                TextColor="White"
+                FontAttributes="Bold" />
+        </Grid>
+
+        <!-- OVERLAY: ÚPRAVA RECEPTŮ VE ZLOŽCE -->
+        <Grid x:Name="EditBookmarkOverlay" IsVisible="False" BackgroundColor="#99000000">
+            <Border VerticalOptions="Center" HorizontalOptions="Center" WidthRequest="320" MaximumHeightRequest="500" Padding="20" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}" StrokeShape="RoundRectangle 15">
+                <Grid RowDefinitions="Auto, *, Auto" RowSpacing="15">
+                    <Label Grid.Row="0" x:Name="EditBookmarkTitleLabel" Text="Upravit záložku" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center"/>
+
+                    <CollectionView Grid.Row="1" x:Name="BookmarkRecipesSelectionLayout" SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="bookmarks:BookmarkedRecipeSelectionModel">
+                                <Grid ColumnDefinitions="Auto, *" Padding="0,8">
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsInBookmark}" CheckedChanged="OnBookmarkRecipeCheckedChanged" />
+                                    <Label Grid.Column="1" Text="{Binding RecipeName}" VerticalOptions="Center" FontSize="16" Margin="10,0,0,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                        <CollectionView.EmptyView>
+                            <Label Text="Zatím nemáš žádné recepty." TextColor="Gray" HorizontalOptions="Center" Margin="0,20"/>
+                        </CollectionView.EmptyView>
+                    </CollectionView>
+
+                    <Button Grid.Row="2" Text="Hotovo" Clicked="OnCloseEditBookmarkOverlayClicked" BackgroundColor="#2196F3" TextColor="White" CornerRadius="10" Padding="15" FontAttributes="Bold"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- OVERLAY: UPRAVIT POŘADÍ ZÁLOŽEK -->
+        <Grid x:Name="ReorderOverlay" IsVisible="False" BackgroundColor="#99000000">
+            <Border VerticalOptions="Center" HorizontalOptions="Center" WidthRequest="320" MaximumHeightRequest="500" Padding="20" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}" StrokeShape="RoundRectangle 15">
+                <Grid RowDefinitions="Auto, *, Auto" RowSpacing="15">
+                    <Label Grid.Row="0" Text="Upravit pořadí záložek" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center"/>
+
+                    <CollectionView Grid.Row="1" x:Name="ReorderCollectionView" SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="bookmarks:BookmarkReorderItem">
+                                <Grid ColumnDefinitions="Auto, *, Auto, Auto" Padding="0,8" ColumnSpacing="8">
+                                    <Label Grid.Column="0" Text="⠿" FontSize="20" TextColor="Gray" VerticalOptions="Center"/>
+                                    <Label Grid.Column="1" Text="{Binding Name}" VerticalOptions="Center" FontSize="15"/>
+                                    <Button Grid.Column="2" Text="▲" FontSize="12" WidthRequest="36" HeightRequest="36" Padding="0" 
+                                            Clicked="OnMoveBookmarkUpClicked" CommandParameter="{Binding Name}"/>
+                                    <Button Grid.Column="3" Text="▼" FontSize="12" WidthRequest="36" HeightRequest="36" Padding="0" 
+                                            Clicked="OnMoveBookmarkDownClicked" CommandParameter="{Binding Name}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <Button Grid.Row="2" Text="Uložit pořadí" Clicked="OnSaveReorderClicked" BackgroundColor="#2196F3" TextColor="White" CornerRadius="10" Padding="15" FontAttributes="Bold"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</ContentPage>

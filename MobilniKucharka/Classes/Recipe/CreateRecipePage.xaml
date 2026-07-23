@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MobilniKucharka.Classes.Recipe.CreateRecipePage"
+             Title="Nový recept"
+             Unloaded="OnPageUnloaded">
+
+    <Grid>
+        <ScrollView>
+            <VerticalStackLayout Padding="20" Spacing="15">
+
+                <!-- OBRÁZEK Z GALERIE -->
+                <Label Text="Obrázek receptu" FontAttributes="Bold" FontSize="16"/>
+                <VerticalStackLayout Spacing="10">
+                    <Image x:Name="RecipeImagePreview" HeightRequest="200" Aspect="AspectFill" IsVisible="False" BackgroundColor="LightGray"/>
+                    <Button Text="📷 Vybrat z galerie" Clicked="OnSelectImageLocal" BackgroundColor="#2196F3" TextColor="White"/>
+                </VerticalStackLayout>
+
+                <!-- NÁZEV RECEPTU -->
+                <VerticalStackLayout Spacing="5" Margin="0,0,0,15">
+                    <Label Text="Název receptu" FontAttributes="Bold" FontSize="16" />
+                    <Entry x:Name="EntryTitle" Placeholder="Např. Babiččiny palačinky" ReturnType="Next" />
+                </VerticalStackLayout>
+
+                <!-- POPIS RECEPTU -->
+                <Label Text="Popis receptu (volitelný)" FontAttributes="Bold" FontSize="16"/>
+                <Editor x:Name="DescriptionEditor" Placeholder="Napiš krátký úvod k receptu..." AutoSize="TextChanges" TextChanged="OnFieldChanged" />
+
+                <!-- INGREDIENCE -->
+                <Label Text="Ingredience" FontAttributes="Bold" FontSize="16"/>
+                <VerticalStackLayout x:Name="IngredientsContainer" Spacing="8" />
+                <Button Text="➕ Přidat ingredienci" Clicked="OnAddIngredientFieldClicked" 
+                        BackgroundColor="Gray" TextColor="White" HorizontalOptions="Start"/>
+
+                <!-- CENA -->
+                <VerticalStackLayout Spacing="5" Margin="0,0,0,15">
+                    <Label Text="Odhadovaná cena nákupu v Kč (volitelné)" FontAttributes="Bold" FontSize="16" />
+                    <Entry x:Name="EntryManualCost" Placeholder="Např. 120" Keyboard="Numeric" TextChanged="OnManualCostTextChanged" />
+                </VerticalStackLayout>
+
+                <!-- POMŮCKY A TAGY -->
+                <Label Text="Potřebné pomůcky a Tagy" FontAttributes="Bold" FontSize="16"/>
+                <FlexLayout x:Name="TagsFlexLayout" Wrap="Wrap" Direction="Row" AlignItems="Center" JustifyContent="Start" Margin="0,5" />
+
+                <Grid ColumnDefinitions="*, Auto">
+                    <Entry x:Name="NewTagEntry" Placeholder="Vytvořit nový tag (např. Metla)" />
+                    <Button Grid.Column="1" Text="Přidat Tag" Clicked="OnCreateTagClicked" Margin="5,0,0,0" BackgroundColor="#2196F3" TextColor="White"/>
+                </Grid>
+
+                <!-- POSTUP -->
+                <Label Text="Postup přípravy" FontAttributes="Bold" FontSize="16"/>
+                <VerticalStackLayout x:Name="StepsContainer" Spacing="8" />
+                <Button Text="➕ Přidat krok postupu" Clicked="OnAddStepFieldClicked" 
+                        BackgroundColor="Gray" TextColor="White" HorizontalOptions="Start"/>
+
+                <!-- RATING (SLIDER) -->
+                <Label Text="Tvoje hodnocení" FontAttributes="Bold" FontSize="16"/>
+                <VerticalStackLayout Spacing="5" HorizontalOptions="Center">
+                    <HorizontalStackLayout x:Name="StarsHost" Spacing="2" HorizontalOptions="Center" />
+                    <Label x:Name="RatingTextLabel" Text="Hodnocení: 0.0 / 5" HorizontalOptions="Center" FontAttributes="Bold"/>
+                    <Slider x:Name="RatingSlider" Minimum="0" Maximum="5" Value="0" ValueChanged="OnRatingValueChanged" WidthRequest="250"/>
+                </VerticalStackLayout>
+
+                <!-- ULOŽENÍ -->
+                <Button Text="Uložit recept" Clicked="OnSaveRecipeClicked" HeightRequest="55" Margin="0,20,0,0" BackgroundColor="#4CAF50" TextColor="White" FontAttributes="Bold"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Custom překryvný dialog pro smazání -->
+        <Grid x:Name="DeleteOverlay" IsVisible="False" BackgroundColor="#A0000000">
+            <Border BackgroundColor="{AppThemeBinding Light=White, Dark=#252525}" StrokeShape="RoundRectangle 12" VerticalOptions="Center" HorizontalOptions="Center" WidthRequest="320" Padding="20">
+                <VerticalStackLayout Spacing="20">
+                    <Label Text="Chystáš se smazat tento recept, opravdu to chceš udělat?" TextColor="Red" FontAttributes="Bold" FontSize="16" HorizontalTextAlignment="Center"/>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="15">
+                        <Button Grid.Column="0" Text="Zpět" BackgroundColor="Gray" TextColor="White" Clicked="OnCancelDeleteClicked"/>
+                        <Button Grid.Column="1" Text="Ano" BackgroundColor="Red" TextColor="White" FontAttributes="Bold" Clicked="OnConfirmDeleteClicked"/>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+    </Grid>
+</ContentPage>
