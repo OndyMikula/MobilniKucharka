@@ -34,6 +34,28 @@ jobs:
             echo "exists=false" >> $env:GITHUB_OUTPUT
           }
 
+      - name: Generate changelog from commits
+        if: steps.check.outputs.exists == 'false'
+        shell: pwsh
+        run: |
+          $previousTag = git describe --tags --abbrev=0 2>$null
+          if ($LASTEXITCODE -ne 0 -or -not $previousTag) {
+            $commits = git log --pretty=format:"%H|%s"
+          } else {
+            $commits = git log "$previousTag..HEAD" --pretty=format:"%H|%s"
+          }
+
+          $lines = @()
+          foreach ($line in $commits) {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            $idx = $line.IndexOf('|')
+            $hash = $line.Substring(0, $idx)
+            $message = $line.Substring($idx + 1)
+            $lines += "- [$message](https://github.com/OndyMikula/MobilniKucharka/commit/$hash)"
+          }
+
+          Set-Content -Path "CHANGELOG_BODY.md" -Value ($lines -join "`n") -Encoding UTF8
+
       - name: Setup .NET
         if: steps.check.outputs.exists == 'false'
         uses: actions/setup-dotnet@v4
@@ -85,5 +107,5 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
-          generate_release_notes: true
+          body_path: CHANGELOG_BODY.md
           files: MobilniKucharka/bin/Release/net9.0-android/*Signed.apk
