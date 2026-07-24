@@ -447,7 +447,7 @@ namespace MobilniKucharka.Services
                         ProductId = product.Id,
                         Name = currentLang == "cs" ? product.Name_CS : product.Name_EN,
                         AmountText = $"{totalAmount:G29} {product.Unit}",
-                        CostText = totalCost > 0 ? $"{totalCost:N0} Kč" : "Zdarma/Doma"
+                        CostText = totalCost > 0 ? $"{totalCost:N0} Kč" : "? Kč"
                     });
                 }
 
@@ -757,6 +757,7 @@ namespace MobilniKucharka.Services
     {
         public Recipe Recipe { get; set; } = null!;
         public double CalculatedCost { get; set; }
+        public string CostDisplayText => CalculatedCost > 0 ? $"Cena nákupu: {CalculatedCost:N0} Kč" : "Cena nákupu: ? Kč";
         public bool IsWithinBudget { get; set; }
         public string CostColor => IsWithinBudget ? "#4CAF50" : "#F44336";
         public string BudgetStatusText => IsWithinBudget ? "Vejde se do rozpočtu!" : "Nad denní limit";

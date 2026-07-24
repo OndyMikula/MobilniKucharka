@@ -75,19 +75,27 @@ public partial class RecipeDetailPage : ContentPage
         // Recept bez napojení na LocalProduct katalog (vlastní recept, MealDB, Spoonacular) -> zobrazíme aspoň napsaný text
         if (ingredients.Count == 0 && !string.IsNullOrWhiteSpace(recipe.IngredientsRaw))
         {
-            ingredients = [.. recipe.IngredientsRaw
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                .Select(line =>
+            var rawLines = recipe.IngredientsRaw.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            ingredients = [];
+
+            foreach (var line in rawLines)
+            {
+                var parts = line.Split('|');
+                string name = parts.ElementAtOrDefault(0)?.Trim() ?? "";
+                string amount = parts.ElementAtOrDefault(1)?.Trim() ?? "";
+
+                if (string.IsNullOrWhiteSpace(name)) continue;
+
+                var product = await App.Database.GetOrCreateLocalProductByNameAsync(name);
+
+                ingredients.Add(new DisplayIngredient
                 {
-                    var parts = line.Split('|');
-                    return new DisplayIngredient
-                    {
-                        Name = parts.ElementAtOrDefault(0)?.Trim() ?? "",
-                        AmountText = parts.ElementAtOrDefault(1)?.Trim() ?? "",
-                        CostText = "Cena neznámá"
-                    };
-                })
-                .Where(i => !string.IsNullOrWhiteSpace(i.Name))];
+                    ProductId = product.Id,
+                    Name = name,
+                    AmountText = amount,
+                    CostText = product.EffectivePrice > 0 ? $"{product.EffectivePrice:N2} Kč/j." : "? Kč"
+                });
+            }
         }
 
         BindableLayout.SetItemsSource(IngredientsLayout, ingredients);
@@ -113,6 +121,12 @@ public partial class RecipeDetailPage : ContentPage
     {
         if (sender is not Grid grid || grid.BindingContext is not DisplayIngredient ingredient) return;
 
+        if (ingredient.ProductId <= 0)
+        {
+            await DisplayAlert("Chyba", "Tuto surovinu se nepodařilo přiřadit k produktu. Zkus recept znovu otevřít.", "OK");
+            return;
+        }
+
         string action = await DisplayActionSheet(ingredient.Name, "Zrušit", null,
             "Zadat vlastní cenu", "Propojit s existující surovinou");
 
@@ -126,9 +140,18 @@ public partial class RecipeDetailPage : ContentPage
             if (result == null) return;
 
             if (string.IsNullOrWhiteSpace(result))
+            {
                 await App.Database.ClearManualPriceAsync(ingredient.ProductId);
+            }
             else if (double.TryParse(result.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture, out var price))
+            {
                 await App.Database.SetManualPriceAsync(ingredient.ProductId, price);
+            }
+            else
+            {
+                await DisplayAlert("Neplatná hodnota", $"\"{result}\" se nepodařilo rozpoznat jako číslo. Zkus to znovu, jen s číslicemi (např. 25 nebo 25.50).", "OK");
+                return;
+            }
 
             LoadIngredientsAndSteps();
         }

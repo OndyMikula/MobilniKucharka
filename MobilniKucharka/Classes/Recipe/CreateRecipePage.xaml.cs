@@ -15,7 +15,7 @@ namespace MobilniKucharka.Classes.Recipe
         private readonly NutritionixService _nutritionixService = new();
 
         private readonly HashSet<string> _selectedTags = [];
-        private readonly Dictionary<string, Button> _tagButtons = [];
+        private readonly Dictionary<string, Border> _tagButtons = [];
 
         private double _cachedProtein = 0;
         private double _cachedCarbs = 0;
@@ -108,9 +108,10 @@ namespace MobilniKucharka.Classes.Recipe
             _selectedTags.Clear();
             foreach (var tag in recipe.Equipment)
             {
-                if (_tagButtons.TryGetValue(tag, out var existingBtn))
+                if (_tagButtons.TryGetValue(tag, out var existingChip))
                 {
-                    SetTagButtonSelected(existingBtn, true);
+                    var label = existingChip.Content as Label;
+                    SetTagButtonSelected(existingChip, label, true);
                     _selectedTags.Add(tag);
                 }
                 else
@@ -133,62 +134,70 @@ namespace MobilniKucharka.Classes.Recipe
 
         private void AddTagButton(string tagName, bool isSelected = false)
         {
-            var btn = new Button
+            var label = new Label
             {
                 Text = tagName,
-                BackgroundColor = Colors.Transparent,
-                BorderColor = Color.FromArgb("#2196F3"),
-                BorderWidth = 1,
+                FontSize = 12,
                 TextColor = Color.FromArgb("#2196F3"),
-                CornerRadius = 15,
-                HeightRequest = 35,
-                Padding = new Thickness(15, 0),
-                Margin = new Thickness(0, 0, 8, 8),
-                FontSize = 12
+                VerticalOptions = LayoutOptions.Center,
+                HorizontalOptions = LayoutOptions.Center
             };
 
-            btn.Clicked += (s, e) =>
+            var chip = new Border
             {
-                ToggleTagSelection(tagName, btn);
+                BackgroundColor = Colors.Transparent,
+                Stroke = Color.FromArgb("#2196F3"),
+                StrokeThickness = 1,
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 15 },
+                Padding = new Thickness(15, 6),
+                Margin = new Thickness(0, 0, 8, 8),
+                Content = label
+            };
+
+            var tap = new TapGestureRecognizer();
+            tap.Tapped += (s, e) =>
+            {
+                ToggleTagSelection(tagName, chip, label);
                 _ = TriggerAutoSaveAsync();
             };
+            chip.GestureRecognizers.Add(tap);
 
-            _tagButtons[tagName] = btn;
-            TagsFlexLayout.Children.Add(btn);
+            _tagButtons[tagName] = chip;
+            TagsFlexLayout.Children.Add(chip);
 
             if (isSelected)
             {
-                SetTagButtonSelected(btn, true);
+                SetTagButtonSelected(chip, label, true);
                 _selectedTags.Add(tagName);
             }
         }
 
-        private void ToggleTagSelection(string tagName, Button btn)
+        private void ToggleTagSelection(string tagName, Border chip, Label label)
         {
             if (_selectedTags.Remove(tagName))
             {
-                SetTagButtonSelected(btn, false);
+                SetTagButtonSelected(chip, label, false);
             }
             else
             {
                 _selectedTags.Add(tagName);
-                SetTagButtonSelected(btn, true);
+                SetTagButtonSelected(chip, label, true);
             }
         }
 
-        private static void SetTagButtonSelected(Button btn, bool selected)
+        private static void SetTagButtonSelected(Border chip, Label label, bool selected)
         {
             if (selected)
             {
-                btn.BackgroundColor = Color.FromArgb("#2196F3");
-                btn.TextColor = Colors.White;
-                btn.BorderWidth = 0;
+                chip.BackgroundColor = Color.FromArgb("#2196F3");
+                label.TextColor = Colors.White;
+                chip.StrokeThickness = 0;
             }
             else
             {
-                btn.BackgroundColor = Colors.Transparent;
-                btn.TextColor = Color.FromArgb("#2196F3");
-                btn.BorderWidth = 1;
+                chip.BackgroundColor = Colors.Transparent;
+                label.TextColor = Color.FromArgb("#2196F3");
+                chip.StrokeThickness = 1;
             }
         }
 

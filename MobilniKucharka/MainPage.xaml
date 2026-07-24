@@ -67,8 +67,8 @@
                                        Grid.Column="1" Grid.Row="1" FontSize="12" TextColor="Gray" Margin="10,5,10,0" 
                                        IsVisible="{Binding Recipe.HasPrepTime}"/>
                                 <VerticalStackLayout Grid.Column="1" Grid.Row="2" Margin="10,10,10,10" Spacing="2">
-                                    <Label Text="{Binding CalculatedCost, StringFormat='Cena nákupu: {0} Kč'}" 
-                                           TextColor="{Binding CostColor}" FontAttributes="Bold" FontSize="16" />
+                                    <Label Text="{Binding CostDisplayText}" 
+                                        TextColor="{Binding CostColor}" FontAttributes="Bold" FontSize="16" />
                                     <Label Text="{Binding BudgetStatusText}" 
                                            TextColor="{Binding CostColor}" FontSize="12" />
                                 </VerticalStackLayout>
