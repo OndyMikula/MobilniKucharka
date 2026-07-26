@@ -110,7 +110,7 @@ namespace MobilniKucharka.Classes.Recipe
             {
                 if (_tagButtons.TryGetValue(tag, out var existingChip))
                 {
-                    var label = existingChip.Content as Label;
+                    var label = (Label)existingChip.Content!;
                     SetTagButtonSelected(existingChip, label, true);
                     _selectedTags.Add(tag);
                 }
@@ -270,14 +270,45 @@ namespace MobilniKucharka.Classes.Recipe
 
         private void AddStepRow(string initialText = "")
         {
-            var grid = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) } };
+            var grid = new Grid
+            {
+                ColumnDefinitions =
+        {
+            new ColumnDefinition(GridLength.Auto),
+            new ColumnDefinition(GridLength.Star),
+            new ColumnDefinition(GridLength.Auto),
+            new ColumnDefinition(GridLength.Auto)
+        }
+            };
+
             var emoji = new Label { Text = "👉", VerticalOptions = LayoutOptions.Center, Margin = new Thickness(0, 0, 5, 0) };
             var stepEntry = new Entry { Placeholder = "Popiš tento krok...", Text = initialText };
             stepEntry.TextChanged += OnFieldChanged;
 
+            var upButton = new Button { Text = "▲", FontSize = 12, WidthRequest = 36, HeightRequest = 36, Padding = 0, Margin = new Thickness(4, 0, 0, 0) };
+            var downButton = new Button { Text = "▼", FontSize = 12, WidthRequest = 36, HeightRequest = 36, Padding = 0, Margin = new Thickness(4, 0, 0, 0) };
+
+            upButton.Clicked += (s, e) => MoveStepRow(grid, -1);
+            downButton.Clicked += (s, e) => MoveStepRow(grid, 1);
+
             grid.Add(emoji, 0);
             grid.Add(stepEntry, 1);
+            grid.Add(upButton, 2);
+            grid.Add(downButton, 3);
             StepsContainer.Add(grid);
+        }
+
+        private void MoveStepRow(Grid row, int direction)
+        {
+            int index = StepsContainer.Children.IndexOf(row);
+            int newIndex = index + direction;
+
+            if (newIndex < 0 || newIndex >= StepsContainer.Children.Count) return;
+
+            StepsContainer.Children.RemoveAt(index);
+            StepsContainer.Children.Insert(newIndex, row);
+
+            _ = TriggerAutoSaveAsync();
         }
 
         private void OnAddIngredientFieldClicked(object sender, EventArgs e) => AddIngredientRow();

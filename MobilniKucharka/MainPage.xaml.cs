@@ -24,6 +24,7 @@ namespace MobilniKucharka
             await LoadRecipesDataAsync();
             UpdateSummaryUI();
             ResetDatabaseButton.IsVisible = Preferences.Default.Get("IsDeveloperMode", false);
+            RepairStepsButton.IsVisible = Preferences.Default.Get("IsDeveloperMode", false);
             _ = CheckForUpdatesAsync();
 
             // Levný "nudge" pro překreslení - žádné čekání, žádný přepočet layoutu.
@@ -180,6 +181,12 @@ namespace MobilniKucharka
             await _budgetService.ResetDatabaseAsync();
             await LoadRecipesDataAsync();
             await DisplayAlert("Hotovo", "Databáze byla resetována na testovací data.", "OK");
+        }
+
+        private async void OnRepairStepsClicked(object sender, EventArgs e)
+        {
+            int fixedCount = await _budgetService.RepairAllRecipeStepsAsync();
+            await DisplayAlert("Hotovo", $"Opraveno receptů: {fixedCount}", "OK");
         }
     }
 }

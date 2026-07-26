@@ -16,6 +16,7 @@ namespace MobilniKucharka.Classes
         // Uživatel může cenu přebít vlastní hodnotou (např. z konkrétního obchodu)
         public bool HasManualPrice { get; set; }
         public double ManualPrice { get; set; }
+        public double TypicalUnitWeightGrams { get; set; } = 0;
 
         public string Unit { get; set; } = "g";
 

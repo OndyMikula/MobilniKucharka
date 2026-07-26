@@ -58,6 +58,7 @@ namespace MobilniKucharka.Services.Api
                     Name_EN = data.GetProperty("title").GetString() ?? "",
                     PrepTime = data.GetProperty("readyInMinutes").GetInt32(),
                     ImageUrl = data.GetProperty("image").GetString() ?? "",
+                    SourceUrl = data.TryGetProperty("sourceUrl", out var srcProp) ? srcProp.GetString() ?? "" : "",
 
                     // Nutriční hodnoty vytažené z analýzy Spoonacularu
                     Protein = ExtractNutrient(data, "Protein"),

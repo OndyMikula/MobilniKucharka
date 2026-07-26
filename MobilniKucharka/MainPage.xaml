@@ -17,7 +17,7 @@
                     FontSize="24" Clicked="OnSettingsToolbarClicked" Padding="0" VerticalOptions="Center"/>
         </Grid>
 
-        <Grid Grid.Row="1" RowDefinitions="Auto, Auto, Auto, *">
+        <Grid Grid.Row="1" RowDefinitions="Auto, Auto, Auto, Auto, *">
             <Border Grid.Row="0" Margin="15,5,15,5" Padding="12,8" StrokeShape="RoundRectangle 10" Stroke="Transparent" BackgroundColor="#2196F3">
                 <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
                     <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
@@ -49,10 +49,14 @@
 
             <Button Grid.Row="2" x:Name="ResetDatabaseButton" Text="🔄 Resetovat testovací databázi" Clicked="OnResetDatabaseClicked"
                     FontSize="11" TextColor="Gray" BackgroundColor="Transparent" 
+                    HorizontalOptions="Center" Padding="0" HeightRequest="24" Margin="0,0,0,0"
+                    IsVisible="False"/>
+            <Button Grid.Row="3" x:Name="RepairStepsButton" Text="🔧 Opravit formátování kroků" Clicked="OnRepairStepsClicked"
+                    FontSize="11" TextColor="Gray" BackgroundColor="Transparent" 
                     HorizontalOptions="Center" Padding="0" HeightRequest="24" Margin="0,0,0,5"
                     IsVisible="False"/>
 
-            <CollectionView x:Name="RecipesCollectionView" Grid.Row="3">
+            <CollectionView x:Name="RecipesCollectionView" Grid.Row="4">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="services:RecipeWithCost">
                         <Border Margin="15,5,15,10" Padding="0" StrokeShape="RoundRectangle 12" Stroke="LightGray" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
