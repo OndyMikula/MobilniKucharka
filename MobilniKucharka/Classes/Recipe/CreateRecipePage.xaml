@@ -39,12 +39,12 @@
                 </VerticalStackLayout>
 
                 <!-- POMŮCKY A TAGY -->
-                <Label Text="Potřebné pomůcky a Tagy" FontAttributes="Bold" FontSize="16"/>
+                <Label Text="Potřebné pomůcky" FontAttributes="Bold" FontSize="16"/>
                 <FlexLayout x:Name="TagsFlexLayout" Wrap="Wrap" Direction="Row" AlignItems="Center" JustifyContent="Start" Margin="0,5" />
 
                 <Grid ColumnDefinitions="*, Auto">
-                    <Entry x:Name="NewTagEntry" Placeholder="Vytvořit nový tag (např. Metla)" />
-                    <Button Grid.Column="1" Text="Přidat Tag" Clicked="OnCreateTagClicked" Margin="5,0,0,0" BackgroundColor="#2196F3" TextColor="White"/>
+                    <Entry x:Name="NewTagEntry" Placeholder="Vytvořit novou pomůcku"/>
+                    <Button Grid.Column="1" Text="Přidat pomůcku" Clicked="OnCreateTagClicked" Margin="5,0,0,0" BackgroundColor="#2196F3" TextColor="White"/>
                 </Grid>
 
                 <!-- POSTUP -->

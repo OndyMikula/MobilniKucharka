@@ -4,7 +4,7 @@ namespace MobilniKucharka.Services
 {
     public class DataBackupService
     {
-        public async Task<string> ExportAsync(IProgress<double>? progress = null)
+        public static async Task<string> ExportAsync(IProgress<double>? progress = null)
         {
             string sourceDir = FileSystem.AppDataDirectory;
             string exportPath = Path.Combine(FileSystem.CacheDirectory, $"MobilniKucharka_zaloha_{DateTime.Now:yyyyMMdd_HHmmss}.zip");
@@ -38,7 +38,7 @@ namespace MobilniKucharka.Services
             return exportPath;
         }
 
-        public async Task ImportAsync(string zipFilePath, IProgress<double>? progress = null)
+        public static async Task ImportAsync(string zipFilePath, IProgress<double>? progress = null)
         {
             string targetDir = FileSystem.AppDataDirectory;
 

@@ -120,7 +120,7 @@ public partial class SettingsPage : ContentPage
 
         try
         {
-            string zipPath = await _backupService.ExportAsync(progress);
+            string zipPath = await DataBackupService.ExportAsync(progress);
             BackupProgressOverlay.IsVisible = false;
 
             await Share.Default.RequestAsync(new ShareFileRequest
@@ -155,7 +155,7 @@ public partial class SettingsPage : ContentPage
                 BackupProgressPercentLabel.Text = $"{value:P0}";
             });
 
-            await _backupService.ImportAsync(result.FullPath, progress);
+            await DataBackupService.ImportAsync(result.FullPath, progress);
 
             BackupProgressOverlay.IsVisible = false;
             await DisplayAlert("Hotovo", "Data byla načtena. Aplikace se nyní zavře — otevři ji prosím znovu ručně.", "OK");
@@ -181,7 +181,7 @@ public partial class SettingsPage : ContentPage
 
         try
         {
-            string zipPath = await _backupService.ExportAsync(progress);
+            string zipPath = await DataBackupService.ExportAsync(progress);
             BackupProgressOverlay.IsVisible = false;
 
             using var stream = File.OpenRead(zipPath);
@@ -194,6 +194,27 @@ public partial class SettingsPage : ContentPage
         {
             BackupProgressOverlay.IsVisible = false;
             await DisplayAlert("Chyba", $"Uložení se nepodařilo: {ex.Message}", "OK");
+        }
+    }
+
+    private async void OnImportRecipeClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            var result = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Vyber soubor receptu" });
+            if (result == null) return;
+
+            var shareService = new RecipeShareService();
+            var recipe = await shareService.ImportRecipeAsync(result.FullPath);
+
+            int newId = await App.Database.ImportSharedRecipeAsync(recipe);
+            await App.Database.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
+
+            await DisplayAlert("Hotovo", $"Recept \"{recipe.Name_CS}\" byl naimportován.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Chyba", $"Import se nepodařil: {ex.Message}", "OK");
         }
     }
 }

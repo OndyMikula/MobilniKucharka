@@ -35,6 +35,12 @@
                 </VerticalStackLayout>
 
                 <VerticalStackLayout Spacing="10" Margin="0,20,0,0">
+                    <Label Text="Sdílené recepty" FontSize="18" FontAttributes="Bold"/>
+                    <Label Text="Naimportuje recept, který ti poslal někdo jiný ze svého zařízení." FontSize="12" TextColor="Gray"/>
+                    <Button Text="Importovat recept ze souboru" Clicked="OnImportRecipeClicked" BackgroundColor="#9C27B0" TextColor="White" CornerRadius="10"/>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="10" Margin="0,20,0,0">
                     <Label Text="Záloha dat" FontSize="18" FontAttributes="Bold"/>
                     <Label Text="Exportuje všechny recepty, záložky a nastavení do jednoho souboru, který můžeš přenést na jiné zařízení." FontSize="12" TextColor="Gray"/>
                     <Button Text="Exportovat data" Clicked="OnExportDataClicked" BackgroundColor="#2196F3" TextColor="White" CornerRadius="10"/>

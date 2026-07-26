@@ -1,8 +1,9 @@
-﻿namespace MobilniKucharka.Services
+using System.Text.RegularExpressions;
+
+namespace MobilniKucharka.Services
 {
-    public static class NutritionEstimationService
+    public static partial class NutritionEstimationService
     {
-        // Hodnoty na 100 g / 100 ml (hrubý odhad z veřejně známých nutričních tabulek)
         private static readonly Dictionary<string, (double Protein, double Carbs, double Fat, double Sugar)> NutritionPer100 = new()
         {
             ["kuřecí"] = (23, 0, 3, 0),
@@ -82,12 +83,12 @@
         {
             double totalProtein = 0, totalCarbs = 0, totalFat = 0, totalSugar = 0;
 
-            foreach (var ing in ingredients)
+            foreach (var (Name, Amount) in ingredients)
             {
-                var match = FindNutritionMatch(ing.Name);
-                if (match == null) continue; // neznámá ingredience -> raději přeskočit než hádat naslepo
+                var match = FindNutritionMatch(Name);
+                if (match == null) continue;
 
-                double grams = ParseAmountToGrams(ing.Amount);
+                double grams = ParseAmountToGrams(Amount);
                 double factor = grams / 100.0;
 
                 totalProtein += match.Value.Protein * factor;
@@ -113,12 +114,15 @@
             return bestKey != null ? NutritionPer100[bestKey] : null;
         }
 
-        private static double ParseAmountToGrams(string amountText)
+        [GeneratedRegex(@"^(\d+(?:[.,]\d+)?)")]
+        private static partial Regex LeadingNumberRegexGen();
+
+        public static double ParseAmountToGrams(string amountText, double defaultPieceWeight = 60)
         {
-            if (string.IsNullOrWhiteSpace(amountText)) return 100; // neznámé množství -> střední odhad jedné porce
+            if (string.IsNullOrWhiteSpace(amountText)) return 100;
 
             string text = amountText.Trim().ToLowerInvariant();
-            var match = System.Text.RegularExpressions.Regex.Match(text, @"^(\d+(?:[.,]\d+)?)");
+            var match = LeadingNumberRegexGen().Match(text);
 
             double quantity = 1;
             string rest = text;
@@ -142,9 +146,16 @@
             if (rest.Contains("medium") || rest.Contains("střední")) return quantity * 100;
             if (rest.Contains("large") || rest.Contains("velký") || rest.Contains("velká")) return quantity * 150;
 
-            if (match.Success && string.IsNullOrWhiteSpace(rest)) return quantity * 60; // holé číslo (ks) -> hrubý odhad na kus
+            if (match.Success && string.IsNullOrWhiteSpace(rest)) return quantity * defaultPieceWeight;
 
-            return 15; // zcela neurčité ("topping", "to taste"...) -> malý nominální odhad
+            return 15;
+        }
+
+        public static double? TryParseLeadingQuantity(string amountText, double defaultPieceWeight = 60)
+        {
+            if (string.IsNullOrWhiteSpace(amountText)) return null;
+            if (!amountText.Any(char.IsDigit)) return null;
+            return ParseAmountToGrams(amountText, defaultPieceWeight);
         }
     }
 }

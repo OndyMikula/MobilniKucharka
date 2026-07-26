@@ -95,7 +95,8 @@ namespace MobilniKucharka.Services.Api
                     Name = meal.GetProperty("strMeal").GetString() ?? "",
                     Category = meal.GetProperty("strCategory").GetString() ?? "",
                     Instructions = meal.GetProperty("strInstructions").GetString() ?? "",
-                    ImageUrl = meal.GetProperty("strMealThumb").GetString() ?? ""
+                    ImageUrl = meal.GetProperty("strMealThumb").GetString() ?? "",
+                    SourceUrl = meal.TryGetProperty("strSource", out var srcProp) ? srcProp.GetString() ?? "" : ""
                 };
 
                 var rawIngredients = ExtractIngredients(meal);
@@ -167,6 +168,7 @@ namespace MobilniKucharka.Services.Api
         public string Category { get; set; } = string.Empty;
         public string Instructions { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
+        public string SourceUrl { get; set; } = string.Empty;
         public List<MealDbIngredient> Ingredients { get; set; } = [];
 
         public double Protein { get; set; }

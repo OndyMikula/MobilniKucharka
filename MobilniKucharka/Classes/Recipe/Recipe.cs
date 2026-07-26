@@ -41,6 +41,7 @@ namespace MobilniKucharka.Classes.Recipe
         public string EquipmentJson { get; set; } = "[]";
         public string DietaryFlagsJson { get; set; } = "[]";
 
+        public string SourceUrl { get; set; } = string.Empty;
         public string ExternalSourceId { get; set; } = string.Empty;
 
         // PRO PRÁCI V KÓDU: Automatická serializace/deserializace
