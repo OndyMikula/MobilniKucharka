@@ -84,6 +84,7 @@ namespace MobilniKucharka.Services
                 Carbs = 85,
                 Fat = 5,
                 Sugar = 11,
+                ServingSize = 1,
                 ImageUrl = "https://images.unsplash.com/photo-1546549032-9571cd6b27df?w=500",
                 StepsJson_CS = JsonSerializer.Serialize(new List<string> { "Dej vařit vodu na špagety.", "Osol vodu a uvař špagety al dente.", "Ohřej rajčatovou omáčku a promíchej ji s těstovinami." }),
                 StepsJson_EN = JsonSerializer.Serialize(new List<string> { "Boil water for spaghetti.", "Salt the water and cook spaghetti al dente.", "Heat the tomato sauce and mix with pasta." }),
@@ -101,6 +102,7 @@ namespace MobilniKucharka.Services
                 Carbs = 2,
                 Fat = 27,
                 Sugar = 1,
+                ServingSize = 1,
                 ImageUrl = "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=500",
                 StepsJson_CS = JsonSerializer.Serialize(new List<string> { "Rozpusť na pánvi máslo.", "Rozklepni vajíčka a míchej na mírném ohni do krémova.", "Osol a ihned podávej." }),
                 StepsJson_EN = JsonSerializer.Serialize(new List<string> { "Melt butter in a pan.", "Crack the eggs and stir over low heat until creamy.", "Salt and serve immediately." }),
@@ -346,6 +348,9 @@ namespace MobilniKucharka.Services
                 int pricableCount = 0;
                 int pricedCount = 0;
 
+                int effectiveServingSize = recipe.ServingSize > 0 ? recipe.ServingSize : 4;
+                double scaleFactor = peopleCount / (double)effectiveServingSize;
+
                 foreach (var line in lines)
                 {
                     var parts = line.Split('|');
@@ -363,11 +368,12 @@ namespace MobilniKucharka.Services
                     }
 
                     double pieceWeight = product.TypicalUnitWeightGrams > 0 ? product.TypicalUnitWeightGrams : 60;
-                    double? parsedAmount = NutritionEstimationService.TryParseLeadingQuantity(amount, pieceWeight);
+                    double? parsedAmount = NutritionEstimationService.ConvertToProductUnit(amount, product.Unit, pieceWeight);
                     if (parsedAmount == null) continue;
 
                     pricableCount++;
-                    double cost = Math.Round(parsedAmount.Value * product.EffectivePrice, 0);
+                    double scaledAmount = parsedAmount.Value * scaleFactor;
+                    double cost = Math.Round(scaledAmount * product.EffectivePrice, 0);
                     total += cost;
                     if (cost > 0) pricedCount++;
                 }
@@ -723,6 +729,15 @@ namespace MobilniKucharka.Services
 
         private const string DecorativeMarkerChars = "☐☑☒□■◻◼⬜⬛•▪◦✓✔✗✘-*";
 
+        [GeneratedRegex(@"(?<=[.!?])\s+(?=[A-Z])")]
+        private static partial Regex SentenceBoundaryRegexGen();
+
+        private static List<string> SplitLongStepIntoSentences(string step)
+        {
+            var sentences = SentenceBoundaryRegexGen().Split(step);
+            return [.. sentences.Select(s => s.Trim()).Where(s => !string.IsNullOrWhiteSpace(s))];
+        }
+
         private static bool IsDecorativeMarkerOnly(string line)
         {
             return line.Length > 0 && line.Length <= 4 && !line.Any(char.IsLetter);
@@ -760,6 +775,21 @@ namespace MobilniKucharka.Services
 
                 if (!string.IsNullOrWhiteSpace(withoutPrefix))
                     cleaned.Add(withoutPrefix);
+            }
+
+            if (cleaned.Count <= 2)
+            {
+                var expanded = new List<string>();
+                foreach (var step in cleaned)
+                {
+                    var sentences = SplitLongStepIntoSentences(step);
+                    if (sentences.Count > 1)
+                        expanded.AddRange(sentences);
+                    else
+                        expanded.Add(step);
+                }
+                if (expanded.Count > cleaned.Count)
+                    cleaned = expanded;
             }
 
             return cleaned;
@@ -847,6 +877,17 @@ namespace MobilniKucharka.Services
             _cachedIngredients = null;
             _isInitialized = false;
             await EnsureInitializedAsync();
+        }
+
+        public async Task UpdateRecipeServingSizeAsync(int recipeId, int servingSize)
+        {
+            await EnsureInitializedAsync();
+            var recipe = await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
+            if (recipe != null)
+            {
+                recipe.ServingSize = servingSize;
+                await _db.UpdateAsync(recipe);
+            }
         }
     }
 

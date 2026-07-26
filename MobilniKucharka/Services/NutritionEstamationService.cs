@@ -157,5 +157,40 @@ namespace MobilniKucharka.Services
             if (!amountText.Any(char.IsDigit)) return null;
             return ParseAmountToGrams(amountText, defaultPieceWeight);
         }
+
+        public static double? ConvertToProductUnit(string amountText, string productUnit, double defaultPieceWeight = 60)
+        {
+            if (string.IsNullOrWhiteSpace(amountText)) return null;
+            if (!amountText.Any(char.IsDigit)) return null;
+
+            string text = amountText.Trim().ToLowerInvariant();
+            var match = LeadingNumberRegexGen().Match(text);
+            if (!match.Success) return null;
+
+            double quantity = double.Parse(match.Value.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture);
+            string rest = text[match.Length..].Trim();
+
+            double? weightGrams = null;
+            double? volumeMl = null;
+            bool isPiece = false;
+
+            if (rest.Contains("kg")) weightGrams = quantity * 1000;
+            else if (rest.Contains('g') && !rest.Contains("gal")) weightGrams = quantity;
+            else if (rest.Contains('l') && !rest.Contains("ml")) volumeMl = quantity * 1000;
+            else if (rest.Contains("ml")) volumeMl = quantity;
+            else if (rest.Contains("tbsp") || rest.Contains("lžíce") || rest.Contains("polévkov")) volumeMl = quantity * 15;
+            else if (rest.Contains("tsp") || rest.Contains("lžička") || rest.Contains("čajov")) volumeMl = quantity * 5;
+            else if (rest.Contains("cup") || rest.Contains("hrnek") || rest.Contains("šálek")) volumeMl = quantity * 240;
+            else if (rest.Contains("ks") || rest.Contains("kus") || string.IsNullOrWhiteSpace(rest)) isPiece = true;
+            else return null;
+
+            return productUnit switch
+            {
+                "g" => weightGrams ?? volumeMl ?? (isPiece ? quantity * defaultPieceWeight : null),
+                "ml" => volumeMl ?? weightGrams ?? (isPiece ? quantity * defaultPieceWeight : null),
+                "ks" => isPiece ? quantity : null,
+                _ => weightGrams ?? volumeMl
+            };
+        }
     }
 }

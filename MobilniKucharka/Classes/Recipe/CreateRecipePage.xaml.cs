@@ -2,6 +2,7 @@
 using MobilniKucharka.Services.Api;
 using SQLite;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace MobilniKucharka.Classes.Recipe
 {
@@ -67,6 +68,7 @@ namespace MobilniKucharka.Classes.Recipe
             EntryTitle.Text = recipe.Name_CS;
             DescriptionEditor.Text = recipe.DescriptionText;
             EntryManualCost.Text = recipe.ManualCost > 0 ? recipe.ManualCost.ToString("F0") : "";
+            EntryServingSize.Text = recipe.ServingSize > 0 ? recipe.ServingSize.ToString() : "4";
 
             if (!string.IsNullOrWhiteSpace(recipe.ImageUrl))
             {
@@ -85,7 +87,8 @@ namespace MobilniKucharka.Classes.Recipe
                 foreach (var line in lines)
                 {
                     var parts = line.Split('|');
-                    AddIngredientRow(parts.ElementAtOrDefault(0) ?? "", parts.ElementAtOrDefault(1) ?? "");
+                    var (qty, unit) = SplitAmountForEditing(parts.ElementAtOrDefault(1) ?? "");
+                    AddIngredientRow(parts.ElementAtOrDefault(0) ?? "", qty, unit);
                 }
             }
             if (IngredientsContainer.Count == 0)
@@ -130,6 +133,31 @@ namespace MobilniKucharka.Classes.Recipe
             {
                 EntryManualCost.Text = filtered;
             }
+        }
+
+        [GeneratedRegex(@"^(\d+(?:[.,]\d+)?)\s*(.*)$")]
+        private static partial Regex AmountSplitRegexGen();
+
+        private static (string Quantity, string Unit) SplitAmountForEditing(string amount)
+        {
+            var match = AmountSplitRegexGen().Match(amount.Trim());
+            if (!match.Success) return (amount, "g");
+
+            string quantity = match.Groups[1].Value;
+            string unitRaw = match.Groups[2].Value.Trim().ToLowerInvariant();
+
+            string unit = unitRaw switch
+            {
+                "kg" => "kg",
+                "ml" => "ml",
+                "l" => "l",
+                var u when u.Contains("lžíce") || u.Contains("tbsp") => "lžíce",
+                var u when u.Contains("lžička") || u.Contains("tsp") => "lžička",
+                var u when u.Contains("ks") || u.Contains("kus") => "ks",
+                _ => "g"
+            };
+
+            return (quantity, unit);
         }
 
         private void AddTagButton(string tagName, bool isSelected = false)
@@ -255,16 +283,32 @@ namespace MobilniKucharka.Classes.Recipe
             _ = TriggerAutoSaveAsync();
         }
 
-        private void AddIngredientRow(string initialName = "", string initialAmount = "")
+        private static readonly string[] UnitOptions = ["g", "kg", "ml", "l", "lžíce", "lžička", "ks"];
+
+        private void AddIngredientRow(string initialName = "", string initialAmount = "", string initialUnit = "g")
         {
-            var grid = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
+            var grid = new Grid
+            {
+                ColumnDefinitions =
+        {
+            new ColumnDefinition(GridLength.Star),
+            new ColumnDefinition(GridLength.Auto),
+            new ColumnDefinition(GridLength.Auto)
+        }
+            };
+
             var nameEntry = new Entry { Placeholder = "Název ingredience", Text = initialName };
             nameEntry.TextChanged += OnFieldChanged;
-            var amountEntry = new Entry { Placeholder = "Množství (např. 100g)", WidthRequest = 150, Text = initialAmount };
+
+            var amountEntry = new Entry { Placeholder = "Množství", WidthRequest = 70, Keyboard = Keyboard.Numeric, Text = initialAmount };
             amountEntry.TextChanged += OnFieldChanged;
+
+            var unitPicker = new Picker { WidthRequest = 90, ItemsSource = UnitOptions, SelectedItem = initialUnit };
+            unitPicker.SelectedIndexChanged += (s, e) => _ = TriggerAutoSaveAsync();
 
             grid.Add(nameEntry, 0);
             grid.Add(amountEntry, 1);
+            grid.Add(unitPicker, 2);
             IngredientsContainer.Add(grid);
         }
 
@@ -320,13 +364,14 @@ namespace MobilniKucharka.Classes.Recipe
 
             foreach (var child in IngredientsContainer.Children)
             {
-                if (child is Grid grid && grid.Children.Count >= 2)
+                if (child is Grid grid && grid.Children.Count >= 3)
                 {
                     string name = (grid.Children[0] as Entry)?.Text?.Trim() ?? "";
-                    string amount = (grid.Children[1] as Entry)?.Text?.Trim() ?? "";
+                    string quantity = (grid.Children[1] as Entry)?.Text?.Trim() ?? "";
+                    string unit = (grid.Children[2] as Picker)?.SelectedItem as string ?? "g";
 
-                    if (!string.IsNullOrWhiteSpace(name))
-                        result.Add((name, amount));
+                    if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(quantity))
+                        result.Add((name, $"{quantity} {unit}"));
                 }
             }
 
@@ -391,6 +436,7 @@ namespace MobilniKucharka.Classes.Recipe
                 Category = "Vytvořené recepty",
                 Rating = _currentRating,
                 ManualCost = manualCost,
+                ServingSize = int.TryParse(EntryServingSize.Text, out var draftServings) && draftServings > 0 ? draftServings : 4,
                 DescriptionText = DescriptionEditor.Text ?? string.Empty,
                 IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}")),
                 StepsJson_CS = JsonSerializer.Serialize(stepRows),
@@ -469,6 +515,7 @@ namespace MobilniKucharka.Classes.Recipe
                     ManualCost = manualCost,
                     DescriptionText = DescriptionEditor.Text ?? string.Empty,
                     IsNutritionEstimated = _cachedIsNutritionEstimated,
+                    ServingSize = int.TryParse(EntryServingSize.Text, out var servings) && servings > 0 ? servings : 4,
                     IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}")),
                     StepsJson_CS = JsonSerializer.Serialize(stepRows),
                     EquipmentJson = JsonSerializer.Serialize(_selectedTags),

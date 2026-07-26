@@ -60,5 +60,7 @@
                 </VerticalStackLayout>
             </Border>
         </Grid>
+
+        <Label x:Name="AppVersionLabel" FontSize="11" TextColor="Gray" HorizontalOptions="Center" Margin="0,20,0,0"/>
     </Grid>
 </ContentPage>

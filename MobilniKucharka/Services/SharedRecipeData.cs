@@ -26,7 +26,7 @@ namespace MobilniKucharka.Services
 
     public class RecipeShareService
     {
-        public async Task<string> ExportRecipeAsync(Classes.Recipe.Recipe recipe)
+        public static async Task<string> ExportRecipeAsync(Classes.Recipe.Recipe recipe)
         {
             string exportPath = Path.Combine(FileSystem.CacheDirectory, $"recept_{SanitizeFileName(recipe.Name_CS)}.mkrecept");
             if (File.Exists(exportPath)) File.Delete(exportPath);
@@ -73,7 +73,7 @@ namespace MobilniKucharka.Services
             return exportPath;
         }
 
-        public async Task<Classes.Recipe.Recipe> ImportRecipeAsync(string filePath)
+        public static async Task<Classes.Recipe.Recipe> ImportRecipeAsync(string filePath)
         {
             SharedRecipeData? shared = null;
             string? photoDestPath = null;
@@ -108,7 +108,6 @@ namespace MobilniKucharka.Services
                 StepsJson_EN = shared.StepsJson_EN,
                 EquipmentJson = shared.EquipmentJson,
                 DietaryFlagsJson = shared.DietaryFlagsJson,
-                Rating = shared.Rating,
                 Protein = shared.Protein,
                 Carbs = shared.Carbs,
                 Fat = shared.Fat,

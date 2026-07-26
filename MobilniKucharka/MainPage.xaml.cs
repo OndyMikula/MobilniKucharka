@@ -77,6 +77,18 @@ namespace MobilniKucharka
 
             var savedRecipe = await _budgetService.SaveExternalRecipeAsync(found);
 
+            if (savedRecipe.ServingSize <= 0)
+            {
+                string result = await DisplayPromptAsync(
+                    "Pro kolik lidí je tento recept?",
+                    "Recept neuvádí počet porcí. Zadej, pro kolik lidí jsou suroviny napsané.",
+                    "OK", initialValue: "4", keyboard: Keyboard.Numeric);
+
+                int servingSize = int.TryParse(result, out var parsed) && parsed > 0 ? parsed : 4;
+                await _budgetService.UpdateRecipeServingSizeAsync(savedRecipe.Id, servingSize);
+                savedRecipe.ServingSize = servingSize;
+            }
+
             var recipeWithCost = new RecipeWithCost
             {
                 Recipe = savedRecipe,

@@ -30,6 +30,7 @@ namespace MobilniKucharka.Classes.Recipe
         //User created recipe data
         public string DescriptionText { get; set; } = string.Empty; // Popis receptu (např. "Tento recept je rychlý a jednoduchý.")
         public bool IsNutritionEstimated { get; set; } // TRUE = Nutriční hodnoty jsou odhadnuté, FALSE = Nutriční hodnoty jsou přesné (např. z API)
+        public int ServingSize { get; set; } = 4;
         public string IngredientsRaw { get; set; } = string.Empty; // Suroviny (např. "1 vejce|1 ks\nMouka|200 g")
         public string StepsRaw { get; set; } = string.Empty; // Postup (např. "1. Smíchejte ingredience.\n2. Pečte 20 minut.")
 

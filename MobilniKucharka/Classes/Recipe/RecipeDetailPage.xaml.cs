@@ -22,10 +22,14 @@ public partial class RecipeDetailPage : ContentPage
         StarRatingHelper.Render(HeroStarsHost, _recipeWithCost.Recipe.Rating);
         SetupUserRatingWidget();
 
-        ProteinLabel.Text = $"{_recipeWithCost.Recipe.Protein}g";
-        CarbsLabel.Text = $"{_recipeWithCost.Recipe.Carbs}g";
-        FatLabel.Text = $"{_recipeWithCost.Recipe.Fat}g";
-        SugarLabel.Text = $"{_recipeWithCost.Recipe.Sugar}g";
+        int peopleCountForNutrition = Preferences.Default.Get("PeopleCount", 2);
+        int effectiveServingSizeForNutrition = _recipeWithCost.Recipe.ServingSize > 0 ? _recipeWithCost.Recipe.ServingSize : 4;
+        double nutritionScale = peopleCountForNutrition / (double)effectiveServingSizeForNutrition;
+
+        ProteinLabel.Text = $"{Math.Round(_recipeWithCost.Recipe.Protein * nutritionScale, 1)}g";
+        CarbsLabel.Text = $"{Math.Round(_recipeWithCost.Recipe.Carbs * nutritionScale, 1)}g";
+        FatLabel.Text = $"{Math.Round(_recipeWithCost.Recipe.Fat * nutritionScale, 1)}g";
+        SugarLabel.Text = $"{Math.Round(_recipeWithCost.Recipe.Sugar * nutritionScale, 1)}g";
         NutritionEstimateLabel.IsVisible = _recipeWithCost.Recipe.IsNutritionEstimated;
 
         LoadIngredientsAndSteps();
@@ -85,6 +89,9 @@ public partial class RecipeDetailPage : ContentPage
             var rawLines = recipe.IngredientsRaw.Split('\n', StringSplitOptions.RemoveEmptyEntries);
             ingredients = [];
 
+            int effectiveServingSize = recipe.ServingSize > 0 ? recipe.ServingSize : 4;
+            double scaleFactor = peopleCount / (double)effectiveServingSize;
+
             foreach (var line in rawLines)
             {
                 var parts = line.Split('|');
@@ -95,31 +102,38 @@ public partial class RecipeDetailPage : ContentPage
 
                 var product = await App.Database.GetOrCreateLocalProductByNameAsync(name);
                 double pieceWeight = product.TypicalUnitWeightGrams > 0 ? product.TypicalUnitWeightGrams : 60;
-                double? parsedAmount = NutritionEstimationService.TryParseLeadingQuantity(amount, pieceWeight);
+                double? parsedAmount = NutritionEstimationService.ConvertToProductUnit(amount, product.Unit, pieceWeight);
+                double? scaledAmount = parsedAmount != null ? parsedAmount.Value * scaleFactor : null;
 
                 string costText;
                 double costValue = 0;
-                if (parsedAmount == null)
+                if (scaledAmount == null)
                 {
                     costText = "";
                 }
                 else
                 {
-                    costValue = Math.Round(parsedAmount.Value * product.EffectivePrice, 0);
+                    costValue = Math.Round(scaledAmount.Value * product.EffectivePrice, 0);
                     costText = costValue > 0 ? $"{costValue:N0} Kč" : "? Kč";
                 }
+
+                string displayAmount = scaledAmount != null ? $"{scaledAmount.Value:0.#} {product.Unit}" : amount;
 
                 ingredients.Add(new DisplayIngredient
                 {
                     ProductId = product.Id,
-                    RawAmount = parsedAmount ?? 0,
+                    RawAmount = scaledAmount ?? 0,
                     CostValue = costValue,
                     Name = name,
-                    AmountText = amount,
+                    AmountText = displayAmount,
                     CostText = costText
                 });
             }
         }
+
+        PeopleCountBadge.Text = recipe.ServingSize > 0 && recipe.ServingSize != peopleCount
+                                ? $"({peopleCount} os., recept byl na {recipe.ServingSize})"
+                                : $"({peopleCount} os.)";
 
         BindableLayout.SetItemsSource(IngredientsLayout, ingredients);
 
@@ -358,7 +372,7 @@ public partial class RecipeDetailPage : ContentPage
         try
         {
             var shareService = new RecipeShareService();
-            string filePath = await shareService.ExportRecipeAsync(_recipeWithCost.Recipe);
+            string filePath = await RecipeShareService.ExportRecipeAsync(_recipeWithCost.Recipe);
 
             await Share.Default.RequestAsync(new ShareFileRequest
             {

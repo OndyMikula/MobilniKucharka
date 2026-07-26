@@ -67,6 +67,7 @@ namespace MobilniKucharka.Services.Api
                     Sugar = ExtractNutrient(data, "Sugar"),
 
                     StepsJson = ExtractSteps(data),
+                    ServingSize = 1,
                     EquipmentJson = "[]",
                     DietaryFlagsJson = ExtractDiets(data)
                 };

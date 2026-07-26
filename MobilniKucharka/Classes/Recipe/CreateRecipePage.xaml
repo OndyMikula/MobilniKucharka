@@ -25,6 +25,12 @@
                 <!-- POPIS RECEPTU -->
                 <Label Text="Popis receptu (volitelný)" FontAttributes="Bold" FontSize="16"/>
                 <Editor x:Name="DescriptionEditor" Placeholder="Napiš krátký úvod k receptu..." AutoSize="TextChanges" TextChanged="OnFieldChanged" />
+                
+                <!-- POČET PORCÍ -->
+                <VerticalStackLayout Spacing="5" Margin="0,0,0,15">
+                    <Label Text="Recept je pro kolik lidí (podle napsaného množství surovin)" FontAttributes="Bold" FontSize="16" />
+                    <Entry x:Name="EntryServingSize" Placeholder="Např. 4" Keyboard="Numeric" Text="4" />
+                </VerticalStackLayout>
 
                 <!-- INGREDIENCE -->
                 <Label Text="Ingredience" FontAttributes="Bold" FontSize="16"/>

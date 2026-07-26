@@ -45,6 +45,8 @@ public partial class SettingsPage : ContentPage
         // Načtení uloženého jazyka
         string savedLanguage = Preferences.Default.Get("AppLanguageName", "Čeština");
         LanguagePicker.SelectedItem = savedLanguage;
+
+        AppVersionLabel.Text = $"Verze {AppInfo.Current.VersionString}";
     }
 
     private void OnThemeChanged(object sender, EventArgs e)
@@ -104,8 +106,6 @@ public partial class SettingsPage : ContentPage
             LanguagePicker.SelectedItem = currentSavedCode == "en" ? "English" : "Čeština";
         }
     }
-
-    private readonly DataBackupService _backupService = new();
 
     private async void OnExportDataClicked(object sender, EventArgs e)
     {
@@ -205,7 +205,7 @@ public partial class SettingsPage : ContentPage
             if (result == null) return;
 
             var shareService = new RecipeShareService();
-            var recipe = await shareService.ImportRecipeAsync(result.FullPath);
+            var recipe = await RecipeShareService.ImportRecipeAsync(result.FullPath);
 
             int newId = await App.Database.ImportSharedRecipeAsync(recipe);
             await App.Database.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
