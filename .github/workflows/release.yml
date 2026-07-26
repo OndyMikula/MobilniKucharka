@@ -78,6 +78,7 @@ jobs:
                   public const string SpoonacularApiKey = "${{ secrets.SPOONACULAR_API_KEY }}";
                   public const string NutritionixAppId = "TVUJ_NUTRITIONIX_APP_ID";
                   public const string NutritionixApiKey = "TVUJ_NUTRITIONIX_API_KEY";
+                  public const string GitHubShareToken = "${{ secrets.GITHUB_SHARE_TOKEN }}";
               }
           }
           "@
