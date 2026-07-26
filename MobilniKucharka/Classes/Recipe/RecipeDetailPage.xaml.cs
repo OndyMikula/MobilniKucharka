@@ -310,13 +310,16 @@ public partial class RecipeDetailPage : ContentPage
         bool isDevMode = Preferences.Default.Get("IsDeveloperMode", false);
 
         string[] options = isDevMode
-            ? ["Přidat do záložky", "Upravit recept", "Smazat recept", "🔧 Zobrazit syrová data kroků"]
-            : ["Přidat do záložky", "Upravit recept", "Smazat recept"];
+            ? ["Sdílet recept", "Přidat do záložky", "Upravit recept", "Smazat recept", "🔧 Zobrazit syrová data kroků"]
+            : ["Sdílet recept", "Přidat do záložky", "Upravit recept", "Smazat recept"];
 
         string action = await DisplayActionSheet("Možnosti receptu", "Zrušit", null, options);
 
         switch (action)
         {
+            case "Sdílet recept":
+                await ShareRecipeAsync();
+                break;
             case "Přidat do záložky":
                 OnOpenBookmarksClicked(this, EventArgs.Empty);
                 break;
