@@ -5,6 +5,7 @@ namespace MobilniKucharka;
 public partial class App : Application
 {
     private static BudgetPlannerService? _database;
+    public static string? PendingImportGuid { get; set; }
 
     // Tato statická vlastnost zaručí, že kdekoli v aplikaci napíšeš "App.Database",
     // dostaneš připravenou instanci tvé hlavní služby BudgetPlannerService.
@@ -28,5 +29,10 @@ public partial class App : Application
         InitializeComponent();
 
         MainPage = new AppShell(); // případně tvoje startovní stránka
+    }
+
+    public static void ResetDatabase()
+    {
+        _database = null;
     }
 }

@@ -34,6 +34,27 @@
                     <Label Text="Změna jazyka se projeví po restartu aplikace." FontSize="12" TextColor="Gray" />
                 </VerticalStackLayout>
 
+                <!-- BETA PROGRAM: NEZAREGISTROVANÝ (produkční build) -->
+                <VerticalStackLayout x:Name="BetaOptInSection" Spacing="10" Margin="0,20,0,0" IsVisible="False">
+                    <Label Text="Beta program" FontSize="18" FontAttributes="Bold"/>
+                    <Label Text="Zaregistruj se jako beta tester a dostávej nové verze dřív, ještě před oficiálním vydáním. Beta verze mohou obsahovat chyby." FontSize="12" TextColor="Gray"/>
+                    <Label Text="Kód beta programu:" FontAttributes="Bold" FontSize="14"/>
+                    <Entry x:Name="BetaCodeEntry" Placeholder="Zadej kód" />
+                    <Button Text="Zaregistrovat se jako beta tester" Clicked="OnRegisterBetaClicked" BackgroundColor="#9C27B0" TextColor="White" CornerRadius="10"/>
+                </VerticalStackLayout>
+
+                <!-- BETA PROGRAM: JIŽ ZAREGISTROVANÝ -->
+                <VerticalStackLayout x:Name="BetaOptedInSection" Spacing="10" Margin="0,20,0,0" IsVisible="False">
+                    <Label Text="Beta program" FontSize="18" FontAttributes="Bold"/>
+                    <Label Text="✅ Jsi zaregistrovaný jako beta tester. Dostáváš i beta verze aplikace." FontSize="12" TextColor="Green"/>
+                    <Button Text="Odregistrovat se z beta programu" Clicked="OnUnregisterBetaClicked" BackgroundColor="Gray" TextColor="White" CornerRadius="10"/>
+                </VerticalStackLayout>
+
+                <!-- INFO: TOTO JE UŽ BETA BUILD -->
+                <VerticalStackLayout x:Name="BetaBuildInfoSection" Spacing="5" Margin="0,20,0,0" IsVisible="False">
+                    <Label Text="🧪 Toto je beta verze aplikace." FontSize="12" TextColor="Gray"/>
+                </VerticalStackLayout>
+
                 <VerticalStackLayout Spacing="10" Margin="0,20,0,0">
                     <Label Text="Sdílené recepty" FontSize="18" FontAttributes="Bold"/>
                     <Label Text="Naimportuje recept, který ti poslal někdo jiný ze svého zařízení." FontSize="12" TextColor="Gray"/>
@@ -48,6 +69,7 @@
                     <Button Text="Načíst data ze zálohy" Clicked="OnLoadDataClicked" BackgroundColor="#FF9800" TextColor="White" CornerRadius="10"/>
                 </VerticalStackLayout>
 
+                <Label x:Name="AppVersionLabel" FontSize="11" TextColor="Gray" HorizontalOptions="Center" VerticalOptions="End" Margin="0,0,0,15"/>
             </VerticalStackLayout>
         </ScrollView>
 
@@ -60,7 +82,5 @@
                 </VerticalStackLayout>
             </Border>
         </Grid>
-
-        <Label x:Name="AppVersionLabel" FontSize="11" TextColor="Gray" HorizontalOptions="Center" Margin="0,20,0,0"/>
     </Grid>
 </ContentPage>

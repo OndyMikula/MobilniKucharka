@@ -69,6 +69,7 @@ namespace MobilniKucharka.Classes.Recipe
             DescriptionEditor.Text = recipe.DescriptionText;
             EntryManualCost.Text = recipe.ManualCost > 0 ? recipe.ManualCost.ToString("F0") : "";
             EntryServingSize.Text = recipe.ServingSize > 0 ? recipe.ServingSize.ToString() : "4";
+            EntryPrepTime.Text = recipe.PrepTime > 0 ? recipe.PrepTime.ToString() : "";
 
             if (!string.IsNullOrWhiteSpace(recipe.ImageUrl))
             {
@@ -417,6 +418,17 @@ namespace MobilniKucharka.Classes.Recipe
             return (Protein, Carbs, Fat, Sugar, true);
         }
 
+        private void OnPrepTimeTextChanged(object? sender, TextChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.NewTextValue)) return;
+
+            string filtered = new([.. e.NewTextValue.Where(char.IsDigit)]);
+            if (filtered != e.NewTextValue)
+            {
+                EntryPrepTime.Text = filtered;
+            }
+        }
+
         private async void OnFieldChanged(object? sender, TextChangedEventArgs e)
         {
             await TriggerAutoSaveAsync();
@@ -441,6 +453,7 @@ namespace MobilniKucharka.Classes.Recipe
                 IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}")),
                 StepsJson_CS = JsonSerializer.Serialize(stepRows),
                 EquipmentJson = JsonSerializer.Serialize(_selectedTags),
+                PrepTime = int.TryParse(EntryPrepTime.Text, out var draftPrepTime) ? draftPrepTime : 0,
                 Protein = _cachedProtein,
                 Carbs = _cachedCarbs,
                 Fat = _cachedFat,
@@ -519,6 +532,7 @@ namespace MobilniKucharka.Classes.Recipe
                     IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}")),
                     StepsJson_CS = JsonSerializer.Serialize(stepRows),
                     EquipmentJson = JsonSerializer.Serialize(_selectedTags),
+                    PrepTime = int.TryParse(EntryPrepTime.Text, out var prepTime) ? prepTime : 0,
                     Protein = Protein,
                     Carbs = Carbs,
                     Fat = Fat,

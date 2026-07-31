@@ -25,21 +25,40 @@ namespace MobilniKucharka.Services
             {
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("MobilniKucharka-App");
 
-                string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
+                bool isBetaBuild = AppInfo.Current.VersionString.Contains("-beta", StringComparison.OrdinalIgnoreCase);
+                bool isOptedIntoBeta = Preferences.Default.Get("IsBetaOptedIn", false);
+                bool checkBothChannels = isBetaBuild || isOptedIntoBeta;
+
+                string url = checkBothChannels
+                    ? $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases"
+                    : $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
+
                 var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode) return null;
 
                 var contentString = await response.Content.ReadAsStringAsync();
-                if (string.IsNullOrWhiteSpace(contentString) || !contentString.StartsWith('{'))
-                    return null;
+                if (string.IsNullOrWhiteSpace(contentString)) return null;
 
-                var root = JsonSerializer.Deserialize<JsonElement>(contentString);
+                JsonElement releaseElement;
 
-                string tagName = root.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? "" : "";
-                string htmlUrl = root.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() ?? "" : "";
+                if (checkBothChannels)
+                {
+                    if (!contentString.TrimStart().StartsWith('[')) return null;
+                    var releases = JsonSerializer.Deserialize<JsonElement>(contentString);
+                    if (releases.ValueKind != JsonValueKind.Array || releases.GetArrayLength() == 0) return null;
+                    releaseElement = releases[0]; // GitHub vrací seznam od nejnovějšího
+                }
+                else
+                {
+                    if (!contentString.TrimStart().StartsWith('{')) return null;
+                    releaseElement = JsonSerializer.Deserialize<JsonElement>(contentString);
+                }
+
+                string tagName = releaseElement.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? "" : "";
+                string htmlUrl = releaseElement.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() ?? "" : "";
 
                 string? apkUrl = null;
-                if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
+                if (releaseElement.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var asset in assets.EnumerateArray())
                     {
@@ -65,7 +84,7 @@ namespace MobilniKucharka.Services
             }
             catch
             {
-                return null; // bez internetu / GitHub nedostupný -> potichu nic nedělat
+                return null;
             }
         }
 
@@ -104,8 +123,11 @@ namespace MobilniKucharka.Services
 
         private static int CompareVersions(string v1, string v2)
         {
-            var parts1 = v1.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
-            var parts2 = v2.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
+            var (core1, beta1) = SplitVersionAndBeta(v1);
+            var (core2, beta2) = SplitVersionAndBeta(v2);
+
+            var parts1 = core1.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
+            var parts2 = core2.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
 
             int maxLength = Math.Max(parts1.Length, parts2.Length);
             for (int i = 0; i < maxLength; i++)
@@ -114,7 +136,24 @@ namespace MobilniKucharka.Services
                 int p2 = i < parts2.Length ? parts2[i] : 0;
                 if (p1 != p2) return p1.CompareTo(p2);
             }
-            return 0;
+
+            // Stejné číslo verze -> stabilní vydání je "novější" než beta stejného čísla,
+            // vyšší beta číslo je novější než nižší
+            if (beta1 == null && beta2 == null) return 0;
+            if (beta1 == null) return 1;
+            if (beta2 == null) return -1;
+            return beta1.Value.CompareTo(beta2.Value);
+        }
+
+        private static (string Core, int? Beta) SplitVersionAndBeta(string version)
+        {
+            int betaIndex = version.IndexOf("-beta", StringComparison.OrdinalIgnoreCase);
+            if (betaIndex < 0) return (version, null);
+
+            string core = version[..betaIndex];
+            string betaSuffix = version[(betaIndex + 5)..];
+            int betaNumber = int.TryParse(betaSuffix, out var n) ? n : 0;
+            return (core, betaNumber);
         }
     }
 }

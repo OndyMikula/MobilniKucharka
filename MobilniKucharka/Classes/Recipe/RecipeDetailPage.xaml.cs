@@ -324,8 +324,8 @@ public partial class RecipeDetailPage : ContentPage
         bool isDevMode = Preferences.Default.Get("IsDeveloperMode", false);
 
         string[] options = isDevMode
-            ? ["Sdílet recept", "Přidat do záložky", "Upravit recept", "Smazat recept", "🔧 Zobrazit syrová data kroků"]
-            : ["Sdílet recept", "Přidat do záložky", "Upravit recept", "Smazat recept"];
+            ? ["Sdílet recept", "Sdílet přes odkaz", "Přidat do záložky", "Upravit recept", "Smazat recept", "🔧 Zobrazit syrová data kroků"]
+            : ["Sdílet recept", "Sdílet přes odkaz", "Přidat do záložky", "Upravit recept", "Smazat recept"];
 
         string action = await DisplayActionSheet("Možnosti receptu", "Zrušit", null, options);
 
@@ -333,6 +333,9 @@ public partial class RecipeDetailPage : ContentPage
         {
             case "Sdílet recept":
                 await ShareRecipeAsync();
+                break;
+            case "Sdílet přes odkaz":
+                await ShareRecipeViaLinkAsync();
                 break;
             case "Přidat do záložky":
                 OnOpenBookmarksClicked(this, EventArgs.Empty);
@@ -420,6 +423,23 @@ public partial class RecipeDetailPage : ContentPage
         StarRatingHelper.Render(UserRatingStarsHost, roundedValue, starSize: 32);
 
         await App.Database.UpdateRecipeRatingAsync(_recipeWithCost.Recipe.Id, roundedValue);
+    }
+
+    private async Task ShareRecipeViaLinkAsync()
+    {
+        string? link = await RecipeLinkShareService.ShareViaLinkAsync(_recipeWithCost.Recipe);
+
+        if (link == null)
+        {
+            await DisplayAlert("Chyba", "Odkaz se nepodařilo vytvořit. Zkontroluj internetové připojení.", "OK");
+            return;
+        }
+
+        await Share.Default.RequestAsync(new ShareTextRequest
+        {
+            Title = $"Recept: {_recipeWithCost.Recipe.Name_CS}",
+            Text = $"Podívej se na tento recept v Mobilní Kuchařce: {link}\n(Odkaz je platný 24 hodin nebo dokud ho neotevřeš.)"
+        });
     }
 }
 

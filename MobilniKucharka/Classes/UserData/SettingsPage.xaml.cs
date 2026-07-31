@@ -10,6 +10,7 @@ public partial class SettingsPage : ContentPage
     {
         InitializeComponent();
         LoadCurrentSettings();
+        UpdateBetaSectionVisibility();
     }
 
     private int _devModeTapCount = 0;
@@ -48,6 +49,39 @@ public partial class SettingsPage : ContentPage
 
         AppVersionLabel.Text = $"Verze {AppInfo.Current.VersionString}";
     }
+
+    private void UpdateBetaSectionVisibility()
+    {
+        bool isBetaBuild = AppInfo.Current.VersionString.Contains("-beta", StringComparison.OrdinalIgnoreCase);
+        bool isOptedIn = Preferences.Default.Get("IsBetaOptedIn", false);
+
+        BetaBuildInfoSection.IsVisible = isBetaBuild;
+        BetaOptedInSection.IsVisible = !isBetaBuild && isOptedIn;
+        BetaOptInSection.IsVisible = !isBetaBuild && !isOptedIn;
+    }
+
+    private async void OnRegisterBetaClicked(object sender, EventArgs e)
+    {
+        if (string.Equals(BetaCodeEntry.Text?.Trim(), "beta", StringComparison.OrdinalIgnoreCase))
+        {
+            Preferences.Default.Set("IsBetaOptedIn", true);
+            BetaCodeEntry.Text = "";
+            UpdateBetaSectionVisibility();
+            await DisplayAlert("Hotovo", "Jsi zaregistrovaný jako beta tester. Nyní budeš dostávat i beta verze.", "OK");
+        }
+        else
+        {
+            await DisplayAlert("Špatný kód", "Zadaný kód není správný.", "OK");
+        }
+    }
+
+    private async void OnUnregisterBetaClicked(object sender, EventArgs e)
+    {
+        Preferences.Default.Set("IsBetaOptedIn", false);
+        UpdateBetaSectionVisibility();
+        await DisplayAlert("Hotovo", "Byl jsi odregistrován z beta programu.", "OK");
+    }
+    private static readonly string[] value = ["application/zip", "application/x-zip-compressed"];
 
     private void OnThemeChanged(object sender, EventArgs e)
     {
@@ -140,7 +174,16 @@ public partial class SettingsPage : ContentPage
     {
         try
         {
-            var result = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Vyber soubor zálohy (.zip)" });
+            var zipFileType = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+        {
+            { DevicePlatform.Android, value }
+        });
+
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Vyber soubor zálohy (.zip)",
+                FileTypes = zipFileType
+            });
             if (result == null) return;
 
             bool confirm = await DisplayAlert("Načíst zálohu", "Tímto se přepíší všechna aktuální data v aplikaci. Pokračovat?", "Ano", "Zrušit");
@@ -149,17 +192,28 @@ public partial class SettingsPage : ContentPage
             BackupProgressOverlay.IsVisible = true;
             BackupProgressLabel.Text = "Načítám data...";
 
+            // Zkopírujeme vybraný soubor do spolehlivého lokálního dočasného souboru -
+            // FullPath nemusí obsahovat kompletní data pro soubory z cloudových úložišť.
+            string localCopyPath = Path.Combine(FileSystem.CacheDirectory, $"import_{Guid.NewGuid()}.zip");
+            using (var sourceStream = await result.OpenReadAsync())
+            using (var localStream = File.Create(localCopyPath))
+            {
+                await sourceStream.CopyToAsync(localStream);
+            }
+
             var progress = new Progress<double>(value =>
             {
                 BackupProgressBar.Progress = value;
                 BackupProgressPercentLabel.Text = $"{value:P0}";
             });
 
-            await DataBackupService.ImportAsync(result.FullPath, progress);
+            await DataBackupService.ImportAsync(localCopyPath, progress);
+
+            File.Delete(localCopyPath);
 
             BackupProgressOverlay.IsVisible = false;
-            await DisplayAlert("Hotovo", "Data byla načtena. Aplikace se nyní zavře — otevři ji prosím znovu ručně.", "OK");
-            Application.Current?.Quit();
+            await DisplayAlert("Hotovo", "Data byla načtena. Aplikace se nyní restartuje.", "Restartovat");
+            RestartApp();
         }
         catch (Exception ex)
         {
@@ -216,5 +270,11 @@ public partial class SettingsPage : ContentPage
         {
             await DisplayAlert("Chyba", $"Import se nepodařil: {ex.Message}", "OK");
         }
+    }
+
+    private static void RestartApp()
+    {
+        App.ResetDatabase();
+        Application.Current!.Windows[0].Page = new NavigationPage(new MainPage());
     }
 }

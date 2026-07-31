@@ -30,6 +30,13 @@ namespace MobilniKucharka
             // Levný "nudge" pro překreslení - žádné čekání, žádný přepočet layoutu.
             Opacity = 0.999;
             Opacity = 1;
+
+            if (!string.IsNullOrWhiteSpace(App.PendingImportGuid)) //link-sharing
+            {
+                string guid = App.PendingImportGuid;
+                App.PendingImportGuid = null;
+                _ = HandlePendingImportAsync(guid);
+            }
         }
 
         private async Task CheckForUpdatesAsync()
@@ -199,6 +206,22 @@ namespace MobilniKucharka
         {
             int fixedCount = await _budgetService.RepairAllRecipeStepsAsync();
             await DisplayAlert("Hotovo", $"Opraveno receptů: {fixedCount}", "OK");
+        }
+
+        private async Task HandlePendingImportAsync(string guid) //link-sharing
+        {
+            var recipe = await RecipeLinkShareService.ImportFromLinkAsync(guid);
+            if (recipe != null)
+            {
+                int newId = await _budgetService.ImportSharedRecipeAsync(recipe);
+                await _budgetService.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
+                await DisplayAlert("Recept naimportován", $"\"{recipe.Name_CS}\" byl přidán do tvých receptů.", "OK");
+                await LoadRecipesDataAsync();
+            }
+            else
+            {
+                await DisplayAlert("Odkaz neplatný", "Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit).", "OK");
+            }
         }
     }
 }
