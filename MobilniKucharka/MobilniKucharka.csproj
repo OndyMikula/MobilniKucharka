@@ -27,7 +27,7 @@
 
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.2</ApplicationDisplayVersion> <!-- Co vidí user (1.2) -->
-		<ApplicationVersion>3</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(3) -->
+		<ApplicationVersion>4</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(4) -->
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>
