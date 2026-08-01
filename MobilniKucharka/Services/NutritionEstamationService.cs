@@ -146,7 +146,7 @@ namespace MobilniKucharka.Services
             if (rest.Contains("medium") || rest.Contains("střední")) return quantity * 100;
             if (rest.Contains("large") || rest.Contains("velký") || rest.Contains("velká")) return quantity * 150;
 
-            if (match.Success && string.IsNullOrWhiteSpace(rest)) return quantity * defaultPieceWeight;
+            if (match.Success && (string.IsNullOrWhiteSpace(rest) || rest == "x")) return quantity * defaultPieceWeight;
 
             return 15;
         }
@@ -181,7 +181,7 @@ namespace MobilniKucharka.Services
             else if (rest.Contains("tbsp") || rest.Contains("lžíce") || rest.Contains("polévkov")) volumeMl = quantity * 15;
             else if (rest.Contains("tsp") || rest.Contains("lžička") || rest.Contains("čajov")) volumeMl = quantity * 5;
             else if (rest.Contains("cup") || rest.Contains("hrnek") || rest.Contains("šálek")) volumeMl = quantity * 240;
-            else if (rest.Contains("ks") || rest.Contains("kus") || string.IsNullOrWhiteSpace(rest)) isPiece = true;
+            else if (rest.Contains("ks") || rest.Contains("kus") || rest == "x" || string.IsNullOrWhiteSpace(rest)) isPiece = true;
             else return null;
 
             return productUnit switch

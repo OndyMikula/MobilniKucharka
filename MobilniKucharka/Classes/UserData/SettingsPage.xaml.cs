@@ -31,6 +31,7 @@ public partial class SettingsPage : ContentPage
 
             bool newState = !Preferences.Default.Get("IsDeveloperMode", false);
             Preferences.Default.Set("IsDeveloperMode", newState);
+            UpdateBetaSectionVisibility();
 
             await DisplayAlert("Vývojářský režim",
                 newState ? "Vývojářský režim byl aktivován." : "Vývojářský režim byl deaktivován.", "OK");
@@ -52,6 +53,16 @@ public partial class SettingsPage : ContentPage
 
     private void UpdateBetaSectionVisibility()
     {
+        bool isDevMode = Preferences.Default.Get("IsDeveloperMode", false);
+
+        if (!isDevMode)
+        {
+            BetaBuildInfoSection.IsVisible = false;
+            BetaOptedInSection.IsVisible = false;
+            BetaOptInSection.IsVisible = false;
+            return;
+        }
+
         bool isBetaBuild = AppInfo.Current.VersionString.Contains("-beta", StringComparison.OrdinalIgnoreCase);
         bool isOptedIn = Preferences.Default.Get("IsBetaOptedIn", false);
 

@@ -9,6 +9,7 @@ namespace MobilniKucharka.Classes.Recipe;
 public partial class RecipeDetailPage : ContentPage
 {
     private readonly RecipeWithCost _recipeWithCost;
+    private bool _hasAppearedOnce = false;
 
     public RecipeDetailPage(RecipeWithCost selectedItem)
     {
@@ -16,30 +17,66 @@ public partial class RecipeDetailPage : ContentPage
         _recipeWithCost = selectedItem;
         BindingContext = _recipeWithCost;
 
+        PopulateFromCurrentRecipe();
+        InitializeFavoriteStateAsync();
+    }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        if (_hasAppearedOnce)
+        {
+            _ = RefreshFromDatabaseAsync();
+        }
+        _hasAppearedOnce = true;
+    }
+
+    private async Task RefreshFromDatabaseAsync()
+    {
+        var freshRecipe = await App.Database.GetRecipeByIdAsync(_recipeWithCost.Recipe.Id);
+        if (freshRecipe == null) return;
+
+        _recipeWithCost.Recipe = freshRecipe;
+        BindingContext = _recipeWithCost;
+        PopulateFromCurrentRecipe();
+        await Task.Run(InitializeFavoriteStateAsync);
+    }
+
+    private void PopulateFromCurrentRecipe()
+    {
         RecipeImage.Source = _recipeWithCost.Recipe.ImageUrl;
         RecipeNameLabel.Text = _recipeWithCost.Recipe.Name_CS;
         HeroRatingNumberLabel.Text = _recipeWithCost.Recipe.Rating.ToString("F1");
         StarRatingHelper.Render(HeroStarsHost, _recipeWithCost.Recipe.Rating);
         SetupUserRatingWidget();
 
-        int peopleCountForNutrition = Preferences.Default.Get("PeopleCount", 2);
-        int effectiveServingSizeForNutrition = _recipeWithCost.Recipe.ServingSize > 0 ? _recipeWithCost.Recipe.ServingSize : 4;
-        double nutritionScale = peopleCountForNutrition / (double)effectiveServingSizeForNutrition;
-
-        ProteinLabel.Text = $"{Math.Round(_recipeWithCost.Recipe.Protein * nutritionScale, 1)}g";
-        CarbsLabel.Text = $"{Math.Round(_recipeWithCost.Recipe.Carbs * nutritionScale, 1)}g";
-        FatLabel.Text = $"{Math.Round(_recipeWithCost.Recipe.Fat * nutritionScale, 1)}g";
-        SugarLabel.Text = $"{Math.Round(_recipeWithCost.Recipe.Sugar * nutritionScale, 1)}g";
+        ProteinLabel.Text = $"{_recipeWithCost.Recipe.Protein}g";
+        CarbsLabel.Text = $"{_recipeWithCost.Recipe.Carbs}g";
+        FatLabel.Text = $"{_recipeWithCost.Recipe.Fat}g";
+        SugarLabel.Text = $"{_recipeWithCost.Recipe.Sugar}g";
         NutritionEstimateLabel.IsVisible = _recipeWithCost.Recipe.IsNutritionEstimated;
-
-        LoadIngredientsAndSteps();
-        InitializeFavoriteStateAsync();
 
         if (_recipeWithCost.Recipe.PrepTime > 0)
         {
             PrepTimeLabel.Text = $"⏱ {_recipeWithCost.Recipe.PrepTime} min";
             PrepTimeLabel.IsVisible = true;
         }
+
+        if (!string.IsNullOrWhiteSpace(_recipeWithCost.Recipe.SourceUrl))
+        {
+            SourceLabel.Text = "🔗 Zobrazit původní recept";
+            SourceLabel.TextDecorations = TextDecorations.Underline;
+            SourceLabel.GestureRecognizers.Clear();
+            var tap = new TapGestureRecognizer();
+            tap.Tapped += async (s, e) => await Launcher.Default.OpenAsync(_recipeWithCost.Recipe.SourceUrl);
+            SourceLabel.GestureRecognizers.Add(tap);
+        }
+        else if (string.IsNullOrWhiteSpace(_recipeWithCost.Recipe.ExternalSourceId))
+        {
+            SourceLabel.Text = "Recept vytvořen uživatelem";
+        }
+
+        LoadIngredientsAndSteps();
     }
 
     private async void LoadIngredientsAndSteps()
@@ -131,9 +168,10 @@ public partial class RecipeDetailPage : ContentPage
             }
         }
 
-        PeopleCountBadge.Text = recipe.ServingSize > 0 && recipe.ServingSize != peopleCount
-                                ? $"({peopleCount} os., recept byl na {recipe.ServingSize})"
-                                : $"({peopleCount} os.)";
+        int effectiveServingSizeForBadge = recipe.ServingSize > 0 ? recipe.ServingSize : 4;
+        PeopleCountBadge.Text = effectiveServingSizeForBadge != peopleCount
+            ? $"({peopleCount} os., recept byl na {effectiveServingSizeForBadge})"
+            : $"({peopleCount} os.)";
 
         BindableLayout.SetItemsSource(IngredientsLayout, ingredients);
 
@@ -441,6 +479,7 @@ public partial class RecipeDetailPage : ContentPage
             Text = $"Podívej se na tento recept v Mobilní Kuchařce: {link}\n(Odkaz je platný 24 hodin nebo dokud ho neotevřeš.)"
         });
     }
+
 }
 
 public class DisplayStep
