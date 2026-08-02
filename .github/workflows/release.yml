@@ -20,6 +20,7 @@ jobs:
         run: |
           $csproj = Get-Content "MobilniKucharka/MobilniKucharka.csproj" -Raw
           $version = [regex]::Match($csproj, '<ApplicationDisplayVersion>(.*?)</ApplicationDisplayVersion>').Groups[1].Value
+          Write-Host "Verze načtená z csproj: '$version'"
           echo "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Check if this version was already released
@@ -27,10 +28,15 @@ jobs:
         shell: pwsh
         run: |
           $tag = "v${{ steps.version.outputs.version }}"
+          Write-Host "Hledám tag: $tag"
+          Write-Host "Existující tagy v repozitáři:"
+          git tag -l | Write-Host
           $exists = git tag -l $tag
           if ($exists) {
+            Write-Host "Tag $tag už existuje -> release se přeskočí."
             echo "exists=true" >> $env:GITHUB_OUTPUT
           } else {
+            Write-Host "Tag $tag zatím neexistuje -> pokračuji sestavením."
             echo "exists=false" >> $env:GITHUB_OUTPUT
           }
 
@@ -79,6 +85,7 @@ jobs:
                   public const string NutritionixAppId = "TVUJ_NUTRITIONIX_APP_ID";
                   public const string NutritionixApiKey = "TVUJ_NUTRITIONIX_API_KEY";
                   public const string GitHubShareToken = "${{ secrets.SHARE_TOKEN }}";
+                  public const bool IsBetaChannel = false;
               }
           }
           "@
@@ -102,6 +109,18 @@ jobs:
             -p:AndroidSigningKeyPass=${{ secrets.ANDROID_KEY_PASSWORD }} `
             -p:AndroidSigningStorePass=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
 
+      - name: Rename APK with version
+        if: steps.check.outputs.exists == 'false'
+        id: rename
+        shell: pwsh
+        run: |
+          $apkFile = Get-ChildItem -Path "MobilniKucharka/bin/Release/net9.0-android" -Filter "*Signed.apk" -Recurse | Select-Object -First 1
+          $newName = "MobilniKucharka-v${{ steps.version.outputs.version }}.apk"
+          $newPath = Join-Path $apkFile.DirectoryName $newName
+          Copy-Item $apkFile.FullName $newPath -Force
+          Write-Host "Přejmenováno na: $newPath"
+          echo "apk_path=$newPath" >> $env:GITHUB_OUTPUT
+
       - name: Create GitHub Release
         if: steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
@@ -109,4 +128,4 @@ jobs:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
           body_path: CHANGELOG_BODY.md
-          files: MobilniKucharka/bin/Release/net9.0-android/*Signed.apk
+          files: ${{ steps.rename.outputs.apk_path }}
