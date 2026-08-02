@@ -85,7 +85,6 @@ jobs:
                   public const string NutritionixAppId = "TVUJ_NUTRITIONIX_APP_ID";
                   public const string NutritionixApiKey = "TVUJ_NUTRITIONIX_API_KEY";
                   public const string GitHubShareToken = "${{ secrets.SHARE_TOKEN }}";
-                  public const bool IsBetaChannel = true;
               }
           }
           "@
