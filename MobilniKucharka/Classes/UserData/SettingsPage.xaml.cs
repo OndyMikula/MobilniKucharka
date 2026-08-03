@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Maui.Storage;
 using MobilniKucharka.Services;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace MobilniKucharka;
 
@@ -40,66 +41,20 @@ public partial class SettingsPage : ContentPage
 
     private void LoadCurrentSettings()
     {
-        // Načtení uloženého motivu
         string savedTheme = Preferences.Default.Get("AppTheme", "Podle systému");
         ThemePicker.SelectedItem = savedTheme;
 
-        // Načtení uloženého jazyka
         string savedLanguage = Preferences.Default.Get("AppLanguageName", "Čeština");
         LanguagePicker.SelectedItem = savedLanguage;
 
         AppVersionLabel.Text = $"Verze {AppInfo.Current.VersionString}";
     }
 
-    private void UpdateBetaSectionVisibility()
-    {
-        bool isDevMode = Preferences.Default.Get("IsDeveloperMode", false);
-
-        if (!isDevMode)
-        {
-            BetaBuildInfoSection.IsVisible = false;
-            BetaOptedInSection.IsVisible = false;
-            BetaOptInSection.IsVisible = false;
-            return;
-        }
-
-        bool isBetaBuild = AppInfo.Current.VersionString.Contains("-beta", StringComparison.OrdinalIgnoreCase);
-        bool isOptedIn = Preferences.Default.Get("IsBetaOptedIn", false);
-
-        BetaBuildInfoSection.IsVisible = isBetaBuild;
-        BetaOptedInSection.IsVisible = !isBetaBuild && isOptedIn;
-        BetaOptInSection.IsVisible = !isBetaBuild && !isOptedIn;
-    }
-
-    private async void OnRegisterBetaClicked(object sender, EventArgs e)
-    {
-        if (string.Equals(BetaCodeEntry.Text?.Trim(), "beta", StringComparison.OrdinalIgnoreCase))
-        {
-            Preferences.Default.Set("IsBetaOptedIn", true);
-            BetaCodeEntry.Text = "";
-            UpdateBetaSectionVisibility();
-            await DisplayAlert("Hotovo", "Jsi zaregistrovaný jako beta tester. Nyní budeš dostávat i beta verze.", "OK");
-        }
-        else
-        {
-            await DisplayAlert("Špatný kód", "Zadaný kód není správný.", "OK");
-        }
-    }
-
-    private async void OnUnregisterBetaClicked(object sender, EventArgs e)
-    {
-        Preferences.Default.Set("IsBetaOptedIn", false);
-        UpdateBetaSectionVisibility();
-        await DisplayAlert("Hotovo", "Byl jsi odregistrován z beta programu.", "OK");
-    }
-    private static readonly string[] value = ["application/zip", "application/x-zip-compressed"];
-
     private void OnThemeChanged(object sender, EventArgs e)
     {
         string selectedTheme = ThemePicker.SelectedItem.ToString() ?? "Podle systému";
         Preferences.Default.Set("AppTheme", selectedTheme);
 
-        // Okamžitá aplikace motivu
         if (selectedTheme == "Světlý (Light)")
             Application.Current!.UserAppTheme = AppTheme.Light;
         else if (selectedTheme == "Tmavý (Dark)")
@@ -116,10 +71,8 @@ public partial class SettingsPage : ContentPage
         string currentSavedCode = Preferences.Default.Get("AppLanguageCode", "cs");
         string newCultureCode = selectedLanguage == "English" ? "en" : "cs";
 
-        // Pokud uživatel klikl na stejný jazyk, nic nedělej
         if (currentSavedCode == newCultureCode) return;
 
-        // Lokální překlad dialogu podle toho, jaký jazyk uživatel zrovna vybral
         string title = newCultureCode == "en" ? "Language Change" : "Změna jazyka";
         string message = newCultureCode == "en"
             ? "The app needs to reload to apply the language change. Do you want to reload now?"
@@ -131,23 +84,19 @@ public partial class SettingsPage : ContentPage
 
         if (shouldRestart)
         {
-            // 1. Uložíme nové nastavení
             Preferences.Default.Set("AppLanguageName", selectedLanguage);
             Preferences.Default.Set("AppLanguageCode", newCultureCode);
 
-            // 2. Nastavíme novou kulturu pro celou aplikaci
             var culture = new CultureInfo(newCultureCode);
             Thread.CurrentThread.CurrentCulture = culture;
             Thread.CurrentThread.CurrentUICulture = culture;
             CultureInfo.DefaultThreadCurrentCulture = culture;
             CultureInfo.DefaultThreadCurrentUICulture = culture;
 
-            // 3. Soft-restart: Znovu vygenerujeme celou navigační strukturu
-            Application.Current!.Windows[0].Page = new NavigationPage(new MainPage());
+            RestartApp();
         }
         else
         {
-            // Pokud uživatel stornoval, vrátíme Picker na původní hodnotu
             LanguagePicker.SelectedItem = currentSavedCode == "en" ? "English" : "Čeština";
         }
     }
@@ -181,19 +130,19 @@ public partial class SettingsPage : ContentPage
         }
     }
 
+    private static readonly FilePickerFileType ZipFileType = new(new Dictionary<DevicePlatform, IEnumerable<string>>
+    {
+        { DevicePlatform.Android, new[] { "application/zip", "application/x-zip-compressed" } }
+    });
+
     private async void OnLoadDataClicked(object sender, EventArgs e)
     {
         try
         {
-            var zipFileType = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
-        {
-            { DevicePlatform.Android, value }
-        });
-
             var result = await FilePicker.Default.PickAsync(new PickOptions
             {
                 PickerTitle = "Vyber soubor zálohy (.zip)",
-                FileTypes = zipFileType
+                FileTypes = ZipFileType
             });
             if (result == null) return;
 
@@ -203,8 +152,6 @@ public partial class SettingsPage : ContentPage
             BackupProgressOverlay.IsVisible = true;
             BackupProgressLabel.Text = "Načítám data...";
 
-            // Zkopírujeme vybraný soubor do spolehlivého lokálního dočasného souboru -
-            // FullPath nemusí obsahovat kompletní data pro soubory z cloudových úložišť.
             string localCopyPath = Path.Combine(FileSystem.CacheDirectory, $"import_{Guid.NewGuid()}.zip");
             using (var sourceStream = await result.OpenReadAsync())
             using (var localStream = File.Create(localCopyPath))
@@ -269,7 +216,6 @@ public partial class SettingsPage : ContentPage
             var result = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Vyber soubor receptu" });
             if (result == null) return;
 
-            var shareService = new RecipeShareService();
             var recipe = await RecipeShareService.ImportRecipeAsync(result.FullPath);
 
             int newId = await App.Database.ImportSharedRecipeAsync(recipe);
@@ -281,6 +227,123 @@ public partial class SettingsPage : ContentPage
         {
             await DisplayAlert("Chyba", $"Import se nepodařil: {ex.Message}", "OK");
         }
+    }
+
+    private async void OnImportFromLinkClicked(object sender, EventArgs e)
+    {
+        string? link = RecipeLinkEntry.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(link))
+        {
+            await DisplayAlert("Chyba", "Nejdřív vlož odkaz.", "OK");
+            return;
+        }
+
+        string? guid = ExtractGuidFromLink(link);
+        if (guid == null)
+        {
+            await DisplayAlert("Chyba", "Tento odkaz nevypadá jako platný odkaz na recept.", "OK");
+            return;
+        }
+
+        var recipe = await RecipeLinkShareService.ImportFromLinkAsync(guid);
+        if (recipe == null)
+        {
+            await DisplayAlert("Odkaz neplatný", "Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit).", "OK");
+            return;
+        }
+
+        int newId = await App.Database.ImportSharedRecipeAsync(recipe);
+        await App.Database.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
+
+        RecipeLinkEntry.Text = "";
+        await DisplayAlert("Hotovo", $"Recept \"{recipe.Name_CS}\" byl naimportován.", "OK");
+    }
+
+    [GeneratedRegex(@"[?&]id=([a-fA-F0-9]+)")]
+    private static partial Regex QueryIdRegexGen();
+
+    [GeneratedRegex(@"recipe/([a-fA-F0-9]+)")]
+    private static partial Regex PathIdRegexGen();
+
+    private static string? ExtractGuidFromLink(string link)
+    {
+        var queryMatch = QueryIdRegexGen().Match(link);
+        if (queryMatch.Success) return queryMatch.Groups[1].Value;
+
+        var pathMatch = PathIdRegexGen().Match(link);
+        if (pathMatch.Success) return pathMatch.Groups[1].Value;
+
+        return null;
+    }
+
+    private async void OnCheckForUpdatesClicked(object sender, EventArgs e)
+    {
+        var updateService = new UpdateCheckService();
+        var info = await updateService.CheckForUpdateAsync();
+
+        if (info == null)
+        {
+            await DisplayAlert("Kontrola aktualizací", "Nepodařilo se zkontrolovat aktualizace. Zkontroluj internetové připojení.", "OK");
+            return;
+        }
+
+        if (!info.IsUpdateAvailable)
+        {
+            await DisplayAlert("Kontrola aktualizací", "Používáš nejnovější verzi.", "OK");
+            return;
+        }
+
+        bool download = await DisplayAlert(
+            "Nová verze je k dispozici",
+            $"Je dostupná nová verze aplikace ({info.LatestVersion}). Chceš ji instalovat? Všechny recepty, záložky a nastavení zůstanou zachovány.",
+            "Instalovat", "Pokračovat bez instalace");
+
+        if (download)
+        {
+            string urlToOpen = !string.IsNullOrWhiteSpace(info.ApkDownloadUrl) ? info.ApkDownloadUrl : info.ReleaseUrl;
+            if (!string.IsNullOrWhiteSpace(urlToOpen))
+                await Launcher.Default.OpenAsync(urlToOpen);
+        }
+    }
+
+    private void UpdateBetaSectionVisibility()
+    {
+        bool isDevMode = Preferences.Default.Get("IsDeveloperMode", false);
+
+        if (!isDevMode)
+        {
+            BetaOptedInSection.IsVisible = false;
+            BetaOptInSection.IsVisible = false;
+            return;
+        }
+
+        bool isBetaBuild = AppInfo.Current.VersionString.Contains("beta", StringComparison.OrdinalIgnoreCase);
+        bool isOptedIn = Preferences.Default.Get("IsBetaOptedIn", false);
+
+        BetaOptedInSection.IsVisible = !isBetaBuild && isOptedIn;
+        BetaOptInSection.IsVisible = !isBetaBuild && !isOptedIn;
+    }
+
+    private async void OnRegisterBetaClicked(object sender, EventArgs e)
+    {
+        if (string.Equals(BetaCodeEntry.Text?.Trim(), "beta", StringComparison.OrdinalIgnoreCase))
+        {
+            Preferences.Default.Set("IsBetaOptedIn", true);
+            BetaCodeEntry.Text = "";
+            UpdateBetaSectionVisibility();
+            await DisplayAlert("Hotovo", "Jsi zaregistrovaný jako beta tester. Nyní budeš dostávat i beta verze.", "OK");
+        }
+        else
+        {
+            await DisplayAlert("Špatný kód", "Zadaný kód není správný.", "OK");
+        }
+    }
+
+    private async void OnUnregisterBetaClicked(object sender, EventArgs e)
+    {
+        Preferences.Default.Set("IsBetaOptedIn", false);
+        UpdateBetaSectionVisibility();
+        await DisplayAlert("Hotovo", "Byl jsi odregistrován z beta programu.", "OK");
     }
 
     private static void RestartApp()

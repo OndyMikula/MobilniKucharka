@@ -99,11 +99,11 @@
                         <Label x:Name="DescriptionLabel" FontSize="15" LineHeight="1.3" />
                     </VerticalStackLayout>
 
-                    <!-- NAKUPNI SEZNAM -->
+                    <!-- INGREDIENCE -->
                     <VerticalStackLayout Spacing="10">
                         <HorizontalStackLayout Spacing="10">
                             <Label Text="🛒" FontSize="20"/>
-                            <Label Text="Nákupní seznam" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" />
+                            <Label Text="Ingredience" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" />
                             <Label x:Name="PeopleCountBadge" TextColor="Gray" FontSize="14" VerticalOptions="Center" Margin="5,0,0,0"/>
                         </HorizontalStackLayout>
 

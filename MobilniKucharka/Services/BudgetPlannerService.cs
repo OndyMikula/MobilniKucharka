@@ -487,7 +487,7 @@ namespace MobilniKucharka.Services
             }
         }
 
-        public async Task<LocalProduct> GetOrCreateLocalProductByNameAsync(string name)
+        public async Task<LocalProduct> GetOrCreateLocalProductByNameAsync(string name, string suggestedUnit = "g")
         {
             await EnsureInitializedAsync();
             string trimmed = name.Trim();
@@ -512,7 +512,7 @@ namespace MobilniKucharka.Services
             {
                 Name_CS = trimmed,
                 Name_EN = trimmed,
-                Unit = "g",
+                Unit = suggestedUnit,
                 PriceAverage = 0
             };
 
@@ -887,6 +887,41 @@ namespace MobilniKucharka.Services
             {
                 recipe.ServingSize = servingSize;
                 await _db.UpdateAsync(recipe);
+            }
+        }
+
+        public async Task<(double Cost, bool AllPriced)> GetRecipeCostDetailsAsync(int recipeId, int peopleCount)
+        {
+            try
+            {
+                await EnsureInitializedAsync();
+
+                var recipe = await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
+                if (recipe == null) return (0, false);
+
+                var allProducts = await GetProductsCachedAsync();
+                var allIngredients = await GetIngredientsCachedAsync();
+                var allAliases = await GetAliasesCachedAsync();
+
+                var (cost, allPriced, _) = CalculateFullRecipeCost(recipe, peopleCount, allProducts, allIngredients, allAliases);
+                return (cost, allPriced);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Chyba při výpočtu ceny: {ex.Message}");
+                return (0, false);
+            }
+        }
+
+        public async Task SetProductUnitAsync(int productId, string unit)
+        {
+            await EnsureInitializedAsync();
+            var product = await _db.Table<LocalProduct>().Where(p => p.Id == productId).FirstOrDefaultAsync();
+            if (product != null)
+            {
+                product.Unit = unit;
+                await _db.UpdateAsync(product);
+                _cachedProducts = null;
             }
         }
     }

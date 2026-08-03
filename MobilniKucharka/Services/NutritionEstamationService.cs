@@ -181,7 +181,7 @@ namespace MobilniKucharka.Services
             else if (rest.Contains("tbsp") || rest.Contains("lžíce") || rest.Contains("polévkov")) volumeMl = quantity * 15;
             else if (rest.Contains("tsp") || rest.Contains("lžička") || rest.Contains("čajov")) volumeMl = quantity * 5;
             else if (rest.Contains("cup") || rest.Contains("hrnek") || rest.Contains("šálek")) volumeMl = quantity * 240;
-            else if (rest.Contains("ks") || rest.Contains("kus") || rest == "x" || string.IsNullOrWhiteSpace(rest)) isPiece = true;
+            else if (rest.Contains("ks") || rest.Contains("kus") || rest.Contains("can") || rest.Contains("plechovk") || rest == "x" || string.IsNullOrWhiteSpace(rest)) isPiece = true;
             else return null;
 
             return productUnit switch
@@ -191,6 +191,24 @@ namespace MobilniKucharka.Services
                 "ks" => isPiece ? quantity : null,
                 _ => weightGrams ?? volumeMl
             };
+        }
+
+        public static string DetectUnitFamily(string amountText)
+        {
+            if (string.IsNullOrWhiteSpace(amountText)) return "g";
+
+            string text = amountText.Trim().ToLowerInvariant();
+            var match = LeadingNumberRegexGen().Match(text);
+            string rest = match.Success ? text[match.Length..].Trim() : text;
+
+            if (rest.Contains("kg") || (rest.Contains('g') && !rest.Contains("gal"))) return "g";
+            if (rest.Contains("ml") || (rest.Contains('l') && !rest.Contains("small") && !rest.Contains("large"))) return "ml";
+            if (rest.Contains("tbsp") || rest.Contains("lžíce") || rest.Contains("polévkov")) return "ml";
+            if (rest.Contains("tsp") || rest.Contains("lžička") || rest.Contains("čajov")) return "ml";
+            if (rest.Contains("cup") || rest.Contains("hrnek") || rest.Contains("šálek")) return "ml";
+            if (rest.Contains("ks") || rest.Contains("kus") || rest.Contains("can") || rest.Contains("plechovk") || rest == "x" || string.IsNullOrWhiteSpace(rest)) return "ks";
+
+            return "g";
         }
     }
 }

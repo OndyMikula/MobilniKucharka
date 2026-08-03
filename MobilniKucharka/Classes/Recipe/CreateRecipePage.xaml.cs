@@ -15,6 +15,8 @@ namespace MobilniKucharka.Classes.Recipe
         private string _savedImagePath = string.Empty;
         private readonly NutritionixService _nutritionixService = new();
 
+        private bool _isLoadingRecipe = false;
+
         private readonly HashSet<string> _selectedTags = [];
         private readonly Dictionary<string, Border> _tagButtons = [];
 
@@ -56,72 +58,80 @@ namespace MobilniKucharka.Classes.Recipe
 
         private async void LoadRecipeForEditing(int id)
         {
-            var recipe = await App.Database.GetRecipeByIdAsync(id);
-            if (recipe == null) return;
-
-            _cachedProtein = recipe.Protein;
-            _cachedCarbs = recipe.Carbs;
-            _cachedFat = recipe.Fat;
-            _cachedSugar = recipe.Sugar;
-            _cachedIsNutritionEstimated = recipe.IsNutritionEstimated;
-
-            EntryTitle.Text = recipe.Name_CS;
-            DescriptionEditor.Text = recipe.DescriptionText;
-            EntryManualCost.Text = recipe.ManualCost > 0 ? recipe.ManualCost.ToString("F0") : "";
-            EntryServingSize.Text = recipe.ServingSize > 0 ? recipe.ServingSize.ToString() : "4";
-            EntryPrepTime.Text = recipe.PrepTime > 0 ? recipe.PrepTime.ToString() : "";
-
-            if (!string.IsNullOrWhiteSpace(recipe.ImageUrl))
+            _isLoadingRecipe = true;
+            try
             {
-                _savedImagePath = recipe.ImageUrl;
-                RecipeImagePreview.Source = ImageSource.FromFile(recipe.ImageUrl);
-                RecipeImagePreview.IsVisible = true;
-            }
+                var recipe = await App.Database.GetRecipeByIdAsync(id);
+                if (recipe == null) return;
 
-            _currentRating = recipe.Rating;
-            RatingSlider.Value = recipe.Rating;
+                _cachedProtein = recipe.Protein;
+                _cachedCarbs = recipe.Carbs;
+                _cachedFat = recipe.Fat;
+                _cachedSugar = recipe.Sugar;
+                _cachedIsNutritionEstimated = recipe.IsNutritionEstimated;
 
-            IngredientsContainer.Clear();
-            if (!string.IsNullOrWhiteSpace(recipe.IngredientsRaw))
-            {
-                var lines = recipe.IngredientsRaw.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-                foreach (var line in lines)
+                EntryTitle.Text = recipe.Name_CS;
+                DescriptionEditor.Text = recipe.DescriptionText;
+                EntryManualCost.Text = recipe.ManualCost > 0 ? recipe.ManualCost.ToString("F0") : "";
+                EntryServingSize.Text = recipe.ServingSize > 0 ? recipe.ServingSize.ToString() : "4";
+                EntryPrepTime.Text = recipe.PrepTime > 0 ? recipe.PrepTime.ToString() : "";
+
+                if (!string.IsNullOrWhiteSpace(recipe.ImageUrl))
                 {
-                    var parts = line.Split('|');
-                    var (qty, unit) = SplitAmountForEditing(parts.ElementAtOrDefault(1) ?? "");
-                    AddIngredientRow(parts.ElementAtOrDefault(0) ?? "", qty, unit);
+                    _savedImagePath = recipe.ImageUrl;
+                    RecipeImagePreview.Source = ImageSource.FromFile(recipe.ImageUrl);
+                    RecipeImagePreview.IsVisible = true;
                 }
-            }
-            if (IngredientsContainer.Count == 0)
-            {
-                for (int i = 0; i < 3; i++) AddIngredientRow();
-            }
 
-            StepsContainer.Clear();
-            var savedSteps = recipe.Steps_CS;
-            if (savedSteps.Count > 0)
-            {
-                foreach (var step in savedSteps)
-                    AddStepRow(step);
-            }
-            else
-            {
-                for (int i = 0; i < 3; i++) AddStepRow();
-            }
+                _currentRating = recipe.Rating;
+                RatingSlider.Value = recipe.Rating;
 
-            _selectedTags.Clear();
-            foreach (var tag in recipe.Equipment)
-            {
-                if (_tagButtons.TryGetValue(tag, out var existingChip))
+                IngredientsContainer.Clear();
+                if (!string.IsNullOrWhiteSpace(recipe.IngredientsRaw))
                 {
-                    var label = (Label)existingChip.Content!;
-                    SetTagButtonSelected(existingChip, label, true);
-                    _selectedTags.Add(tag);
+                    var lines = recipe.IngredientsRaw.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in lines)
+                    {
+                        var parts = line.Split('|');
+                        var (qty, unit) = SplitAmountForEditing(parts.ElementAtOrDefault(1) ?? "");
+                        AddIngredientRow(parts.ElementAtOrDefault(0) ?? "", qty, unit);
+                    }
+                }
+                if (IngredientsContainer.Count == 0)
+                {
+                    for (int i = 0; i < 3; i++) AddIngredientRow();
+                }
+
+                StepsContainer.Clear();
+                var savedSteps = recipe.Steps_CS;
+                if (savedSteps.Count > 0)
+                {
+                    foreach (var step in savedSteps)
+                        AddStepRow(step);
                 }
                 else
                 {
-                    AddTagButton(tag, isSelected: true);
+                    for (int i = 0; i < 3; i++) AddStepRow();
                 }
+
+                _selectedTags.Clear();
+                foreach (var tag in recipe.Equipment)
+                {
+                    if (_tagButtons.TryGetValue(tag, out var existingChip))
+                    {
+                        var label = (Label)existingChip.Content!;
+                        SetTagButtonSelected(existingChip, label, true);
+                        _selectedTags.Add(tag);
+                    }
+                    else
+                    {
+                        AddTagButton(tag, isSelected: true);
+                    }
+                }
+            }
+            finally
+            {
+                _isLoadingRecipe = false;
             }
         }
 
@@ -141,8 +151,10 @@ namespace MobilniKucharka.Classes.Recipe
 
         private static (string Quantity, string Unit) SplitAmountForEditing(string amount)
         {
+            if (string.IsNullOrWhiteSpace(amount)) return ("", "g");
+
             var match = AmountSplitRegexGen().Match(amount.Trim());
-            if (!match.Success) return (amount, "g");
+            if (!match.Success) return (amount, ""); // volný text (např. "podle chuti") -> žádná jednotka se nevymýšlí
 
             string quantity = match.Groups[1].Value;
             string unitRaw = match.Groups[2].Value.Trim().ToLowerInvariant();
@@ -155,6 +167,8 @@ namespace MobilniKucharka.Classes.Recipe
                 var u when u.Contains("lžíce") || u.Contains("tbsp") => "lžíce",
                 var u when u.Contains("lžička") || u.Contains("tsp") => "lžička",
                 var u when u.Contains("ks") || u.Contains("kus") => "ks",
+                "x" => "ks",
+                "" => "ks",
                 _ => "g"
             };
 
@@ -371,8 +385,13 @@ namespace MobilniKucharka.Classes.Recipe
                     string quantity = (grid.Children[1] as Entry)?.Text?.Trim() ?? "";
                     string unit = (grid.Children[2] as Picker)?.SelectedItem as string ?? "g";
 
-                    if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(quantity))
-                        result.Add((name, $"{quantity} {unit}"));
+                    if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(quantity)) continue;
+
+                    // Jednotku přidáváme jen tehdy, když je v množství skutečně číslo -
+                    // u volného textu (např. "podle chuti") by přidaná jednotka nedávala smysl a jen by se hromadila při každé úpravě.
+                    string combinedAmount = quantity.Any(char.IsDigit) ? $"{quantity} {unit}" : quantity;
+
+                    result.Add((name, combinedAmount));
                 }
             }
 
@@ -436,6 +455,8 @@ namespace MobilniKucharka.Classes.Recipe
 
         private async Task TriggerAutoSaveAsync()
         {
+            if (_isLoadingRecipe) return; // recept se ještě načítá k úpravě -> nesmíme přepsat data polovičně natažené kopie
+
             var ingredientRows = CollectIngredientRows();
             var stepRows = CollectStepRows();
             double manualCost = double.TryParse(EntryManualCost.Text, out var parsedCost) ? parsedCost : 0;
@@ -509,6 +530,8 @@ namespace MobilniKucharka.Classes.Recipe
                 var ingredientRows = CollectIngredientRows();
                 var stepRows = CollectStepRows();
 
+                await SyncIngredientUnitsAsync(ingredientRows);
+
                 var (Protein, Carbs, Fat, Sugar, IsEstimated) = await CalculateNutritionFromIngredientsAsync(ingredientRows);
                 _cachedProtein = Protein;
                 _cachedCarbs = Carbs;
@@ -558,6 +581,31 @@ namespace MobilniKucharka.Classes.Recipe
             catch (Exception ex)
             {
                 await DisplayAlert("Chyba při ukládání", $"Recept se nepodařilo uložit.\nDetail: {ex.Message}", "OK");
+            }
+        }
+
+        private static string NormalizeToBaseUnit(string pickerUnit) => pickerUnit switch
+        {
+            "kg" => "g",
+            "l" or "lžíce" or "lžička" => "ml",
+            "ks" => "ks",
+            _ => "g"
+        };
+
+        private static async Task SyncIngredientUnitsAsync(List<(string Name, string Amount)> ingredientRows)
+        {
+            foreach (var (Name, Amount) in ingredientRows)
+            {
+                var parts = Amount.Split(' ', 2);
+                if (parts.Length < 2) continue;
+
+                string baseUnit = NormalizeToBaseUnit(parts[1].Trim());
+                var product = await App.Database.GetOrCreateLocalProductByNameAsync(Name, baseUnit);
+
+                if (product.Unit != baseUnit)
+                {
+                    await App.Database.SetProductUnitAsync(product.Id, baseUnit);
+                }
             }
         }
 

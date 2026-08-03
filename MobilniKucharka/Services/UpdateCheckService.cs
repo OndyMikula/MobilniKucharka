@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace MobilniKucharka.Services
 {
@@ -10,7 +11,7 @@ namespace MobilniKucharka.Services
         public string? ApkDownloadUrl { get; set; }
     }
 
-    public class UpdateCheckService
+    public partial class UpdateCheckService
     {
         private readonly HttpClient _httpClient = new();
         private const string RepoOwner = "OndyMikula";
@@ -25,7 +26,7 @@ namespace MobilniKucharka.Services
             {
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("MobilniKucharka-App");
 
-                bool isBetaBuild = AppInfo.Current.VersionString.Contains("-beta", StringComparison.OrdinalIgnoreCase);
+                bool isBetaBuild = AppInfo.Current.VersionString.Contains("beta", StringComparison.OrdinalIgnoreCase);
                 bool isOptedIntoBeta = Preferences.Default.Get("IsBetaOptedIn", false);
                 bool checkBothChannels = isBetaBuild || isOptedIntoBeta;
 
@@ -46,7 +47,7 @@ namespace MobilniKucharka.Services
                     if (!contentString.TrimStart().StartsWith('[')) return null;
                     var releases = JsonSerializer.Deserialize<JsonElement>(contentString);
                     if (releases.ValueKind != JsonValueKind.Array || releases.GetArrayLength() == 0) return null;
-                    releaseElement = releases[0]; // GitHub vrací seznam od nejnovějšího
+                    releaseElement = releases[0];
                 }
                 else
                 {
@@ -93,23 +94,15 @@ namespace MobilniKucharka.Services
 #if ANDROID
             try
             {
+                if (!OperatingSystem.IsAndroidVersionAtLeast(30)) return false;
+
                 var context = Android.App.Application.Context;
-                var packageManager = context.PackageManager;
                 string packageName = context.PackageName ?? "";
+                var packageManager = context.PackageManager;
 
                 if (packageManager == null) return false;
 
-                string? installer;
-
-                if (OperatingSystem.IsAndroidVersionAtLeast(30))
-                {
-                    installer = packageManager.GetInstallSourceInfo(packageName)?.InstallingPackageName;
-                }
-                else
-                {
-                    installer = packageManager.GetInstallerPackageName(packageName); //cesta pro android verze 20+
-                }
-
+                string? installer = packageManager.GetInstallSourceInfo(packageName)?.InstallingPackageName;
                 return installer == "com.android.vending";
             }
             catch
@@ -121,10 +114,21 @@ namespace MobilniKucharka.Services
 #endif
         }
 
+        [GeneratedRegex(@"^\d+(\.\d+)*")]
+        private static partial Regex VersionCoreRegexGen();
+
+        private static (string Core, bool IsBeta) SplitVersionAndBeta(string version)
+        {
+            bool isBeta = version.Contains("beta", StringComparison.OrdinalIgnoreCase);
+            var match = VersionCoreRegexGen().Match(version);
+            string core = match.Success ? match.Value : version;
+            return (core, isBeta);
+        }
+
         private static int CompareVersions(string v1, string v2)
         {
-            var (core1, beta1) = SplitVersionAndBeta(v1);
-            var (core2, beta2) = SplitVersionAndBeta(v2);
+            var (core1, isBeta1) = SplitVersionAndBeta(v1);
+            var (core2, isBeta2) = SplitVersionAndBeta(v2);
 
             var parts1 = core1.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
             var parts2 = core2.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
@@ -137,23 +141,8 @@ namespace MobilniKucharka.Services
                 if (p1 != p2) return p1.CompareTo(p2);
             }
 
-            // Stejné číslo verze -> stabilní vydání je "novější" než beta stejného čísla,
-            // vyšší beta číslo je novější než nižší
-            if (beta1 == null && beta2 == null) return 0;
-            if (beta1 == null) return 1;
-            if (beta2 == null) return -1;
-            return beta1.Value.CompareTo(beta2.Value);
-        }
-
-        private static (string Core, int? Beta) SplitVersionAndBeta(string version)
-        {
-            int betaIndex = version.IndexOf("-beta", StringComparison.OrdinalIgnoreCase);
-            if (betaIndex < 0) return (version, null);
-
-            string core = version[..betaIndex];
-            string betaSuffix = version[(betaIndex + 5)..];
-            int betaNumber = int.TryParse(betaSuffix, out var n) ? n : 0;
-            return (core, betaNumber);
+            if (isBeta1 == isBeta2) return 0;
+            return isBeta1 ? -1 : 1; // beta a stabilní se stejným číslem -> stabilní vyhrává
         }
     }
 }
