@@ -20,17 +20,26 @@ jobs:
         run: |
           $csproj = Get-Content "MobilniKucharka/MobilniKucharka.csproj" -Raw
           $version = [regex]::Match($csproj, '<ApplicationDisplayVersion>(.*?)</ApplicationDisplayVersion>').Groups[1].Value
+          $safeTag = $version -replace '\s+', ''
+          Write-Host "Verze načtená z csproj: '$version'"
+          Write-Host "Bezpečný tag (bez mezer): '$safeTag'"
           echo "version=$version" >> $env:GITHUB_OUTPUT
+          echo "safe_tag=$safeTag" >> $env:GITHUB_OUTPUT
 
       - name: Check if this version was already released
         id: check
         shell: pwsh
         run: |
-          $tag = "v${{ steps.version.outputs.version }}"
+          $tag = "v${{ steps.version.outputs.safe_tag }}"
+          Write-Host "Hledám tag: $tag"
+          Write-Host "Existující tagy v repozitáři:"
+          git tag -l | Write-Host
           $exists = git tag -l $tag
           if ($exists) {
+            Write-Host "Tag $tag už existuje -> release se přeskočí."
             echo "exists=true" >> $env:GITHUB_OUTPUT
           } else {
+            Write-Host "Tag $tag zatím neexistuje -> pokračuji sestavením."
             echo "exists=false" >> $env:GITHUB_OUTPUT
           }
 
@@ -102,12 +111,24 @@ jobs:
             -p:AndroidSigningKeyPass=${{ secrets.ANDROID_KEY_PASSWORD }} `
             -p:AndroidSigningStorePass=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
 
+      - name: Rename APK with version
+        if: steps.check.outputs.exists == 'false'
+        id: rename
+        shell: pwsh
+        run: |
+          $apkFile = Get-ChildItem -Path "MobilniKucharka/bin/Release/net9.0-android" -Filter "*Signed.apk" -Recurse | Select-Object -First 1
+          $newName = "MobilniKucharka-v${{ steps.version.outputs.safe_tag }}.apk"
+          $newPath = Join-Path $apkFile.DirectoryName $newName
+          Copy-Item $apkFile.FullName $newPath -Force
+          Write-Host "Přejmenováno na: $newPath"
+          echo "apk_path=$newPath" >> $env:GITHUB_OUTPUT
+
       - name: Create GitHub Release (prerelease)
         if: steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
+          tag_name: v${{ steps.version.outputs.safe_tag }}
           name: v${{ steps.version.outputs.version }} (Beta)
           body_path: CHANGELOG_BODY.md
           prerelease: true
-          files: MobilniKucharka/bin/Release/net9.0-android/*Signed.apk
+          files: ${{ steps.rename.outputs.apk_path }}
