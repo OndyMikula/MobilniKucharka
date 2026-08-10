@@ -46,8 +46,8 @@
                 <!-- BETA PROGRAM: JIŽ ZAREGISTROVANÝ -->
                 <VerticalStackLayout x:Name="BetaOptedInSection" Spacing="10" Margin="0,20,0,0" IsVisible="False">
                     <Label Text="Beta program" FontSize="18" FontAttributes="Bold"/>
-                    <Label Text="✅ Jsi připojen jako beta tester. Dostáváš i beta verze aplikace." FontSize="12" TextColor="Green"/>
-                    <Button Text="Odpojit se z beta programu" Clicked="OnUnregisterBetaClicked" BackgroundColor="Gray" TextColor="White" CornerRadius="10"/>
+                    <Label x:Name="BetaOptedInStatusLabel" Text="✅ Jsi připojen jako beta tester. Dostáváš i beta verze aplikace." FontSize="12" TextColor="Green"/>
+                    <Button x:Name="UnregisterBetaButton" Text="Odpojit se z beta programu" Clicked="OnUnregisterBetaClicked" BackgroundColor="Gray" TextColor="White" CornerRadius="10"/>
                 </VerticalStackLayout>
 
                 <!-- IMPORT RECEPTU ZE SOUBORU -->

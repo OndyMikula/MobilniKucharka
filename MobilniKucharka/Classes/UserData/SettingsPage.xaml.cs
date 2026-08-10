@@ -319,9 +319,18 @@ public partial class SettingsPage : ContentPage
 
         bool isBetaBuild = AppInfo.Current.VersionString.Contains("beta", StringComparison.OrdinalIgnoreCase);
         bool isOptedIn = Preferences.Default.Get("IsBetaOptedIn", false);
+        bool effectivelyOptedIn = isBetaBuild || isOptedIn;
 
-        BetaOptedInSection.IsVisible = !isBetaBuild && isOptedIn;
-        BetaOptInSection.IsVisible = !isBetaBuild && !isOptedIn;
+        BetaOptedInSection.IsVisible = effectivelyOptedIn;
+        BetaOptInSection.IsVisible = !effectivelyOptedIn;
+
+        if (effectivelyOptedIn)
+        {
+            BetaOptedInStatusLabel.Text = isBetaBuild
+                ? "🧪 Právě běžíš na beta verzi aplikace."
+                : "✅ Jsi připojen jako beta tester. Dostáváš i beta verze aplikace.";
+            UnregisterBetaButton.IsVisible = !isBetaBuild;
+        }
     }
 
     private async void OnRegisterBetaClicked(object sender, EventArgs e)

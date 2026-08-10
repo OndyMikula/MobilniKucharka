@@ -207,7 +207,7 @@ public partial class RecipeDetailPage : ContentPage
         }
 
         string action = await DisplayActionSheet(ingredient.Name, "Zrušit", null,
-            "Zadat vlastní cenu", "Propojit s existující surovinou");
+    "Zadat vlastní cenu", "Propojit s existující surovinou", "Změnit jednotku");
 
         if (action == "Zadat vlastní cenu")
         {
@@ -264,6 +264,17 @@ public partial class RecipeDetailPage : ContentPage
             if (match != null)
             {
                 await App.Database.LinkIngredientNameToProductAsync(ingredient.Name, match.Id);
+                LoadIngredientsAndSteps();
+            }
+        }
+        else if (action == "Změnit jednotku")
+        {
+            string[] unitOptions = ["g", "ml", "ks"];
+            string chosenUnit = await DisplayActionSheet("Vyber jednotku", "Zrušit", null, unitOptions);
+
+            if (unitOptions.Contains(chosenUnit))
+            {
+                await App.Database.SetProductUnitAsync(ingredient.ProductId, chosenUnit);
                 LoadIngredientsAndSteps();
             }
         }
