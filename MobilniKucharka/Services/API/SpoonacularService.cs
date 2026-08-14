@@ -67,7 +67,9 @@ namespace MobilniKucharka.Services.Api
                     Sugar = ExtractNutrient(data, "Sugar"),
 
                     StepsJson = ExtractSteps(data),
-                    ServingSize = 1,
+                    ServingSize = data.TryGetProperty("servings", out var servingsProp) && servingsProp.GetInt32() > 0
+                        ? servingsProp.GetInt32()
+                        : 1,
                     EquipmentJson = "[]",
                     DietaryFlagsJson = ExtractDiets(data)
                 };

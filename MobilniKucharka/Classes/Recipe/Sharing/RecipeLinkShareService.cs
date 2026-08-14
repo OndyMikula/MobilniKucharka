@@ -1,8 +1,9 @@
 ﻿using System.Text;
 using System.Text.Json;
 using MobilniKucharka.Classes.Recipe;
+using MobilniKucharka.Services;
 
-namespace MobilniKucharka.Services
+namespace MobilniKucharka.Classes.Recipe.Sharing
 {
     public static class RecipeLinkShareService
     {
@@ -41,7 +42,7 @@ namespace MobilniKucharka.Services
                     IsNutritionEstimated = recipe.IsNutritionEstimated,
                     ManualCost = recipe.ManualCost,
                     PrepTime = recipe.PrepTime,
-                    ServingSize = recipe.ServingSize > 0 ? recipe.ServingSize : 4,
+                    ServingSize = recipe.ServingSize,
                     PhotoBase64 = photoBase64,
                     ExpiresAtUtc = DateTime.UtcNow.AddDays(1)
                 };
@@ -115,7 +116,7 @@ namespace MobilniKucharka.Services
                     IsNutritionEstimated = shared.IsNutritionEstimated,
                     ManualCost = shared.ManualCost,
                     PrepTime = shared.PrepTime,
-                    ServingSize = shared.ServingSize > 0 ? shared.ServingSize : 4,
+                    ServingSize = shared.ServingSize,
                     Category = "Vytvořené recepty",
                     ImageUrl = photoPath ?? ""
                 };

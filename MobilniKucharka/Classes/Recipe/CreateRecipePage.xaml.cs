@@ -17,6 +17,11 @@ namespace MobilniKucharka.Classes.Recipe
 
         private bool _isLoadingRecipe = false;
 
+        // Perzistentní objekt receptu - autosave do něj MUTUJE, místo aby pokaždé vytvářel nový Recipe()
+        // a přes UpdateAsync smazal pole, která tahle stránka nespravuje (Name_EN, StepsJson_EN, SourceUrl,
+        // ExternalSourceId, BookmarkId, DietaryFlagsJson...). Stejná třída bugu jako kdysi u RatingSlideru.
+        private Recipe _recipe = new();
+
         private readonly HashSet<string> _selectedTags = [];
         private readonly Dictionary<string, Border> _tagButtons = [];
 
@@ -25,6 +30,9 @@ namespace MobilniKucharka.Classes.Recipe
         private double _cachedFat = 0;
         private double _cachedSugar = 0;
         private bool _cachedIsNutritionEstimated = false;
+
+        private static string Tr(string csText) => MobilniKucharka.Translation.UiTranslator.Tr(csText);
+        private static string CurrentLang => Preferences.Default.Get("AppLanguageCode", "cs");
 
         public CreateRecipePage()
         {
@@ -64,16 +72,18 @@ namespace MobilniKucharka.Classes.Recipe
                 var recipe = await App.Database.GetRecipeByIdAsync(id);
                 if (recipe == null) return;
 
+                _recipe = recipe; // od teď mutujeme tenhle stejný objekt, ne kopii
+
                 _cachedProtein = recipe.Protein;
                 _cachedCarbs = recipe.Carbs;
                 _cachedFat = recipe.Fat;
                 _cachedSugar = recipe.Sugar;
                 _cachedIsNutritionEstimated = recipe.IsNutritionEstimated;
 
-                EntryTitle.Text = recipe.Name_CS;
+                EntryTitle.Text = recipe.Name; // jazykově správně, dřív natvrdo Name_CS
                 DescriptionEditor.Text = recipe.DescriptionText;
                 EntryManualCost.Text = recipe.ManualCost > 0 ? recipe.ManualCost.ToString("F0") : "";
-                EntryServingSize.Text = recipe.ServingSize > 0 ? recipe.ServingSize.ToString() : "4";
+                EntryServingSize.Text = recipe.ServingSize > 0 ? recipe.ServingSize.ToString() : string.Empty;
                 EntryPrepTime.Text = recipe.PrepTime > 0 ? recipe.PrepTime.ToString() : "";
 
                 if (!string.IsNullOrWhiteSpace(recipe.ImageUrl))
@@ -103,7 +113,7 @@ namespace MobilniKucharka.Classes.Recipe
                 }
 
                 StepsContainer.Clear();
-                var savedSteps = recipe.Steps_CS;
+                var savedSteps = CurrentLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
                 if (savedSteps.Count > 0)
                 {
                     foreach (var step in savedSteps)
@@ -276,7 +286,7 @@ namespace MobilniKucharka.Classes.Recipe
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Chyba", $"Nepodařilo se načíst obrázek: {ex.Message}", "OK");
+                await DisplayAlert(Tr("Chyba"), $"{Tr("Nepodařilo se načíst obrázek")}: {ex.Message}", "OK");
             }
         }
 
@@ -291,7 +301,7 @@ namespace MobilniKucharka.Classes.Recipe
             }
 
             _currentRating = roundedValue;
-            RatingTextLabel.Text = $"Hodnocení: {_currentRating:F1} / 5";
+            RatingTextLabel.Text = string.Format(Tr("Hodnocení: {0:F1} / 5"), _currentRating);
 
             StarRatingHelper.Render(StarsHost, _currentRating, starSize: 30);
 
@@ -312,10 +322,10 @@ namespace MobilniKucharka.Classes.Recipe
         }
             };
 
-            var nameEntry = new Entry { Placeholder = "Název ingredience", Text = initialName };
+            var nameEntry = new Entry { Placeholder = Tr("Název ingredience"), Text = initialName };
             nameEntry.TextChanged += OnFieldChanged;
 
-            var amountEntry = new Entry { Placeholder = "Množství", WidthRequest = 70, Keyboard = Keyboard.Numeric, Text = initialAmount };
+            var amountEntry = new Entry { Placeholder = Tr("Množství"), WidthRequest = 70, Keyboard = Keyboard.Numeric, Text = initialAmount };
             amountEntry.TextChanged += OnFieldChanged;
 
             var unitPicker = new Picker { WidthRequest = 90, ItemsSource = UnitOptions, SelectedItem = initialUnit };
@@ -341,7 +351,7 @@ namespace MobilniKucharka.Classes.Recipe
             };
 
             var emoji = new Label { Text = "👉", VerticalOptions = LayoutOptions.Center, Margin = new Thickness(0, 0, 5, 0) };
-            var stepEntry = new Entry { Placeholder = "Popiš tento krok...", Text = initialText };
+            var stepEntry = new Entry { Placeholder = Tr("Popiš tento krok..."), Text = initialText };
             stepEntry.TextChanged += OnFieldChanged;
 
             var upButton = new Button { Text = "▲", FontSize = 12, WidthRequest = 36, HeightRequest = 36, Padding = 0, Margin = new Thickness(4, 0, 0, 0) };
@@ -460,38 +470,46 @@ namespace MobilniKucharka.Classes.Recipe
             var ingredientRows = CollectIngredientRows();
             var stepRows = CollectStepRows();
             double manualCost = double.TryParse(EntryManualCost.Text, out var parsedCost) ? parsedCost : 0;
+            string currentLang = CurrentLang;
 
-            var draftRecipe = new MobilniKucharka.Classes.Recipe.Recipe
+            _recipe.ImageUrl = _savedImagePath;
+            _recipe.IsDraft = !_isEditingExisting; // úprava hotového receptu ho autosave nesmí "vrátit" zpět mezi koncepty
+            _recipe.Category = "Vytvořené recepty";
+            _recipe.Rating = _currentRating;
+            _recipe.ManualCost = manualCost;
+            _recipe.ServingSize = int.TryParse(EntryServingSize.Text, out var draftServings) && draftServings > 0 ? draftServings : 0;
+            _recipe.DescriptionText = DescriptionEditor.Text ?? string.Empty;
+            _recipe.IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}"));
+            _recipe.EquipmentJson = JsonSerializer.Serialize(_selectedTags);
+            _recipe.PrepTime = int.TryParse(EntryPrepTime.Text, out var draftPrepTime) ? draftPrepTime : 0;
+            _recipe.Protein = _cachedProtein;
+            _recipe.Carbs = _cachedCarbs;
+            _recipe.Fat = _cachedFat;
+            _recipe.Sugar = _cachedSugar;
+            _recipe.IsNutritionEstimated = _cachedIsNutritionEstimated;
+
+            string title = string.IsNullOrWhiteSpace(EntryTitle.Text) ? Tr("Rozepsaný recept") : EntryTitle.Text.Trim();
+            if (currentLang == "cs")
             {
-                Name_CS = string.IsNullOrWhiteSpace(EntryTitle.Text) ? "Rozepsaný recept" : EntryTitle.Text.Trim(),
-                ImageUrl = _savedImagePath,
-                IsDraft = !_isEditingExisting, // úprava hotového receptu ho autosave nesmí "vrátit" zpět mezi koncepty
-                Category = "Vytvořené recepty",
-                Rating = _currentRating,
-                ManualCost = manualCost,
-                ServingSize = int.TryParse(EntryServingSize.Text, out var draftServings) && draftServings > 0 ? draftServings : 4,
-                DescriptionText = DescriptionEditor.Text ?? string.Empty,
-                IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}")),
-                StepsJson_CS = JsonSerializer.Serialize(stepRows),
-                EquipmentJson = JsonSerializer.Serialize(_selectedTags),
-                PrepTime = int.TryParse(EntryPrepTime.Text, out var draftPrepTime) ? draftPrepTime : 0,
-                Protein = _cachedProtein,
-                Carbs = _cachedCarbs,
-                Fat = _cachedFat,
-                Sugar = _cachedSugar,
-                IsNutritionEstimated = _cachedIsNutritionEstimated
-            };
+                _recipe.Name_CS = title;
+                _recipe.Steps_CS = stepRows;
+            }
+            else
+            {
+                _recipe.Name_EN = title;
+                _recipe.Steps_EN = stepRows;
+            }
 
             if (_currentRecipeId == null)
             {
-                await _db.InsertAsync(draftRecipe);
-                _currentRecipeId = draftRecipe.Id;
+                await _db.InsertAsync(_recipe);
+                _currentRecipeId = _recipe.Id;
                 await App.Database.AddRecipeToCategoryAsync(_currentRecipeId.Value, "Koncepty");
             }
             else
             {
-                draftRecipe.Id = _currentRecipeId.Value;
-                await _db.UpdateAsync(draftRecipe);
+                _recipe.Id = _currentRecipeId.Value;
+                await _db.UpdateAsync(_recipe);
             }
         }
 
@@ -521,7 +539,7 @@ namespace MobilniKucharka.Classes.Recipe
         {
             if (string.IsNullOrWhiteSpace(EntryTitle.Text))
             {
-                await DisplayAlert("Upozornění", "Zadej prosím název receptu.", "OK");
+                await DisplayAlert(Tr("Upozornění"), Tr("Zadej prosím název receptu."), "OK");
                 return;
             }
 
@@ -540,37 +558,45 @@ namespace MobilniKucharka.Classes.Recipe
                 _cachedIsNutritionEstimated = IsEstimated;
 
                 double manualCost = double.TryParse(EntryManualCost.Text, out var parsedCost) ? parsedCost : 0;
+                string currentLang = CurrentLang;
 
-                var finalRecipe = new Recipe
-                {
-                    Name_CS = EntryTitle.Text.Trim(),
-                    ImageUrl = _savedImagePath,
-                    IsDraft = false,
-                    Category = "Vytvořené recepty",
-                    Rating = _currentRating,
-                    ManualCost = manualCost,
-                    DescriptionText = DescriptionEditor.Text ?? string.Empty,
-                    IsNutritionEstimated = _cachedIsNutritionEstimated,
-                    ServingSize = int.TryParse(EntryServingSize.Text, out var servings) && servings > 0 ? servings : 4,
-                    IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}")),
-                    StepsJson_CS = JsonSerializer.Serialize(stepRows),
-                    EquipmentJson = JsonSerializer.Serialize(_selectedTags),
-                    PrepTime = int.TryParse(EntryPrepTime.Text, out var prepTime) ? prepTime : 0,
-                    Protein = Protein,
-                    Carbs = Carbs,
-                    Fat = Fat,
-                    Sugar = Sugar
-                };
+                _recipe.ImageUrl = _savedImagePath;
+                _recipe.IsDraft = false;
+                _recipe.Category = "Vytvořené recepty";
+                _recipe.Rating = _currentRating;
+                _recipe.ManualCost = manualCost;
+                _recipe.DescriptionText = DescriptionEditor.Text ?? string.Empty;
+                _recipe.IsNutritionEstimated = _cachedIsNutritionEstimated;
+                _recipe.ServingSize = int.TryParse(EntryServingSize.Text, out var servings) && servings > 0 ? servings : 0;
+                _recipe.IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}"));
+                _recipe.EquipmentJson = JsonSerializer.Serialize(_selectedTags);
+                _recipe.PrepTime = int.TryParse(EntryPrepTime.Text, out var prepTime) ? prepTime : 0;
+                _recipe.Protein = Protein;
+                _recipe.Carbs = Carbs;
+                _recipe.Fat = Fat;
+                _recipe.Sugar = Sugar;
 
-                if (_currentRecipeId == null)
+                string title = EntryTitle.Text.Trim();
+                if (currentLang == "cs")
                 {
-                    await _db.InsertAsync(finalRecipe);
-                    _currentRecipeId = finalRecipe.Id;
+                    _recipe.Name_CS = title;
+                    _recipe.Steps_CS = stepRows;
                 }
                 else
                 {
-                    finalRecipe.Id = _currentRecipeId.Value;
-                    await _db.UpdateAsync(finalRecipe);
+                    _recipe.Name_EN = title;
+                    _recipe.Steps_EN = stepRows;
+                }
+
+                if (_currentRecipeId == null)
+                {
+                    await _db.InsertAsync(_recipe);
+                    _currentRecipeId = _recipe.Id;
+                }
+                else
+                {
+                    _recipe.Id = _currentRecipeId.Value;
+                    await _db.UpdateAsync(_recipe);
                 }
 
                 await App.Database.AddRecipeToCategoryAsync(_currentRecipeId.Value, "Vytvořené recepty");
@@ -580,7 +606,7 @@ namespace MobilniKucharka.Classes.Recipe
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Chyba při ukládání", $"Recept se nepodařilo uložit.\nDetail: {ex.Message}", "OK");
+                await DisplayAlert(Tr("Chyba při ukládání"), $"{Tr("Recept se nepodařilo uložit.")}\n{Tr("Detail")}: {ex.Message}", "OK");
             }
         }
 

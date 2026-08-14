@@ -1,5 +1,6 @@
 ﻿#nullable disable
 using MobilniKucharka.Classes.Recipe;
+using MobilniKucharka.Classes.Recipe.Sharing;
 using MobilniKucharka.Classes.UserData;
 using MobilniKucharka.Classes.UserData.Bookmark;
 using MobilniKucharka.Services;
@@ -16,6 +17,8 @@ namespace MobilniKucharka
             InitializeComponent();
             _budgetService = App.Database;
         }
+
+        private static string Tr(string csText) => MobilniKucharka.Translation.UiTranslator.Tr(csText);
 
         // Zavolá se pokaždé, když se stránka zobrazí na displeji
         protected override async void OnAppearing()
@@ -47,10 +50,10 @@ namespace MobilniKucharka
             if (info != null && info.IsUpdateAvailable)
             {
                 bool download = await DisplayAlert(
-                    "Nová verze je k dispozici",
-                    $"Je dostupná nová verze aplikace ({info.LatestVersion}). Chceš ji nainstalovat? Všechny recepty, záložky a nastavení zůstanou zachovány.",
-                    "Instalovat",
-                    "Pokračovat bez instalace");
+                    Tr("Nová verze je k dispozici"),
+                    string.Format(Tr("Je dostupná nová verze aplikace ({0}). Chceš ji nainstalovat? Všechny recepty, záložky a nastavení zůstanou zachovány."), info.LatestVersion),
+                    Tr("Instalovat"),
+                    Tr("Pokračovat bez instalace"));
 
                 if (download)
                 {
@@ -78,7 +81,7 @@ namespace MobilniKucharka
 
             if (found == null)
             {
-                await DisplayAlert("Chyba", "Nepodařilo se najít žádný recept. Zkontroluj internetové připojení.", "OK");
+                await DisplayAlert(Tr("Chyba"), Tr("Nepodařilo se najít žádný recept. Zkontroluj internetové připojení."), "OK");
                 return;
             }
 
@@ -87,13 +90,15 @@ namespace MobilniKucharka
             if (savedRecipe.ServingSize <= 0)
             {
                 string result = await DisplayPromptAsync(
-                    "Pro kolik lidí je tento recept?",
-                    "Recept neuvádí počet porcí. Zadej, pro kolik lidí jsou suroviny napsané.",
-                    "OK", initialValue: "4", keyboard: Keyboard.Numeric);
+                    Tr("Pro kolik lidí by měl recept být?"),
+                    Tr("Zadej, pro kolik lidí chceš recept uvařit."),
+                    "OK", initialValue: string.Empty, keyboard: Keyboard.Numeric);
 
-                int servingSize = int.TryParse(result, out var parsed) && parsed > 0 ? parsed : 4;
-                await _budgetService.UpdateRecipeServingSizeAsync(savedRecipe.Id, servingSize);
-                savedRecipe.ServingSize = servingSize;
+                if (int.TryParse(result, out var parsed) && parsed > 0)
+                {
+                    await _budgetService.UpdateRecipeServingSizeAsync(savedRecipe.Id, parsed);
+                    savedRecipe.ServingSize = parsed;
+                }
             }
 
             var recipeWithCost = new RecipeWithCost
@@ -132,10 +137,12 @@ namespace MobilniKucharka
 
         private void UpdateSummaryUI()
         {
+            // Načtení aktuálních preferencí pro hlavičku
             int people = Preferences.Default.Get("PeopleCount", 2);
             double budget = Preferences.Default.Get("WeeklyBudget", 2000.0);
 
-            SettingsSummaryLabel.Text = $"{people} osoby | Rozpočet: {budget} Kč/týden";
+            string template = Tr("{0} osoby | Rozpočet: {1} Kč/týden");
+            SettingsSummaryLabel.Text = string.Format(template, people, budget);
         }
 
         private async void OnEditSettingsClicked(object sender, EventArgs e)
@@ -194,18 +201,18 @@ namespace MobilniKucharka
 
         private async void OnResetDatabaseClicked(object sender, EventArgs e)
         {
-            bool confirm = await DisplayAlert("Reset databáze", "Tohle smaže VŠECHNY recepty a záložky a nahradí je testovacími daty. Pokračovat?", "Ano", "Zrušit");
+            bool confirm = await DisplayAlert(Tr("Reset databáze"), Tr("Tohle smaže VŠECHNY recepty a záložky a nahradí je testovacími daty. Pokračovat?"), Tr("Ano"), Tr("Zrušit"));
             if (!confirm) return;
 
             await _budgetService.ResetDatabaseAsync();
             await LoadRecipesDataAsync();
-            await DisplayAlert("Hotovo", "Databáze byla resetována na testovací data.", "OK");
+            await DisplayAlert(Tr("Hotovo"), Tr("Databáze byla resetována na testovací data."), "OK");
         }
 
         private async void OnRepairStepsClicked(object sender, EventArgs e)
         {
             int fixedCount = await _budgetService.RepairAllRecipeStepsAsync();
-            await DisplayAlert("Hotovo", $"Opraveno receptů: {fixedCount}", "OK");
+            await DisplayAlert(Tr("Hotovo"), string.Format(Tr("Opraveno receptů: {0}"), fixedCount), "OK");
         }
 
         private async Task HandlePendingImportAsync(string guid) //link-sharing
@@ -215,12 +222,12 @@ namespace MobilniKucharka
             {
                 int newId = await _budgetService.ImportSharedRecipeAsync(recipe);
                 await _budgetService.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
-                await DisplayAlert("Recept naimportován", $"\"{recipe.Name_CS}\" byl přidán do tvých receptů.", "OK");
+                await DisplayAlert(Tr("Recept naimportován"), string.Format(Tr("\"{0}\" byl přidán do tvých receptů."), recipe.Name), "OK");
                 await LoadRecipesDataAsync();
             }
             else
             {
-                await DisplayAlert("Odkaz neplatný", "Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit).", "OK");
+                await DisplayAlert(Tr("Odkaz neplatný"), Tr("Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit)."), "OK");
             }
         }
     }

@@ -4,6 +4,7 @@ using System.Text.Json;
 using MobilniKucharka.Classes.Recipe;
 using MobilniKucharka.Classes.UserData.Bookmark;
 using MobilniKucharka.Services.Api;
+using MobilniKucharka.Classes.Recipe.Sharing;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
@@ -348,8 +349,8 @@ namespace MobilniKucharka.Services
                 int pricableCount = 0;
                 int pricedCount = 0;
 
-                int effectiveServingSize = recipe.ServingSize > 0 ? recipe.ServingSize : 4;
-                double scaleFactor = peopleCount / (double)effectiveServingSize;
+                int effectiveServingSize = recipe.ServingSize > 0 ? recipe.ServingSize : 0;
+                double scaleFactor = effectiveServingSize > 0 ? peopleCount / (double)effectiveServingSize : 1.0;
 
                 foreach (var line in lines)
                 {
@@ -714,7 +715,8 @@ namespace MobilniKucharka.Services
                 EquipmentJson = "[]",
                 DietaryFlagsJson = JsonSerializer.Serialize(GuessDietFlags(mealDbRecipe.Category)),
                 IngredientsRaw = string.Join("\n", mealDbRecipe.Ingredients.Select(i => $"{i.Name}|{i.Measure}")),
-                SourceUrl = mealDbRecipe.SourceUrl
+                SourceUrl = mealDbRecipe.SourceUrl,
+                ServingSize = 0
             };
 
             await _db.InsertAsync(recipe);

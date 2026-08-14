@@ -15,6 +15,24 @@ namespace MobilniKucharka.Services
                 (s.StartsWith('.') && s.Length > 1));
         }
 
+        private static bool TryGetDestinationPath(string targetDirectory, string archivePath, out string destinationPath)
+        {
+            destinationPath = string.Empty;
+
+            if (Path.IsPathRooted(archivePath)) return false;
+
+            string targetRoot = Path.GetFullPath(targetDirectory);
+            string targetRootWithSeparator = targetRoot.EndsWith(Path.DirectorySeparatorChar)
+                ? targetRoot
+                : targetRoot + Path.DirectorySeparatorChar;
+            string candidate = Path.GetFullPath(Path.Combine(targetRoot, archivePath));
+
+            if (!candidate.StartsWith(targetRootWithSeparator, StringComparison.OrdinalIgnoreCase)) return false;
+
+            destinationPath = candidate;
+            return true;
+        }
+
         public static async Task<string> ExportAsync(IProgress<double>? progress = null)
         {
             string sourceDir = FileSystem.AppDataDirectory;
@@ -81,7 +99,12 @@ namespace MobilniKucharka.Services
                         continue;
                     }
 
-                    string destPath = Path.Combine(targetDir, entry.FullName);
+                    if (!TryGetDestinationPath(targetDir, entry.FullName, out string destPath))
+                    {
+                        processed++;
+                        continue;
+                    }
+
                     Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
 
                     try

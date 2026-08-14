@@ -1,7 +1,7 @@
 ﻿using System.IO.Compression;
 using System.Text.Json;
 
-namespace MobilniKucharka.Services
+namespace MobilniKucharka.Classes.Recipe.Sharing
 {
     public class SharedRecipeData
     {
@@ -21,12 +21,13 @@ namespace MobilniKucharka.Services
         public bool IsNutritionEstimated { get; set; }
         public double ManualCost { get; set; }
         public int PrepTime { get; set; }
+        public int ServingSize { get; set; }
         public bool HasPhoto { get; set; }
     }
 
     public class RecipeShareService
     {
-        public static async Task<string> ExportRecipeAsync(Classes.Recipe.Recipe recipe)
+        public static async Task<string> ExportRecipeAsync(Recipe recipe)
         {
             string exportPath = Path.Combine(FileSystem.CacheDirectory, $"recept_{SanitizeFileName(recipe.Name_CS)}.mkrecept");
             if (File.Exists(exportPath)) File.Delete(exportPath);
@@ -51,6 +52,7 @@ namespace MobilniKucharka.Services
                 IsNutritionEstimated = recipe.IsNutritionEstimated,
                 ManualCost = recipe.ManualCost,
                 PrepTime = recipe.PrepTime,
+                ServingSize = recipe.ServingSize,
                 HasPhoto = hasPhoto
             };
 
@@ -73,7 +75,7 @@ namespace MobilniKucharka.Services
             return exportPath;
         }
 
-        public static async Task<Classes.Recipe.Recipe> ImportRecipeAsync(string filePath)
+        public static async Task<Recipe> ImportRecipeAsync(string filePath)
         {
             SharedRecipeData? shared = null;
             string? photoDestPath = null;
@@ -98,7 +100,7 @@ namespace MobilniKucharka.Services
 
             if (shared == null) throw new InvalidOperationException("Recept se nepodařilo přečíst.");
 
-            return new Classes.Recipe.Recipe
+            return new Recipe
             {
                 Name_CS = shared.Name_CS,
                 Name_EN = shared.Name_EN,
@@ -115,6 +117,7 @@ namespace MobilniKucharka.Services
                 IsNutritionEstimated = shared.IsNutritionEstimated,
                 ManualCost = shared.ManualCost,
                 PrepTime = shared.PrepTime,
+                ServingSize = shared.ServingSize,
                 Category = "Vytvořené recepty",
                 ImageUrl = photoDestPath ?? ""
             };

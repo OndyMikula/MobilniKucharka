@@ -26,7 +26,7 @@
 		<ApplicationId>com.ondymikula.mobilnikucharka</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.4.789 - beta</ApplicationDisplayVersion> <!-- Co vidí user (1.4.789), "- beta" pro oznaceni beta verze -->
+		<ApplicationDisplayVersion>1.4.999</ApplicationDisplayVersion> <!-- Co vidí user (1.4.999), "- beta" pro oznaceni beta verze -->
 		<ApplicationVersion>9</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(9) -->
 		
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
@@ -54,21 +54,7 @@
 		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.111" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Compile Update="Resources\Strings\AppResources.Designer.cs">
-	    <DesignTime>True</DesignTime>
-	    <AutoGen>True</AutoGen>
-	    <DependentUpon>AppResources.resx</DependentUpon>
-	  </Compile>
-	</ItemGroup>
-
-	<ItemGroup>
-	  <EmbeddedResource Update="Resources\Strings\AppResources.resx">
-	    <Generator>PublicResXFileCodeGenerator</Generator>
-	    <LastGenOutput>AppResources.Designer.cs</LastGenOutput>
-	  </EmbeddedResource>
+		<PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="10.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>

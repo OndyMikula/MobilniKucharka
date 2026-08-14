@@ -1,6 +1,7 @@
 ﻿using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Shapes;
 using MobilniKucharka.Classes;
+using MobilniKucharka.Classes.Recipe.Sharing;
 using MobilniKucharka.Classes.UserData.Bookmark;
 using MobilniKucharka.Services;
 using System.Text.RegularExpressions;
@@ -10,7 +11,8 @@ namespace MobilniKucharka.Classes.Recipe;
 public partial class RecipeDetailPage : ContentPage
 {
     private readonly RecipeWithCost _recipeWithCost;
-    private bool _hasAppearedOnce = false;
+
+    private static string Tr(string csText) => Translation.UiTranslator.Tr(csText);
 
     public RecipeDetailPage(RecipeWithCost selectedItem)
     {
@@ -22,14 +24,16 @@ public partial class RecipeDetailPage : ContentPage
         InitializeFavoriteStateAsync();
     }
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (_hasAppearedOnce)
+
+        var updatedRecipe = await App.Database.EnsureRecipeLanguageAsync(_recipeWithCost.Recipe.Id);
+        if (updatedRecipe != null)
         {
-            _ = RefreshFromDatabaseAsync();
+            _recipeWithCost.Recipe = updatedRecipe;
+            PopulateFromCurrentRecipe();
         }
-        _hasAppearedOnce = true;
     }
 
     private async Task RefreshFromDatabaseAsync()
@@ -46,15 +50,16 @@ public partial class RecipeDetailPage : ContentPage
     private void PopulateFromCurrentRecipe()
     {
         RecipeImage.Source = _recipeWithCost.Recipe.ImageUrl;
-        RecipeNameLabel.Text = _recipeWithCost.Recipe.Name_CS;
+        RecipeNameLabel.Text = _recipeWithCost.Recipe.Name; // dřív natvrdo Name_CS - teď jazykově správně
         HeroRatingNumberLabel.Text = _recipeWithCost.Recipe.Rating.ToString("F1");
         StarRatingHelper.Render(HeroStarsHost, _recipeWithCost.Recipe.Rating);
         SetupUserRatingWidget();
 
-        ProteinLabel.Text = $"{_recipeWithCost.Recipe.Protein}g";
-        CarbsLabel.Text = $"{_recipeWithCost.Recipe.Carbs}g";
-        FatLabel.Text = $"{_recipeWithCost.Recipe.Fat}g";
-        SugarLabel.Text = $"{_recipeWithCost.Recipe.Sugar}g";
+        int servings = Math.Max(_recipeWithCost.Recipe.ServingSize, 1);
+        ProteinLabel.Text = FormatNutritionPerServing(_recipeWithCost.Recipe.Protein, servings);
+        CarbsLabel.Text = FormatNutritionPerServing(_recipeWithCost.Recipe.Carbs, servings);
+        FatLabel.Text = FormatNutritionPerServing(_recipeWithCost.Recipe.Fat, servings);
+        SugarLabel.Text = FormatNutritionPerServing(_recipeWithCost.Recipe.Sugar, servings);
         NutritionEstimateLabel.IsVisible = _recipeWithCost.Recipe.IsNutritionEstimated;
 
         if (_recipeWithCost.Recipe.PrepTime > 0)
@@ -65,7 +70,7 @@ public partial class RecipeDetailPage : ContentPage
 
         if (!string.IsNullOrWhiteSpace(_recipeWithCost.Recipe.SourceUrl))
         {
-            SourceLabel.Text = "🔗 Zobrazit původní recept";
+            SourceLabel.Text = "🔗 " + Tr("Zobrazit původní recept");
             SourceLabel.TextDecorations = TextDecorations.Underline;
             SourceLabel.GestureRecognizers.Clear();
             var tap = new TapGestureRecognizer();
@@ -74,11 +79,14 @@ public partial class RecipeDetailPage : ContentPage
         }
         else if (string.IsNullOrWhiteSpace(_recipeWithCost.Recipe.ExternalSourceId))
         {
-            SourceLabel.Text = "Recept vytvořen uživatelem";
+            SourceLabel.Text = Tr("Recept vytvořen uživatelem");
         }
 
         LoadIngredientsAndSteps();
     }
+
+    private static string FormatNutritionPerServing(double total, int servings) =>
+        $"{Math.Round(total / servings, 1):0.#}g";
 
     [GeneratedRegex(@"^(\d+(?:[.,]\d+)?)")]
     private static partial Regex AmountScaleNumberRegexGen();
@@ -116,8 +124,8 @@ public partial class RecipeDetailPage : ContentPage
             }
         }
 
-        int effectiveServingSize = recipe.ServingSize > 0 ? recipe.ServingSize : 4;
-        double scaleFactor = peopleCount / (double)effectiveServingSize;
+        int effectiveServingSize = recipe.ServingSize > 0 ? recipe.ServingSize : 0;
+        double scaleFactor = effectiveServingSize > 0 ? peopleCount / (double)effectiveServingSize : 1.0;
 
         if (ingredients.Count == 0 && !string.IsNullOrWhiteSpace(recipe.IngredientsRaw))
         {
@@ -190,10 +198,12 @@ public partial class RecipeDetailPage : ContentPage
 
         var (totalCost, allPriced) = await App.Database.GetRecipeCostDetailsAsync(recipe.Id, peopleCount);
         TotalPriceLabel.Text = allPriced && totalCost > 0
-            ? $"Celkem za jídlo: {totalCost:N0} Kč"
-            : "Cena nákupu není k dispozici";
+            ? string.Format(Tr("Celkem za jídlo: {0:N0} Kč"), totalCost)
+            : Tr("Cena nákupu není k dispozici");
 
-        PeopleCountBadge.Text = $"({effectiveServingSize} os.)";
+        PeopleCountBadge.Text = effectiveServingSize > 0
+            ? $"({MobilniKucharka.Translation.UiTranslator.TrPeopleCount(effectiveServingSize)})"
+            : string.Empty;
     }
 
     private async void OnIngredientTapped(object sender, TappedEventArgs e)
@@ -360,32 +370,23 @@ public partial class RecipeDetailPage : ContentPage
         bool isDevMode = Preferences.Default.Get("IsDeveloperMode", false);
 
         string[] options = isDevMode
-            ? ["Sdílet recept", "Sdílet přes odkaz", "Přidat do záložky", "Upravit recept", "Smazat recept", "🔧 Zobrazit syrová data kroků"]
-            : ["Sdílet recept", "Sdílet přes odkaz", "Přidat do záložky", "Upravit recept", "Smazat recept"];
+            ? [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Smazat recept"), "🔧 " + Tr("Zobrazit syrová data kroků")]
+            : [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Smazat recept")];
 
-        string action = await DisplayActionSheet("Možnosti receptu", "Zrušit", null, options);
+        string action = await DisplayActionSheet(Tr("Možnosti receptu"), Tr("Zrušit"), null, options);
 
-        switch (action)
-        {
-            case "Sdílet recept":
-                await ShareRecipeAsync();
-                break;
-            case "Sdílet přes odkaz":
-                await ShareRecipeViaLinkAsync();
-                break;
-            case "Přidat do záložky":
-                OnOpenBookmarksClicked(this, EventArgs.Empty);
-                break;
-            case "Upravit recept":
-                await Navigation.PushAsync(new CreateRecipePage(_recipeWithCost.Recipe.Id));
-                break;
-            case "Smazat recept":
-                DeleteOverlay.IsVisible = true;
-                break;
-            case "🔧 Zobrazit syrová data kroků":
-                ShowRawStepsDiagnostic();
-                break;
-        }
+        if (action == Tr("Sdílet recept"))
+            await ShareRecipeAsync();
+        else if (action == Tr("Sdílet přes odkaz"))
+            await ShareRecipeViaLinkAsync();
+        else if (action == Tr("Přidat do záložky"))
+            OnOpenBookmarksClicked(this, EventArgs.Empty);
+        else if (action == Tr("Upravit recept"))
+            await Navigation.PushAsync(new CreateRecipePage(_recipeWithCost.Recipe.Id));
+        else if (action == Tr("Smazat recept"))
+            DeleteOverlay.IsVisible = true;
+        else if (action == "🔧 " + Tr("Zobrazit syrová data kroků"))
+            ShowRawStepsDiagnostic();
     }
 
     private async Task ShareRecipeAsync()
@@ -396,13 +397,13 @@ public partial class RecipeDetailPage : ContentPage
 
             await Share.Default.RequestAsync(new ShareFileRequest
             {
-                Title = $"Sdílet recept: {_recipeWithCost.Recipe.Name_CS}",
+                Title = $"{Tr("Sdílet recept")}: {_recipeWithCost.Recipe.Name}",
                 File = new ShareFile(filePath)
             });
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Chyba", $"Sdílení se nepodařilo: {ex.Message}", "OK");
+            await DisplayAlert(Tr("Chyba"), $"{Tr("Sdílení se nepodařilo")}: {ex.Message}", "OK");
         }
     }
 
@@ -412,14 +413,16 @@ public partial class RecipeDetailPage : ContentPage
 
         if (link == null)
         {
-            await DisplayAlert("Chyba", "Odkaz se nepodařilo vytvořit. Zkontroluj internetové připojení.", "OK");
+            await DisplayAlert(Tr("Chyba"), Tr("Odkaz se nepodařilo vytvořit. Zkontroluj internetové připojení."), "OK");
             return;
         }
 
+        string bodyTemplate = Tr("Podívej se na tento recept ({0}) v Mobilní Kuchařce: {1}\n(Odkaz je platný 24 hodin nebo dokud ho neotevřeš.)");
+
         await Share.Default.RequestAsync(new ShareTextRequest
         {
-            Title = $"Recept: {_recipeWithCost.Recipe.Name_CS}",
-            Text = $"Podívej se na tento recept ({_recipeWithCost.Recipe.Name_CS}) v Mobilní Kuchařce: {link}\n(Odkaz je platný 24 hodin nebo dokud ho neotevřeš.)"
+            Title = $"{Tr("Recept")}: {_recipeWithCost.Recipe.Name}",
+            Text = string.Format(bodyTemplate, _recipeWithCost.Recipe.Name, link)
         });
     }
 
@@ -476,10 +479,4 @@ public partial class RecipeDetailPage : ContentPage
 
         await App.Database.UpdateRecipeRatingAsync(_recipeWithCost.Recipe.Id, roundedValue);
     }
-}
-
-public class DisplayStep
-{
-    public int StepNumber { get; set; }
-    public string StepText { get; set; } = string.Empty;
 }

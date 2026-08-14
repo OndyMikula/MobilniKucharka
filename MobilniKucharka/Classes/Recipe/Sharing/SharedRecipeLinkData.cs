@@ -1,4 +1,4 @@
-﻿namespace MobilniKucharka.Services
+﻿namespace MobilniKucharka.Classes.Recipe.Sharing
 {
     public class SharedRecipeLinkData
     {
