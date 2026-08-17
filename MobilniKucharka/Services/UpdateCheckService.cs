@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace MobilniKucharka.Services
 {
@@ -10,7 +11,7 @@ namespace MobilniKucharka.Services
         public string? ApkDownloadUrl { get; set; }
     }
 
-    public class UpdateCheckService
+    public partial class UpdateCheckService
     {
         private readonly HttpClient _httpClient = new();
         private const string RepoOwner = "OndyMikula";
@@ -25,21 +26,40 @@ namespace MobilniKucharka.Services
             {
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("MobilniKucharka-App");
 
-                string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
+                bool isBetaBuild = AppInfo.Current.VersionString.Contains("beta", StringComparison.OrdinalIgnoreCase);
+                bool isOptedIntoBeta = Preferences.Default.Get("IsBetaOptedIn", false);
+                bool checkBothChannels = isBetaBuild || isOptedIntoBeta;
+
+                string url = checkBothChannels
+                    ? $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases"
+                    : $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
+
                 var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode) return null;
 
                 var contentString = await response.Content.ReadAsStringAsync();
-                if (string.IsNullOrWhiteSpace(contentString) || !contentString.StartsWith('{'))
-                    return null;
+                if (string.IsNullOrWhiteSpace(contentString)) return null;
 
-                var root = JsonSerializer.Deserialize<JsonElement>(contentString);
+                JsonElement releaseElement;
 
-                string tagName = root.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? "" : "";
-                string htmlUrl = root.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() ?? "" : "";
+                if (checkBothChannels)
+                {
+                    if (!contentString.TrimStart().StartsWith('[')) return null;
+                    var releases = JsonSerializer.Deserialize<JsonElement>(contentString);
+                    if (releases.ValueKind != JsonValueKind.Array || releases.GetArrayLength() == 0) return null;
+                    releaseElement = releases[0];
+                }
+                else
+                {
+                    if (!contentString.TrimStart().StartsWith('{')) return null;
+                    releaseElement = JsonSerializer.Deserialize<JsonElement>(contentString);
+                }
+
+                string tagName = releaseElement.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? "" : "";
+                string htmlUrl = releaseElement.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() ?? "" : "";
 
                 string? apkUrl = null;
-                if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
+                if (releaseElement.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var asset in assets.EnumerateArray())
                     {
@@ -65,7 +85,7 @@ namespace MobilniKucharka.Services
             }
             catch
             {
-                return null; // bez internetu / GitHub nedostupný -> potichu nic nedělat
+                return null;
             }
         }
 
@@ -74,23 +94,15 @@ namespace MobilniKucharka.Services
 #if ANDROID
             try
             {
+                if (!OperatingSystem.IsAndroidVersionAtLeast(30)) return false;
+
                 var context = Android.App.Application.Context;
-                var packageManager = context.PackageManager;
                 string packageName = context.PackageName ?? "";
+                var packageManager = context.PackageManager;
 
                 if (packageManager == null) return false;
 
-                string? installer;
-
-                if (OperatingSystem.IsAndroidVersionAtLeast(30))
-                {
-                    installer = packageManager.GetInstallSourceInfo(packageName)?.InstallingPackageName;
-                }
-                else
-                {
-                    installer = packageManager.GetInstallerPackageName(packageName); //cesta pro android verze 20+
-                }
-
+                string? installer = packageManager.GetInstallSourceInfo(packageName)?.InstallingPackageName;
                 return installer == "com.android.vending";
             }
             catch
@@ -102,10 +114,24 @@ namespace MobilniKucharka.Services
 #endif
         }
 
+        [GeneratedRegex(@"^\d+(\.\d+)*")]
+        private static partial Regex VersionCoreRegexGen();
+
+        private static (string Core, bool IsBeta) SplitVersionAndBeta(string version)
+        {
+            bool isBeta = version.Contains("beta", StringComparison.OrdinalIgnoreCase);
+            var match = VersionCoreRegexGen().Match(version);
+            string core = match.Success ? match.Value : version;
+            return (core, isBeta);
+        }
+
         private static int CompareVersions(string v1, string v2)
         {
-            var parts1 = v1.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
-            var parts2 = v2.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
+            var (core1, isBeta1) = SplitVersionAndBeta(v1);
+            var (core2, isBeta2) = SplitVersionAndBeta(v2);
+
+            var parts1 = core1.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
+            var parts2 = core2.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
 
             int maxLength = Math.Max(parts1.Length, parts2.Length);
             for (int i = 0; i < maxLength; i++)
@@ -114,7 +140,9 @@ namespace MobilniKucharka.Services
                 int p2 = i < parts2.Length ? parts2[i] : 0;
                 if (p1 != p2) return p1.CompareTo(p2);
             }
-            return 0;
+
+            if (isBeta1 == isBeta2) return 0;
+            return isBeta1 ? -1 : 1; // beta a stabilní se stejným číslem -> stabilní vyhrává
         }
     }
 }

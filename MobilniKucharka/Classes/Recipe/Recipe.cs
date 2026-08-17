@@ -30,6 +30,7 @@ namespace MobilniKucharka.Classes.Recipe
         //User created recipe data
         public string DescriptionText { get; set; } = string.Empty; // Popis receptu (např. "Tento recept je rychlý a jednoduchý.")
         public bool IsNutritionEstimated { get; set; } // TRUE = Nutriční hodnoty jsou odhadnuté, FALSE = Nutriční hodnoty jsou přesné (např. z API)
+        public int ServingSize { get; set; }
         public string IngredientsRaw { get; set; } = string.Empty; // Suroviny (např. "1 vejce|1 ks\nMouka|200 g")
         public string StepsRaw { get; set; } = string.Empty; // Postup (např. "1. Smíchejte ingredience.\n2. Pečte 20 minut.")
 
@@ -50,9 +51,10 @@ namespace MobilniKucharka.Classes.Recipe
         {
             get
             {
-                // Přečteme aktuální jazyk (výchozí je čeština)
                 string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
-                return currentLang == "cs" ? Name_CS : Name_EN;
+                string primary = currentLang == "cs" ? Name_CS : Name_EN;
+                string fallback = currentLang == "cs" ? Name_EN : Name_CS;
+                return !string.IsNullOrWhiteSpace(primary) ? primary : fallback;
             }
         }
 
@@ -65,7 +67,11 @@ namespace MobilniKucharka.Classes.Recipe
         {
             get
             {
-                _stepsCs ??= string.IsNullOrEmpty(StepsJson_CS) ? [] : JsonSerializer.Deserialize<List<string>>(StepsJson_CS) ?? [];
+                if (_stepsCs == null)
+                {
+                    try { _stepsCs = string.IsNullOrEmpty(StepsJson_CS) ? [] : JsonSerializer.Deserialize<List<string>>(StepsJson_CS) ?? []; }
+                    catch (JsonException) { _stepsCs = []; }
+                }
                 return _stepsCs;
             }
             set
@@ -81,7 +87,11 @@ namespace MobilniKucharka.Classes.Recipe
         {
             get
             {
-                _stepsEn ??= string.IsNullOrEmpty(StepsJson_EN) ? [] : JsonSerializer.Deserialize<List<string>>(StepsJson_EN) ?? [];
+                if (_stepsEn == null)
+                {
+                    try { _stepsEn = string.IsNullOrEmpty(StepsJson_EN) ? [] : JsonSerializer.Deserialize<List<string>>(StepsJson_EN) ?? []; }
+                    catch (JsonException) { _stepsEn = []; }
+                }
                 return _stepsEn;
             }
             set

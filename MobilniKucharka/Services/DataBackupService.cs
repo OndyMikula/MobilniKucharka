@@ -2,8 +2,37 @@
 
 namespace MobilniKucharka.Services
 {
-    public class DataBackupService
+    public static class DataBackupService
     {
+        // Interní adresáře .NET/Android tooling (např. fast-deploy override), nikdy ne uživatelská data
+        private static readonly string[] ExcludedFolderNames = [".__override__"];
+
+        private static bool IsExcludedPath(string relativePath)
+        {
+            var segments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return segments.Any(s =>
+                ExcludedFolderNames.Contains(s, StringComparer.OrdinalIgnoreCase) ||
+                (s.StartsWith('.') && s.Length > 1));
+        }
+
+        private static bool TryGetDestinationPath(string targetDirectory, string archivePath, out string destinationPath)
+        {
+            destinationPath = string.Empty;
+
+            if (Path.IsPathRooted(archivePath)) return false;
+
+            string targetRoot = Path.GetFullPath(targetDirectory);
+            string targetRootWithSeparator = targetRoot.EndsWith(Path.DirectorySeparatorChar)
+                ? targetRoot
+                : targetRoot + Path.DirectorySeparatorChar;
+            string candidate = Path.GetFullPath(Path.Combine(targetRoot, archivePath));
+
+            if (!candidate.StartsWith(targetRootWithSeparator, StringComparison.OrdinalIgnoreCase)) return false;
+
+            destinationPath = candidate;
+            return true;
+        }
+
         public static async Task<string> ExportAsync(IProgress<double>? progress = null)
         {
             string sourceDir = FileSystem.AppDataDirectory;
@@ -11,8 +40,12 @@ namespace MobilniKucharka.Services
 
             if (File.Exists(exportPath)) File.Delete(exportPath);
 
-            var files = Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories);
-            int total = Math.Max(files.Length, 1);
+            var allFiles = Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories);
+            var files = allFiles
+                .Where(f => !IsExcludedPath(Path.GetRelativePath(sourceDir, f)))
+                .ToList();
+
+            int total = Math.Max(files.Count, 1);
             int processed = 0;
 
             await Task.Run(() =>
@@ -35,6 +68,16 @@ namespace MobilniKucharka.Services
                 }
             });
 
+            try
+            {
+                using var verify = ZipFile.OpenRead(exportPath);
+                _ = verify.Entries.Count;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Export vytvořil poškozený soubor zálohy: {ex.Message}", ex);
+            }
+
             return exportPath;
         }
 
@@ -50,15 +93,28 @@ namespace MobilniKucharka.Services
 
                 foreach (var entry in zip.Entries)
                 {
-                    if (string.IsNullOrEmpty(entry.Name))
+                    if (string.IsNullOrEmpty(entry.Name) || IsExcludedPath(entry.FullName))
                     {
                         processed++;
                         continue;
                     }
 
-                    string destPath = Path.Combine(targetDir, entry.FullName);
+                    if (!TryGetDestinationPath(targetDir, entry.FullName, out string destPath))
+                    {
+                        processed++;
+                        continue;
+                    }
+
                     Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
-                    entry.ExtractToFile(destPath, overwrite: true);
+
+                    try
+                    {
+                        entry.ExtractToFile(destPath, overwrite: true);
+                    }
+                    catch
+                    {
+                        // soubor uzamčený systémem/tooling -> přeskočíme (nemělo by jít o uživatelská data)
+                    }
 
                     processed++;
                     progress?.Report((double)processed / total);

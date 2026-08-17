@@ -22,6 +22,7 @@ jobs:
           $version = [regex]::Match($csproj, '<ApplicationDisplayVersion>(.*?)</ApplicationDisplayVersion>').Groups[1].Value
           Write-Host "Verze načtená z csproj: '$version'"
           echo "version=$version" >> $env:GITHUB_OUTPUT
+          echo "safe_tag=$safeTag" >> $env:GITHUB_OUTPUT
 
       - name: Check if this version was already released
         id: check
@@ -115,7 +116,7 @@ jobs:
         shell: pwsh
         run: |
           $apkFile = Get-ChildItem -Path "MobilniKucharka/bin/Release/net9.0-android" -Filter "*Signed.apk" -Recurse | Select-Object -First 1
-          $newName = "MobilniKucharka-v${{ steps.version.outputs.version }}.apk"
+          $newName = "MobilniKucharka-v${{ steps.version.outputs.safe_tag }}.apk"
           $newPath = Join-Path $apkFile.DirectoryName $newName
           Copy-Item $apkFile.FullName $newPath -Force
           Write-Host "Přejmenováno na: $newPath"
@@ -125,7 +126,7 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
+          tag_name: v${{ steps.version.outputs.safe_tag }}
           name: v${{ steps.version.outputs.version }} (Beta)
           body_path: CHANGELOG_BODY.md
           prerelease: true

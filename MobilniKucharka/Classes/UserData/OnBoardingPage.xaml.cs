@@ -1,7 +1,4 @@
-﻿using Microsoft.Maui;
-using MobilniKucharka.Classes.UserData;
-
-namespace MobilniKucharka
+﻿namespace MobilniKucharka.Classes.UserData
 {
     public partial class OnboardingPage : ContentPage
     {
@@ -15,14 +12,14 @@ namespace MobilniKucharka
             UpdateStepUI();
         }
 
+        private static string Tr(string csText) => MobilniKucharka.Translation.UiTranslator.Tr(csText);
+
         private void OnPeopleChanged(object sender, ValueChangedEventArgs e)
         {
             int people = (int)e.NewValue;
             _preferences.PeopleCount = people;
 
-            if (people == 1) PeopleLabel.Text = "1 osoba";
-            else if (people > 1 && people < 5) PeopleLabel.Text = $"{people} lidé";
-            else PeopleLabel.Text = $"{people} lidí";
+            PeopleLabel.Text = MobilniKucharka.Translation.UiTranslator.TrPeopleCount(people);
         }
 
         private void OnBudgetChanged(object sender, ValueChangedEventArgs e)
@@ -64,24 +61,24 @@ namespace MobilniKucharka
             Step3_Appliances.IsVisible = false;
 
             BackButton.IsVisible = _currentStep > 1;
-            NextButton.Text = _currentStep == _totalSteps ? "Vygenerovat jídelníček" : "Pokračovat";
+            NextButton.Text = _currentStep == _totalSteps ? Tr("Vygenerovat jídelníček") : Tr("Pokračovat");
             WizardProgress.Progress = (double)_currentStep / _totalSteps;
 
             switch (_currentStep)
             {
                 case 1:
-                    StepTitle.Text = "Počet lidí a rozpočet";
-                    StepDescription.Text = "Nastav, kolik krků budeš krmit a kolik peněz chceš utratit.";
+                    StepTitle.Text = Tr("Počet lidí a rozpočet");
+                    StepDescription.Text = Tr("Nastav, kolik lidí budeš krmit a kolik peněz chceš utratit.");
                     Step1_Budget.IsVisible = true;
                     break;
                 case 2:
-                    StepTitle.Text = "Stravovací návyky";
-                    StepDescription.Text = "Omezíme recepty, které nevyhovují tvým potřebám.";
+                    StepTitle.Text = Tr("Stravovací návyky");
+                    StepDescription.Text = Tr("Omezíme recepty, které nevyhovují tvým potřebám.");
                     Step2_Diets.IsVisible = true;
                     break;
                 case 3:
-                    StepTitle.Text = "Co máš v kuchyni?";
-                    StepDescription.Text = "Nebudeme ti navrhovat pečení v troubě, pokud máš jen mikrovlnku.";
+                    StepTitle.Text = Tr("Co máš v kuchyni?");
+                    StepDescription.Text = Tr("Nebudeme ti navrhovat pečení v troubě, pokud máš jen mikrovlnku.");
                     Step3_Appliances.IsVisible = true;
                     break;
             }

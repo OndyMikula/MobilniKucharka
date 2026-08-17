@@ -363,3 +363,7 @@ MigrationBackup/
 FodyWeavers.xsd
 /MobilniKucharka/Services/Secrets.cs
 /com.ondymikula.mobilnikucharka.apk
+/MobilniKucharka/.vscode/mcp.json
+/MobilniKucharka/crash_log.txt
+/CLAUDE.md
+/AGENTS.md

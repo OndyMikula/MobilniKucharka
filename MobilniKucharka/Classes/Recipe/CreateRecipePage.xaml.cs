@@ -2,6 +2,7 @@
 using MobilniKucharka.Services.Api;
 using SQLite;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace MobilniKucharka.Classes.Recipe
 {
@@ -14,6 +15,13 @@ namespace MobilniKucharka.Classes.Recipe
         private string _savedImagePath = string.Empty;
         private readonly NutritionixService _nutritionixService = new();
 
+        private bool _isLoadingRecipe = false;
+
+        // Perzistentní objekt receptu - autosave do něj MUTUJE, místo aby pokaždé vytvářel nový Recipe()
+        // a přes UpdateAsync smazal pole, která tahle stránka nespravuje (Name_EN, StepsJson_EN, SourceUrl,
+        // ExternalSourceId, BookmarkId, DietaryFlagsJson...). Stejná třída bugu jako kdysi u RatingSlideru.
+        private Recipe _recipe = new();
+
         private readonly HashSet<string> _selectedTags = [];
         private readonly Dictionary<string, Border> _tagButtons = [];
 
@@ -22,6 +30,9 @@ namespace MobilniKucharka.Classes.Recipe
         private double _cachedFat = 0;
         private double _cachedSugar = 0;
         private bool _cachedIsNutritionEstimated = false;
+
+        private static string Tr(string csText) => MobilniKucharka.Translation.UiTranslator.Tr(csText);
+        private static string CurrentLang => Preferences.Default.Get("AppLanguageCode", "cs");
 
         public CreateRecipePage()
         {
@@ -55,69 +66,82 @@ namespace MobilniKucharka.Classes.Recipe
 
         private async void LoadRecipeForEditing(int id)
         {
-            var recipe = await App.Database.GetRecipeByIdAsync(id);
-            if (recipe == null) return;
-
-            _cachedProtein = recipe.Protein;
-            _cachedCarbs = recipe.Carbs;
-            _cachedFat = recipe.Fat;
-            _cachedSugar = recipe.Sugar;
-            _cachedIsNutritionEstimated = recipe.IsNutritionEstimated;
-
-            EntryTitle.Text = recipe.Name_CS;
-            DescriptionEditor.Text = recipe.DescriptionText;
-            EntryManualCost.Text = recipe.ManualCost > 0 ? recipe.ManualCost.ToString("F0") : "";
-
-            if (!string.IsNullOrWhiteSpace(recipe.ImageUrl))
+            _isLoadingRecipe = true;
+            try
             {
-                _savedImagePath = recipe.ImageUrl;
-                RecipeImagePreview.Source = ImageSource.FromFile(recipe.ImageUrl);
-                RecipeImagePreview.IsVisible = true;
-            }
+                var recipe = await App.Database.GetRecipeByIdAsync(id);
+                if (recipe == null) return;
 
-            _currentRating = recipe.Rating;
-            RatingSlider.Value = recipe.Rating;
+                _recipe = recipe; // od teď mutujeme tenhle stejný objekt, ne kopii
 
-            IngredientsContainer.Clear();
-            if (!string.IsNullOrWhiteSpace(recipe.IngredientsRaw))
-            {
-                var lines = recipe.IngredientsRaw.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-                foreach (var line in lines)
+                _cachedProtein = recipe.Protein;
+                _cachedCarbs = recipe.Carbs;
+                _cachedFat = recipe.Fat;
+                _cachedSugar = recipe.Sugar;
+                _cachedIsNutritionEstimated = recipe.IsNutritionEstimated;
+
+                EntryTitle.Text = recipe.Name; // jazykově správně, dřív natvrdo Name_CS
+                DescriptionEditor.Text = recipe.DescriptionText;
+                EntryManualCost.Text = recipe.ManualCost > 0 ? recipe.ManualCost.ToString("F0") : "";
+                EntryServingSize.Text = recipe.ServingSize > 0 ? recipe.ServingSize.ToString() : string.Empty;
+                EntryPrepTime.Text = recipe.PrepTime > 0 ? recipe.PrepTime.ToString() : "";
+
+                if (!string.IsNullOrWhiteSpace(recipe.ImageUrl))
                 {
-                    var parts = line.Split('|');
-                    AddIngredientRow(parts.ElementAtOrDefault(0) ?? "", parts.ElementAtOrDefault(1) ?? "");
+                    _savedImagePath = recipe.ImageUrl;
+                    RecipeImagePreview.Source = ImageSource.FromFile(recipe.ImageUrl);
+                    RecipeImagePreview.IsVisible = true;
                 }
-            }
-            if (IngredientsContainer.Count == 0)
-            {
-                for (int i = 0; i < 3; i++) AddIngredientRow();
-            }
 
-            StepsContainer.Clear();
-            var savedSteps = recipe.Steps_CS;
-            if (savedSteps.Count > 0)
-            {
-                foreach (var step in savedSteps)
-                    AddStepRow(step);
-            }
-            else
-            {
-                for (int i = 0; i < 3; i++) AddStepRow();
-            }
+                _currentRating = recipe.Rating;
+                RatingSlider.Value = recipe.Rating;
 
-            _selectedTags.Clear();
-            foreach (var tag in recipe.Equipment)
-            {
-                if (_tagButtons.TryGetValue(tag, out var existingChip))
+                IngredientsContainer.Clear();
+                if (!string.IsNullOrWhiteSpace(recipe.IngredientsRaw))
                 {
-                    var label = (Label)existingChip.Content!;
-                    SetTagButtonSelected(existingChip, label, true);
-                    _selectedTags.Add(tag);
+                    var lines = recipe.IngredientsRaw.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in lines)
+                    {
+                        var parts = line.Split('|');
+                        var (qty, unit) = SplitAmountForEditing(parts.ElementAtOrDefault(1) ?? "");
+                        AddIngredientRow(parts.ElementAtOrDefault(0) ?? "", qty, unit);
+                    }
+                }
+                if (IngredientsContainer.Count == 0)
+                {
+                    for (int i = 0; i < 3; i++) AddIngredientRow();
+                }
+
+                StepsContainer.Clear();
+                var savedSteps = CurrentLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
+                if (savedSteps.Count > 0)
+                {
+                    foreach (var step in savedSteps)
+                        AddStepRow(step);
                 }
                 else
                 {
-                    AddTagButton(tag, isSelected: true);
+                    for (int i = 0; i < 3; i++) AddStepRow();
                 }
+
+                _selectedTags.Clear();
+                foreach (var tag in recipe.Equipment)
+                {
+                    if (_tagButtons.TryGetValue(tag, out var existingChip))
+                    {
+                        var label = (Label)existingChip.Content!;
+                        SetTagButtonSelected(existingChip, label, true);
+                        _selectedTags.Add(tag);
+                    }
+                    else
+                    {
+                        AddTagButton(tag, isSelected: true);
+                    }
+                }
+            }
+            finally
+            {
+                _isLoadingRecipe = false;
             }
         }
 
@@ -130,6 +154,35 @@ namespace MobilniKucharka.Classes.Recipe
             {
                 EntryManualCost.Text = filtered;
             }
+        }
+
+        [GeneratedRegex(@"^(\d+(?:[.,]\d+)?)\s*(.*)$")]
+        private static partial Regex AmountSplitRegexGen();
+
+        private static (string Quantity, string Unit) SplitAmountForEditing(string amount)
+        {
+            if (string.IsNullOrWhiteSpace(amount)) return ("", "g");
+
+            var match = AmountSplitRegexGen().Match(amount.Trim());
+            if (!match.Success) return (amount, ""); // volný text (např. "podle chuti") -> žádná jednotka se nevymýšlí
+
+            string quantity = match.Groups[1].Value;
+            string unitRaw = match.Groups[2].Value.Trim().ToLowerInvariant();
+
+            string unit = unitRaw switch
+            {
+                "kg" => "kg",
+                "ml" => "ml",
+                "l" => "l",
+                var u when u.Contains("lžíce") || u.Contains("tbsp") => "lžíce",
+                var u when u.Contains("lžička") || u.Contains("tsp") => "lžička",
+                var u when u.Contains("ks") || u.Contains("kus") => "ks",
+                "x" => "ks",
+                "" => "ks",
+                _ => "g"
+            };
+
+            return (quantity, unit);
         }
 
         private void AddTagButton(string tagName, bool isSelected = false)
@@ -233,7 +286,7 @@ namespace MobilniKucharka.Classes.Recipe
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Chyba", $"Nepodařilo se načíst obrázek: {ex.Message}", "OK");
+                await DisplayAlert(Tr("Chyba"), $"{Tr("Nepodařilo se načíst obrázek")}: {ex.Message}", "OK");
             }
         }
 
@@ -248,23 +301,39 @@ namespace MobilniKucharka.Classes.Recipe
             }
 
             _currentRating = roundedValue;
-            RatingTextLabel.Text = $"Hodnocení: {_currentRating:F1} / 5";
+            RatingTextLabel.Text = string.Format(Tr("Hodnocení: {0:F1} / 5"), _currentRating);
 
             StarRatingHelper.Render(StarsHost, _currentRating, starSize: 30);
 
             _ = TriggerAutoSaveAsync();
         }
 
-        private void AddIngredientRow(string initialName = "", string initialAmount = "")
+        private static readonly string[] UnitOptions = ["g", "kg", "ml", "l", "lžíce", "lžička", "ks"];
+
+        private void AddIngredientRow(string initialName = "", string initialAmount = "", string initialUnit = "g")
         {
-            var grid = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
-            var nameEntry = new Entry { Placeholder = "Název ingredience", Text = initialName };
+            var grid = new Grid
+            {
+                ColumnDefinitions =
+        {
+            new ColumnDefinition(GridLength.Star),
+            new ColumnDefinition(GridLength.Auto),
+            new ColumnDefinition(GridLength.Auto)
+        }
+            };
+
+            var nameEntry = new Entry { Placeholder = Tr("Název ingredience"), Text = initialName };
             nameEntry.TextChanged += OnFieldChanged;
-            var amountEntry = new Entry { Placeholder = "Množství (např. 100g)", WidthRequest = 150, Text = initialAmount };
+
+            var amountEntry = new Entry { Placeholder = Tr("Množství"), WidthRequest = 70, Keyboard = Keyboard.Numeric, Text = initialAmount };
             amountEntry.TextChanged += OnFieldChanged;
+
+            var unitPicker = new Picker { WidthRequest = 90, ItemsSource = UnitOptions, SelectedItem = initialUnit };
+            unitPicker.SelectedIndexChanged += (s, e) => _ = TriggerAutoSaveAsync();
 
             grid.Add(nameEntry, 0);
             grid.Add(amountEntry, 1);
+            grid.Add(unitPicker, 2);
             IngredientsContainer.Add(grid);
         }
 
@@ -282,7 +351,7 @@ namespace MobilniKucharka.Classes.Recipe
             };
 
             var emoji = new Label { Text = "👉", VerticalOptions = LayoutOptions.Center, Margin = new Thickness(0, 0, 5, 0) };
-            var stepEntry = new Entry { Placeholder = "Popiš tento krok...", Text = initialText };
+            var stepEntry = new Entry { Placeholder = Tr("Popiš tento krok..."), Text = initialText };
             stepEntry.TextChanged += OnFieldChanged;
 
             var upButton = new Button { Text = "▲", FontSize = 12, WidthRequest = 36, HeightRequest = 36, Padding = 0, Margin = new Thickness(4, 0, 0, 0) };
@@ -320,13 +389,19 @@ namespace MobilniKucharka.Classes.Recipe
 
             foreach (var child in IngredientsContainer.Children)
             {
-                if (child is Grid grid && grid.Children.Count >= 2)
+                if (child is Grid grid && grid.Children.Count >= 3)
                 {
                     string name = (grid.Children[0] as Entry)?.Text?.Trim() ?? "";
-                    string amount = (grid.Children[1] as Entry)?.Text?.Trim() ?? "";
+                    string quantity = (grid.Children[1] as Entry)?.Text?.Trim() ?? "";
+                    string unit = (grid.Children[2] as Picker)?.SelectedItem as string ?? "g";
 
-                    if (!string.IsNullOrWhiteSpace(name))
-                        result.Add((name, amount));
+                    if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(quantity)) continue;
+
+                    // Jednotku přidáváme jen tehdy, když je v množství skutečně číslo -
+                    // u volného textu (např. "podle chuti") by přidaná jednotka nedávala smysl a jen by se hromadila při každé úpravě.
+                    string combinedAmount = quantity.Any(char.IsDigit) ? $"{quantity} {unit}" : quantity;
+
+                    result.Add((name, combinedAmount));
                 }
             }
 
@@ -372,6 +447,17 @@ namespace MobilniKucharka.Classes.Recipe
             return (Protein, Carbs, Fat, Sugar, true);
         }
 
+        private void OnPrepTimeTextChanged(object? sender, TextChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.NewTextValue)) return;
+
+            string filtered = new([.. e.NewTextValue.Where(char.IsDigit)]);
+            if (filtered != e.NewTextValue)
+            {
+                EntryPrepTime.Text = filtered;
+            }
+        }
+
         private async void OnFieldChanged(object? sender, TextChangedEventArgs e)
         {
             await TriggerAutoSaveAsync();
@@ -379,39 +465,51 @@ namespace MobilniKucharka.Classes.Recipe
 
         private async Task TriggerAutoSaveAsync()
         {
+            if (_isLoadingRecipe) return; // recept se ještě načítá k úpravě -> nesmíme přepsat data polovičně natažené kopie
+
             var ingredientRows = CollectIngredientRows();
             var stepRows = CollectStepRows();
             double manualCost = double.TryParse(EntryManualCost.Text, out var parsedCost) ? parsedCost : 0;
+            string currentLang = CurrentLang;
 
-            var draftRecipe = new MobilniKucharka.Classes.Recipe.Recipe
+            _recipe.ImageUrl = _savedImagePath;
+            _recipe.IsDraft = !_isEditingExisting; // úprava hotového receptu ho autosave nesmí "vrátit" zpět mezi koncepty
+            _recipe.Category = "Vytvořené recepty";
+            _recipe.Rating = _currentRating;
+            _recipe.ManualCost = manualCost;
+            _recipe.ServingSize = int.TryParse(EntryServingSize.Text, out var draftServings) && draftServings > 0 ? draftServings : 0;
+            _recipe.DescriptionText = DescriptionEditor.Text ?? string.Empty;
+            _recipe.IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}"));
+            _recipe.EquipmentJson = JsonSerializer.Serialize(_selectedTags);
+            _recipe.PrepTime = int.TryParse(EntryPrepTime.Text, out var draftPrepTime) ? draftPrepTime : 0;
+            _recipe.Protein = _cachedProtein;
+            _recipe.Carbs = _cachedCarbs;
+            _recipe.Fat = _cachedFat;
+            _recipe.Sugar = _cachedSugar;
+            _recipe.IsNutritionEstimated = _cachedIsNutritionEstimated;
+
+            string title = string.IsNullOrWhiteSpace(EntryTitle.Text) ? Tr("Rozepsaný recept") : EntryTitle.Text.Trim();
+            if (currentLang == "cs")
             {
-                Name_CS = string.IsNullOrWhiteSpace(EntryTitle.Text) ? "Rozepsaný recept" : EntryTitle.Text.Trim(),
-                ImageUrl = _savedImagePath,
-                IsDraft = !_isEditingExisting, // úprava hotového receptu ho autosave nesmí "vrátit" zpět mezi koncepty
-                Category = "Vytvořené recepty",
-                Rating = _currentRating,
-                ManualCost = manualCost,
-                DescriptionText = DescriptionEditor.Text ?? string.Empty,
-                IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}")),
-                StepsJson_CS = JsonSerializer.Serialize(stepRows),
-                EquipmentJson = JsonSerializer.Serialize(_selectedTags),
-                Protein = _cachedProtein,
-                Carbs = _cachedCarbs,
-                Fat = _cachedFat,
-                Sugar = _cachedSugar,
-                IsNutritionEstimated = _cachedIsNutritionEstimated
-            };
+                _recipe.Name_CS = title;
+                _recipe.Steps_CS = stepRows;
+            }
+            else
+            {
+                _recipe.Name_EN = title;
+                _recipe.Steps_EN = stepRows;
+            }
 
             if (_currentRecipeId == null)
             {
-                await _db.InsertAsync(draftRecipe);
-                _currentRecipeId = draftRecipe.Id;
+                await _db.InsertAsync(_recipe);
+                _currentRecipeId = _recipe.Id;
                 await App.Database.AddRecipeToCategoryAsync(_currentRecipeId.Value, "Koncepty");
             }
             else
             {
-                draftRecipe.Id = _currentRecipeId.Value;
-                await _db.UpdateAsync(draftRecipe);
+                _recipe.Id = _currentRecipeId.Value;
+                await _db.UpdateAsync(_recipe);
             }
         }
 
@@ -441,7 +539,7 @@ namespace MobilniKucharka.Classes.Recipe
         {
             if (string.IsNullOrWhiteSpace(EntryTitle.Text))
             {
-                await DisplayAlert("Upozornění", "Zadej prosím název receptu.", "OK");
+                await DisplayAlert(Tr("Upozornění"), Tr("Zadej prosím název receptu."), "OK");
                 return;
             }
 
@@ -449,6 +547,8 @@ namespace MobilniKucharka.Classes.Recipe
             {
                 var ingredientRows = CollectIngredientRows();
                 var stepRows = CollectStepRows();
+
+                await SyncIngredientUnitsAsync(ingredientRows);
 
                 var (Protein, Carbs, Fat, Sugar, IsEstimated) = await CalculateNutritionFromIngredientsAsync(ingredientRows);
                 _cachedProtein = Protein;
@@ -458,35 +558,45 @@ namespace MobilniKucharka.Classes.Recipe
                 _cachedIsNutritionEstimated = IsEstimated;
 
                 double manualCost = double.TryParse(EntryManualCost.Text, out var parsedCost) ? parsedCost : 0;
+                string currentLang = CurrentLang;
 
-                var finalRecipe = new Recipe
-                {
-                    Name_CS = EntryTitle.Text.Trim(),
-                    ImageUrl = _savedImagePath,
-                    IsDraft = false,
-                    Category = "Vytvořené recepty",
-                    Rating = _currentRating,
-                    ManualCost = manualCost,
-                    DescriptionText = DescriptionEditor.Text ?? string.Empty,
-                    IsNutritionEstimated = _cachedIsNutritionEstimated,
-                    IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}")),
-                    StepsJson_CS = JsonSerializer.Serialize(stepRows),
-                    EquipmentJson = JsonSerializer.Serialize(_selectedTags),
-                    Protein = Protein,
-                    Carbs = Carbs,
-                    Fat = Fat,
-                    Sugar = Sugar
-                };
+                _recipe.ImageUrl = _savedImagePath;
+                _recipe.IsDraft = false;
+                _recipe.Category = "Vytvořené recepty";
+                _recipe.Rating = _currentRating;
+                _recipe.ManualCost = manualCost;
+                _recipe.DescriptionText = DescriptionEditor.Text ?? string.Empty;
+                _recipe.IsNutritionEstimated = _cachedIsNutritionEstimated;
+                _recipe.ServingSize = int.TryParse(EntryServingSize.Text, out var servings) && servings > 0 ? servings : 0;
+                _recipe.IngredientsRaw = string.Join("\n", ingredientRows.Select(i => $"{i.Name}|{i.Amount}"));
+                _recipe.EquipmentJson = JsonSerializer.Serialize(_selectedTags);
+                _recipe.PrepTime = int.TryParse(EntryPrepTime.Text, out var prepTime) ? prepTime : 0;
+                _recipe.Protein = Protein;
+                _recipe.Carbs = Carbs;
+                _recipe.Fat = Fat;
+                _recipe.Sugar = Sugar;
 
-                if (_currentRecipeId == null)
+                string title = EntryTitle.Text.Trim();
+                if (currentLang == "cs")
                 {
-                    await _db.InsertAsync(finalRecipe);
-                    _currentRecipeId = finalRecipe.Id;
+                    _recipe.Name_CS = title;
+                    _recipe.Steps_CS = stepRows;
                 }
                 else
                 {
-                    finalRecipe.Id = _currentRecipeId.Value;
-                    await _db.UpdateAsync(finalRecipe);
+                    _recipe.Name_EN = title;
+                    _recipe.Steps_EN = stepRows;
+                }
+
+                if (_currentRecipeId == null)
+                {
+                    await _db.InsertAsync(_recipe);
+                    _currentRecipeId = _recipe.Id;
+                }
+                else
+                {
+                    _recipe.Id = _currentRecipeId.Value;
+                    await _db.UpdateAsync(_recipe);
                 }
 
                 await App.Database.AddRecipeToCategoryAsync(_currentRecipeId.Value, "Vytvořené recepty");
@@ -496,7 +606,32 @@ namespace MobilniKucharka.Classes.Recipe
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Chyba při ukládání", $"Recept se nepodařilo uložit.\nDetail: {ex.Message}", "OK");
+                await DisplayAlert(Tr("Chyba při ukládání"), $"{Tr("Recept se nepodařilo uložit.")}\n{Tr("Detail")}: {ex.Message}", "OK");
+            }
+        }
+
+        private static string NormalizeToBaseUnit(string pickerUnit) => pickerUnit switch
+        {
+            "kg" => "g",
+            "l" or "lžíce" or "lžička" => "ml",
+            "ks" => "ks",
+            _ => "g"
+        };
+
+        private static async Task SyncIngredientUnitsAsync(List<(string Name, string Amount)> ingredientRows)
+        {
+            foreach (var (Name, Amount) in ingredientRows)
+            {
+                var parts = Amount.Split(' ', 2);
+                if (parts.Length < 2) continue;
+
+                string baseUnit = NormalizeToBaseUnit(parts[1].Trim());
+                var product = await App.Database.GetOrCreateLocalProductByNameAsync(Name, baseUnit);
+
+                if (product.Unit != baseUnit)
+                {
+                    await App.Database.SetProductUnitAsync(product.Id, baseUnit);
+                }
             }
         }
 
