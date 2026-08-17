@@ -175,5 +175,10 @@
   "Žádné recepty nevyhovují filtru.": "No recipes match the filter.",
   "{0} osoby | Rozpočet: {1} Kč/týden": "{0} people | Budget: {1} CZK/week",
   "🔄 Resetovat testovací databázi": "🔄 Reset test database",
-  "🔧 Opravit formátování kroků": "🔧 Fix step formatting"
+  "🔧 Opravit formátování kroků": "🔧 Fix step formatting",
+
+  "Zkopírováno": "Copied",
+  "Suroviny byly zkopírovány do schránky.": "The ingredients have been copied to the clipboard.",
+  "Postup přípravy byl zkopírován do schránky.": "The cooking steps have been copied to the clipboard.",
+  "Není co zkopírovat.": "There's nothing to copy."
 }

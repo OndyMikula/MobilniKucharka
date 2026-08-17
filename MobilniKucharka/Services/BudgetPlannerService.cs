@@ -692,16 +692,15 @@ namespace MobilniKucharka.Services
         public async Task<Recipe> SaveExternalRecipeAsync(MealDbRecipe mealDbRecipe)
         {
             await EnsureInitializedAsync();
-
             string externalId = $"mealdb_{mealDbRecipe.ExternalId}";
-
             var existing = await _db.Table<Recipe>().Where(r => r.ExternalSourceId == externalId).FirstOrDefaultAsync();
             if (existing != null) return existing;
-
             var recipe = new Recipe
             {
-                Name_CS = mealDbRecipe.Name,
                 Name_EN = mealDbRecipe.Name,
+                // Name_CS necháváme prázdné - zdroj je anglický, EnsureRecipeLanguageAsync doplní češtinu
+                // při prvním zobrazení (viz RecipeDetailPage.OnAppearing). Dřív se sem plnilo Name_CS
+                // stejným textem jako Name_EN, takže "už přeložený" recept se nikdy doopravdy nepřeložil.
                 ExternalSourceId = externalId,
                 ImageUrl = mealDbRecipe.ImageUrl,
                 Category = "Objevené recepty",
@@ -710,15 +709,14 @@ namespace MobilniKucharka.Services
                 Fat = mealDbRecipe.Fat,
                 Sugar = mealDbRecipe.Sugar,
                 IsNutritionEstimated = mealDbRecipe.IsNutritionEstimated,
-                StepsJson_CS = JsonSerializer.Serialize(SplitInstructions(mealDbRecipe.Instructions)),
                 StepsJson_EN = JsonSerializer.Serialize(SplitInstructions(mealDbRecipe.Instructions)),
+                // StepsJson_CS necháváme prázdné ze stejného důvodu jako Name_CS výše.
                 EquipmentJson = "[]",
                 DietaryFlagsJson = JsonSerializer.Serialize(GuessDietFlags(mealDbRecipe.Category)),
                 IngredientsRaw = string.Join("\n", mealDbRecipe.Ingredients.Select(i => $"{i.Name}|{i.Measure}")),
                 SourceUrl = mealDbRecipe.SourceUrl,
                 ServingSize = 0
             };
-
             await _db.InsertAsync(recipe);
             return recipe;
         }

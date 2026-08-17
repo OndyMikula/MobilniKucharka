@@ -67,7 +67,11 @@ namespace MobilniKucharka.Classes.Recipe
         {
             get
             {
-                _stepsCs ??= string.IsNullOrEmpty(StepsJson_CS) ? [] : JsonSerializer.Deserialize<List<string>>(StepsJson_CS) ?? [];
+                if (_stepsCs == null)
+                {
+                    try { _stepsCs = string.IsNullOrEmpty(StepsJson_CS) ? [] : JsonSerializer.Deserialize<List<string>>(StepsJson_CS) ?? []; }
+                    catch (JsonException) { _stepsCs = []; }
+                }
                 return _stepsCs;
             }
             set
@@ -83,7 +87,11 @@ namespace MobilniKucharka.Classes.Recipe
         {
             get
             {
-                _stepsEn ??= string.IsNullOrEmpty(StepsJson_EN) ? [] : JsonSerializer.Deserialize<List<string>>(StepsJson_EN) ?? [];
+                if (_stepsEn == null)
+                {
+                    try { _stepsEn = string.IsNullOrEmpty(StepsJson_EN) ? [] : JsonSerializer.Deserialize<List<string>>(StepsJson_EN) ?? []; }
+                    catch (JsonException) { _stepsEn = []; }
+                }
                 return _stepsEn;
             }
             set

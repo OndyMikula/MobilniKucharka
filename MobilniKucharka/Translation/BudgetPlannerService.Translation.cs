@@ -116,21 +116,25 @@ namespace MobilniKucharka.Services
             if (recipe == null) return null;
 
             string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
-            bool hasCurrentLang = currentLang == "cs"
-                ? !string.IsNullOrWhiteSpace(recipe.Name_CS)
-                : !string.IsNullOrWhiteSpace(recipe.Name_EN);
-
-            if (hasCurrentLang) return recipe; // není co dělat
-
             string otherLang = currentLang == "cs" ? "en" : "cs";
-            bool hasOtherLang = otherLang == "cs"
-                ? !string.IsNullOrWhiteSpace(recipe.Name_CS)
-                : !string.IsNullOrWhiteSpace(recipe.Name_EN);
 
-            if (!hasOtherLang) return recipe; // recept nemá vyplněný ani jeden jazyk, není z čeho překládat
+            string currentName = currentLang == "cs" ? recipe.Name_CS : recipe.Name_EN;
+            string otherName = otherLang == "cs" ? recipe.Name_CS : recipe.Name_EN;
+            var currentSteps = currentLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
+            var otherSteps = otherLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
+
+            // "Hotovo" znamená: jméno je vyplněné A (zdrojový jazyk nemá žádné kroky, NEBO cílový jazyk
+            // kroky taky má). Dřív se kontrolovalo jen jméno, takže recept s vyplněným jménem ale prázdnými
+            // kroky (např. z dřív přerušeného překladu) navždy vypadal jako hotový a nikdy se nedokončil.
+            bool stepsOk = otherSteps.Count == 0 || currentSteps.Count > 0;
+            if (!string.IsNullOrWhiteSpace(currentName) && stepsOk)
+                return recipe;
+
+            if (string.IsNullOrWhiteSpace(otherName))
+                return recipe; // není z čeho překládat
 
             bool success = await TranslateAndSaveRecipeAsync(recipeId, fromLang: otherLang, toLang: currentLang);
-            if (!success) return recipe; // překlad selhal (offline / limit) - vrátíme aspoň to, co je
+            if (!success) return recipe;
 
             return await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
         }

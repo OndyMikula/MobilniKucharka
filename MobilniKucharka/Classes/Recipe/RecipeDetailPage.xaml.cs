@@ -1,6 +1,4 @@
-﻿using Microsoft.Maui.Controls;
-using Microsoft.Maui.Controls.Shapes;
-using MobilniKucharka.Classes;
+﻿using Microsoft.Maui.Controls.Shapes;
 using MobilniKucharka.Classes.Recipe.Sharing;
 using MobilniKucharka.Classes.UserData.Bookmark;
 using MobilniKucharka.Services;
@@ -188,12 +186,7 @@ public partial class RecipeDetailPage : ContentPage
         string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
         var rawSteps = currentLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
 
-        var structuredSteps = rawSteps.Select((stepText, index) => new DisplayStep
-        {
-            StepNumber = index + 1,
-            StepText = stepText
-        }).ToList();
-
+        var structuredSteps = rawSteps.Select((stepText, index) => new DisplayStep { StepNumber = index + 1, StepText = stepText }).ToList();
         BindableLayout.SetItemsSource(StepsLayout, structuredSteps);
 
         var (totalCost, allPriced) = await App.Database.GetRecipeCostDetailsAsync(recipe.Id, peopleCount);
@@ -202,7 +195,7 @@ public partial class RecipeDetailPage : ContentPage
             : Tr("Cena nákupu není k dispozici");
 
         PeopleCountBadge.Text = effectiveServingSize > 0
-            ? $"({MobilniKucharka.Translation.UiTranslator.TrPeopleCount(effectiveServingSize)})"
+            ? $"({Translation.UiTranslator.TrPeopleCount(effectiveServingSize)})"
             : string.Empty;
     }
 
@@ -478,5 +471,34 @@ public partial class RecipeDetailPage : ContentPage
         StarRatingHelper.Render(UserRatingStarsHost, roundedValue, starSize: 32);
 
         await App.Database.UpdateRecipeRatingAsync(_recipeWithCost.Recipe.Id, roundedValue);
+    }
+
+    private async void OnCopyIngredientsClicked(object sender, EventArgs e)
+    {
+        if (BindableLayout.GetItemsSource(IngredientsLayout) is not IEnumerable<DisplayIngredient> ingredients || !ingredients.Any())
+        {
+            await DisplayAlert(Tr("Kopírování"), Tr("Není co zkopírovat."), "OK");
+            return;
+        }
+
+        string text = string.Join("\n", ingredients.Select(i => $"{i.AmountText} {i.Name}"));
+        await Clipboard.Default.SetTextAsync(text);
+        await DisplayAlert(Tr("Zkopírováno"), Tr("Suroviny byly zkopírovány do schránky."), "OK");
+    }
+
+    private async void OnCopyStepsClicked(object sender, EventArgs e)
+    {
+        string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
+        var steps = currentLang == "cs" ? _recipeWithCost.Recipe.Steps_CS : _recipeWithCost.Recipe.Steps_EN;
+
+        if (steps.Count == 0)
+        {
+            await DisplayAlert(Tr("Kopírování"), Tr("Není co zkopírovat."), "OK");
+            return;
+        }
+
+        string text = string.Join("\n\n", steps.Select((s, i) => $"{i + 1}. {s}"));
+        await Clipboard.Default.SetTextAsync(text);
+        await DisplayAlert(Tr("Zkopírováno"), Tr("Postup přípravy byl zkopírován do schránky."), "OK");
     }
 }

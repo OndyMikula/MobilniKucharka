@@ -4,38 +4,35 @@ using MobilniKucharka.Services;
 namespace MobilniKucharka.Translation
 {
     // Překlad receptů CS <-> EN přes DeepL API.
-    // Klíč čti ze Secrets.DeepLApiKey (generováno CI z GitHub Actions secretu DEEPL_API_KEY).
     public class TranslationService
     {
         private readonly HttpClient _httpClient = new();
 
-        // Klíče pro free-tier účet DeepL vždy končí ":fx" a musí jít na api-free endpoint.
-        // Developer/Pro klíč ":fx" nemá, jde na plný api.deepl.com endpoint.
         private static bool IsFreeApiKey =>
             !string.IsNullOrEmpty(Secrets.DeepLApiKey) && Secrets.DeepLApiKey.EndsWith(":fx", StringComparison.OrdinalIgnoreCase);
 
         private static string Endpoint =>
             IsFreeApiKey ? "https://api-free.deepl.com/v2/translate" : "https://api.deepl.com/v2/translate";
 
-        // Appka pracuje s "cs"/"en" (stejně jako AppLanguageCode). DeepL chce jako target "CS" / "EN-US", jako source stačí "EN".
         private static string ToDeepLTargetCode(string appLangCode) =>
             appLangCode.Equals("en", StringComparison.OrdinalIgnoreCase) ? "EN-US" : "CS";
 
         private static string ToDeepLSourceCode(string appLangCode) =>
             appLangCode.Equals("en", StringComparison.OrdinalIgnoreCase) ? "EN" : "CS";
 
-        // Přeloží dávku textů najednou (šetří API volání i znakový limit oproti jednotlivým requestům).
-        // Vrací null při chybě/chybějícím klíči - volající by na to měl reagovat, ne tiše selhat.
         public async Task<List<string>?> TranslateBatchAsync(List<string> texts, string targetAppLang, string? sourceAppLang = null)
         {
             if (texts == null || texts.Count == 0) return [];
-            if (string.IsNullOrWhiteSpace(Secrets.DeepLApiKey)) return null;
+            if (string.IsNullOrWhiteSpace(Secrets.DeepLApiKey))
+            {
+                System.Diagnostics.Debug.WriteLine("[DeepL] Chybí Secrets.DeepLApiKey - překlad se nespustil.");
+                return null;
+            }
 
             try
             {
                 var form = new List<KeyValuePair<string, string>>
                 {
-                    new("auth_key", Secrets.DeepLApiKey),
                     new("target_lang", ToDeepLTargetCode(targetAppLang))
                 };
 
@@ -46,13 +43,26 @@ namespace MobilniKucharka.Translation
                     form.Add(new("text", t ?? string.Empty));
 
                 using var content = new FormUrlEncodedContent(form);
-                var response = await _httpClient.PostAsync(Endpoint, content).ConfigureAwait(false);
+                using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint) { Content = content };
+                // DeepL očekává klíč v hlavičce, ne jako "auth_key" v těle requestu - tohle je jediná
+                // podporovaná metoda pro nové účty. Bez ní appka dostane 403 s "Missing Authorization header".
+                request.Headers.Add("Authorization", $"DeepL-Auth-Key {Secrets.DeepLApiKey}");
 
-                if (!response.IsSuccessStatusCode) return null;
+                var response = await _httpClient.SendAsync(request);
 
-                var contentString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                if (string.IsNullOrWhiteSpace(contentString) || !contentString.TrimStart().StartsWith('{'))
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorBody = await response.Content.ReadAsStringAsync();
+                    System.Diagnostics.Debug.WriteLine($"[DeepL] Chyba {(int)response.StatusCode} {response.StatusCode}: {errorBody}");
                     return null;
+                }
+
+                var contentString = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(contentString) || !contentString.TrimStart().StartsWith('{'))
+                {
+                    System.Diagnostics.Debug.WriteLine("[DeepL] Odpověď nevypadá jako platný JSON.");
+                    return null;
+                }
 
                 var root = JsonSerializer.Deserialize<JsonElement>(contentString);
                 if (!root.TryGetProperty("translations", out var translationsArray))
@@ -64,8 +74,9 @@ namespace MobilniKucharka.Translation
 
                 return results;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[DeepL] Výjimka při volání API: {ex.Message}");
                 return null;
             }
         }
@@ -73,14 +84,11 @@ namespace MobilniKucharka.Translation
         public async Task<string?> TranslateAsync(string text, string targetAppLang, string? sourceAppLang = null)
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
-            var result = await TranslateBatchAsync([text], targetAppLang, sourceAppLang).ConfigureAwait(false);
+            var result = await TranslateBatchAsync([text], targetAppLang, sourceAppLang);
             return result?.FirstOrDefault();
         }
 
-        // Přeloží JEN Name a Steps - mají vlastní _CS/_EN sloupce na Recipe, takže žádná cache navíc netřeba,
-        // jakmile se jednou přeloží, zůstává to tam napořád. DescriptionText/IngredientsRaw řeší
-        // BudgetPlannerService.TranslateAndSaveRecipeAsync přes RecipeTranslationCache, ne tahle metoda.
-        public async Task<bool> TranslateRecipeNameAndStepsAsync(Classes.Recipe.Recipe recipe, string fromLang, string toLang)
+        public async Task<bool> TranslateRecipeNameAndStepsAsync(MobilniKucharka.Classes.Recipe.Recipe recipe, string fromLang, string toLang)
         {
             bool fromCs = fromLang.Equals("cs", StringComparison.OrdinalIgnoreCase);
 
@@ -90,7 +98,7 @@ namespace MobilniKucharka.Translation
             var batch = new List<string> { sourceName };
             batch.AddRange(sourceSteps);
 
-            var translated = await TranslateBatchAsync(batch, toLang, fromLang).ConfigureAwait(false);
+            var translated = await TranslateBatchAsync(batch, toLang, fromLang);
             if (translated == null || translated.Count != batch.Count) return false;
 
             string translatedName = translated[0];
