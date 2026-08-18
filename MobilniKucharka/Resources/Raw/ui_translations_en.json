@@ -180,5 +180,9 @@
   "Zkopírováno": "Copied",
   "Suroviny byly zkopírovány do schránky.": "The ingredients have been copied to the clipboard.",
   "Postup přípravy byl zkopírován do schránky.": "The cooking steps have been copied to the clipboard.",
-  "Není co zkopírovat.": "There's nothing to copy."
+  "Není co zkopírovat.": "There's nothing to copy.",
+  "Pro kolik lidí je tento recept napsaný?": "How many people is this recipe written for?",
+  "Zobrazit recept pro kolik lidí?": "Show this recipe for how many people?",
+  "Množství surovin se přepočítá jen pro tohle zobrazení, tvoje výchozí nastavení domácnosti se nezmění.": "Ingredient amounts will be recalculated just for this view — your default household size won't change.",
+  "Nastavit počet porcí": "Set serving count"
 }

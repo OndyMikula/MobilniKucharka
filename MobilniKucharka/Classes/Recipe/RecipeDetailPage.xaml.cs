@@ -9,6 +9,7 @@ namespace MobilniKucharka.Classes.Recipe;
 public partial class RecipeDetailPage : ContentPage
 {
     private readonly RecipeWithCost _recipeWithCost;
+    private int _displayPeopleCount = Preferences.Default.Get("PeopleCount", 2);
 
     private static string Tr(string csText) => Translation.UiTranslator.Tr(csText);
 
@@ -94,7 +95,7 @@ public partial class RecipeDetailPage : ContentPage
         var service = App.Database;
         var recipe = _recipeWithCost.Recipe;
 
-        int peopleCount = Preferences.Default.Get("PeopleCount", 2);
+        int peopleCount = _displayPeopleCount;
 
         var ingredients = await service.GetIngredientsForRecipeAsync(recipe.Id, peopleCount);
 
@@ -195,8 +196,8 @@ public partial class RecipeDetailPage : ContentPage
             : Tr("Cena nákupu není k dispozici");
 
         PeopleCountBadge.Text = effectiveServingSize > 0
-            ? $"({Translation.UiTranslator.TrPeopleCount(effectiveServingSize)})"
-            : string.Empty;
+            ? $"({MobilniKucharka.Translation.UiTranslator.TrPeopleCount(_displayPeopleCount)}) ✏️"
+            : $"✏️ {Tr("Nastavit počet porcí")}";
     }
 
     private async void OnIngredientTapped(object sender, TappedEventArgs e)
@@ -500,5 +501,41 @@ public partial class RecipeDetailPage : ContentPage
         string text = string.Join("\n\n", steps.Select((s, i) => $"{i + 1}. {s}"));
         await Clipboard.Default.SetTextAsync(text);
         await DisplayAlert(Tr("Zkopírováno"), Tr("Postup přípravy byl zkopírován do schránky."), "OK");
+    }
+
+    private async void OnPeopleCountBadgeTapped(object sender, TappedEventArgs e)
+    {
+        var recipe = _recipeWithCost.Recipe;
+
+        if (recipe.ServingSize <= 0)
+        {
+            // Recept vůbec neví, pro kolik lidí je napsaný - bez týhle hodnoty nejde nic přepočítávat,
+            // takže se ptáme na skutečný základní počet porcí receptu (stejný prompt jako u importu).
+            string baseResult = await DisplayPromptAsync(
+                Tr("Pro kolik lidí je tento recept napsaný?"),
+                Tr("Recept neuvádí počet porcí. Zadej, pro kolik lidí jsou napsané suroviny."),
+                "OK", initialValue: string.Empty, keyboard: Keyboard.Numeric);
+
+            if (int.TryParse(baseResult, out var baseParsed) && baseParsed > 0)
+            {
+                await App.Database.UpdateRecipeServingSizeAsync(recipe.Id, baseParsed);
+                recipe.ServingSize = baseParsed;
+                LoadIngredientsAndSteps();
+            }
+            return;
+        }
+
+        // Základní počet porcí recept zná - tenhle prompt jen mění, pro kolik lidí se ZOBRAZUJÍ suroviny
+        // teď, ne trvalé nastavení domácnosti z onboardingu.
+        string result = await DisplayPromptAsync(
+            Tr("Zobrazit recept pro kolik lidí?"),
+            Tr("Množství surovin se přepočítá jen pro tohle zobrazení, tvoje výchozí nastavení domácnosti se nezmění."),
+            "OK", initialValue: _displayPeopleCount.ToString(), keyboard: Keyboard.Numeric);
+
+        if (int.TryParse(result, out var parsed) && parsed > 0)
+        {
+            _displayPeopleCount = parsed;
+            LoadIngredientsAndSteps();
+        }
     }
 }

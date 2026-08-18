@@ -1,13 +1,11 @@
-﻿using System.IO.Compression;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace MobilniKucharka.Classes.Recipe.Sharing
 {
     public class SharedRecipeData
     {
         // Značka a verze formátu - appka podle nich hned pozná, jestli soubor vůbec je (nebo NENÍ)
-        // recept Mobilní Kuchařky, než se ho pokusí zpracovat. Bez týhle kontroly by appka zkoušela
-        // naimportovat úplně libovolný JSON soubor.
+        // recept Mobilní Kuchařky, než se ho pokusí zpracovat.
         public string FormatMarker { get; set; } = "MobilniKucharkaRecipe";
         public int FormatVersion { get; set; } = 1;
 
@@ -35,111 +33,14 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
     public class RecipeShareService
     {
         private const int MaxNameLength = 200;
-        private const int MaxTextFieldLength = 5000;   // popis receptu
-        private const int MaxIngredientsLength = 20000; // celý seznam surovin najednou
+        private const int MaxTextFieldLength = 5000;
+        private const int MaxIngredientsLength = 20000;
         private const int MaxStepsJsonLength = 20000;
-        private const long MaxPhotoBytes = 8 * 1024 * 1024; // 8 MB
+        private const long MaxPhotoBytes = 8 * 1024 * 1024;
 
-        public static async Task<string> ExportRecipeAsync(Recipe recipe)
-        {
-            string exportPath = Path.Combine(FileSystem.CacheDirectory, $"recept_{SanitizeFileName(recipe.Name_CS)}.mkrecept");
-            if (File.Exists(exportPath)) File.Delete(exportPath);
+        private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
 
-            bool hasPhoto = !string.IsNullOrWhiteSpace(recipe.ImageUrl) && File.Exists(recipe.ImageUrl);
-
-            var shared = new SharedRecipeData
-            {
-                Name_CS = recipe.Name_CS,
-                Name_EN = recipe.Name_EN,
-                DescriptionText = recipe.DescriptionText,
-                IngredientsRaw = recipe.IngredientsRaw,
-                StepsJson_CS = recipe.StepsJson_CS,
-                StepsJson_EN = recipe.StepsJson_EN,
-                EquipmentJson = recipe.EquipmentJson,
-                DietaryFlagsJson = recipe.DietaryFlagsJson,
-                Rating = recipe.Rating,
-                Protein = recipe.Protein,
-                Carbs = recipe.Carbs,
-                Fat = recipe.Fat,
-                Sugar = recipe.Sugar,
-                IsNutritionEstimated = recipe.IsNutritionEstimated,
-                ManualCost = recipe.ManualCost,
-                PrepTime = recipe.PrepTime,
-                ServingSize = recipe.ServingSize,
-                HasPhoto = hasPhoto
-            };
-
-            await Task.Run(() =>
-            {
-                using var zip = ZipFile.Open(exportPath, ZipArchiveMode.Create);
-
-                var jsonEntry = zip.CreateEntry("recipe.json");
-                using (var writer = new StreamWriter(jsonEntry.Open()))
-                {
-                    writer.Write(JsonSerializer.Serialize(shared));
-                }
-
-                if (hasPhoto)
-                {
-                    zip.CreateEntryFromFile(recipe.ImageUrl, "photo.jpg");
-                }
-            });
-
-            return exportPath;
-        }
-
-        public static async Task<Recipe> ImportRecipeAsync(string filePath)
-        {
-            SharedRecipeData? shared = null;
-            string? photoDestPath = null;
-
-            await Task.Run(() =>
-            {
-                using var zip = ZipFile.OpenRead(filePath);
-
-                var jsonEntry = zip.GetEntry("recipe.json") ?? throw new InvalidOperationException("Soubor neobsahuje platný recept.");
-                using (var reader = new StreamReader(jsonEntry.Open()))
-                {
-                    shared = JsonSerializer.Deserialize<SharedRecipeData>(reader.ReadToEnd());
-                }
-
-                var photoEntry = zip.GetEntry("photo.jpg");
-                if (photoEntry != null)
-                {
-                    photoDestPath = Path.Combine(FileSystem.AppDataDirectory, $"{Guid.NewGuid()}_sdileny_recept.jpg");
-                    photoEntry.ExtractToFile(photoDestPath, overwrite: true);
-                }
-            });
-
-            if (shared == null) throw new InvalidOperationException("Recept se nepodařilo přečíst.");
-
-            ValidateSharedRecipe(shared);
-
-            return new Recipe
-            {
-                Name_CS = shared.Name_CS,
-                Name_EN = shared.Name_EN,
-                DescriptionText = shared.DescriptionText,
-                IngredientsRaw = shared.IngredientsRaw,
-                StepsJson_CS = SanitizeNestedJson(shared.StepsJson_CS),
-                StepsJson_EN = SanitizeNestedJson(shared.StepsJson_EN),
-                EquipmentJson = SanitizeNestedJson(shared.EquipmentJson),
-                DietaryFlagsJson = SanitizeNestedJson(shared.DietaryFlagsJson),
-                Protein = shared.Protein,
-                Carbs = shared.Carbs,
-                Fat = shared.Fat,
-                Sugar = shared.Sugar,
-                IsNutritionEstimated = shared.IsNutritionEstimated,
-                ManualCost = shared.ManualCost,
-                PrepTime = shared.PrepTime,
-                ServingSize = shared.ServingSize,
-                Category = "Vytvořené recepty",
-                ImageUrl = photoDestPath ?? ""
-            };
-        }
-
-        // Nová cesta: recept jako obyčejný .json soubor (žádný .zip), aby ho šlo napsat i ručně mimo appku.
-        public static async Task<string> ExportRecipeAsJsonAsync(Recipe recipe)
+        public static async Task<string> ExportRecipeAsync(Classes.Recipe.Recipe recipe)
         {
             bool hasPhoto = !string.IsNullOrWhiteSpace(recipe.ImageUrl) && File.Exists(recipe.ImageUrl);
 
@@ -169,13 +70,13 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
             string exportPath = Path.Combine(FileSystem.CacheDirectory, $"recept_{SanitizeFileName(recipe.Name_CS)}.json");
             if (File.Exists(exportPath)) File.Delete(exportPath);
 
-            string json = JsonSerializer.Serialize(shared, new JsonSerializerOptions { WriteIndented = true });
+            string json = JsonSerializer.Serialize(shared, IndentedJsonOptions);
             await File.WriteAllTextAsync(exportPath, json);
 
             return exportPath;
         }
 
-        public static async Task<Recipe> ImportRecipeFromJsonAsync(string filePath)
+        public static async Task<Classes.Recipe.Recipe> ImportRecipeAsync(string filePath)
         {
             string json = await File.ReadAllTextAsync(filePath);
 
@@ -212,7 +113,7 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
                 }
             }
 
-            return new Recipe
+            return new Classes.Recipe.Recipe
             {
                 Name_CS = shared.Name_CS,
                 Name_EN = shared.Name_EN,
@@ -235,8 +136,6 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
             };
         }
 
-        // Ověří značku formátu a rozumné meze na velikost polí, než se recept vůbec dostane do DB.
-        // Vyhazuje InvalidOperationException se srozumitelnou zprávou pro DisplayAlert na volající straně.
         private static void ValidateSharedRecipe(SharedRecipeData shared)
         {
             if (shared.FormatMarker != "MobilniKucharkaRecipe")
