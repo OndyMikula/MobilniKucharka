@@ -1,4 +1,7 @@
-<summary>EN</summary>
+
+<details>
+  <summary>EN</summary>
+  
 # Mobile Cookbook
 
 (Czech version on the bottom) 
@@ -41,6 +44,7 @@ Recipes imported from external sources are saved to the local database the first
 Set **API keys** in `Services/Secrets.txt` and rename the file to `Services/Secrets.cs`.
 
 **Releasing versions:** GitHub Actions (`.github/workflows/release.yml`) automatically reads the version from `.csproj` when you push to `main`, and if it’s a new version, it creates a tag, generates a changelog from the commits, and attaches a signed APK as a GitHub Release. The app itself checks for the availability of a new version via the GitHub API (`UpdateCheckService`) — with the exception of installations from Google Play, where updates are handled exclusively by Play itself.
+</details>
 
 
 <details>
