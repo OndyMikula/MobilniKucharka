@@ -165,17 +165,32 @@ namespace MobilniKucharka
             await Navigation.PushAsync(new SettingsPage());
         }
 
+        // Tlačítko "Hledat" v patičce - otevře stránku pro hledání receptů na INTERNETU (SearchPage).
+        // Nezaměňovat s lokálním vyhledávacím řádkem výše (OnLocalSearchButtonClicked), který hledá
+        // jen mezi recepty už uloženými v appce.
+        private async void OnSearchPageClicked(object sender, EventArgs e)
+        {
+            await Navigation.PushAsync(new SearchPage());
+        }
+
         private async void OnBookmarksClicked(object sender, EventArgs e)
         {
             await Navigation.PushAsync(new BookmarksPage());
         }
 
+        // Vyhledávací řádek nahoře na stránce - hledá POUZE mezi lokálně uloženými recepty
+        // (včetně receptů naimportovaných z internetu přes SearchPage), ne na internetu.
         private async void OnSearchTextChanged(object sender, TextChangedEventArgs e)
         {
             await PerformSearchAsync();
         }
 
         private async void OnFilterByPreferencesChanged(object sender, CheckedChangedEventArgs e)
+        {
+            await PerformSearchAsync();
+        }
+
+        private async void OnLocalSearchButtonClicked(object sender, EventArgs e)
         {
             await PerformSearchAsync();
         }
@@ -192,11 +207,6 @@ namespace MobilniKucharka
 
             var results = await _budgetService.SearchRecipesAsync(searchText, FilterByPreferencesCheckBox.IsChecked);
             RecipesCollectionView.ItemsSource = results;
-        }
-
-        private async void OnSearchButtonClicked(object sender, EventArgs e)
-        {
-            await PerformSearchAsync();
         }
 
         private async void OnResetDatabaseClicked(object sender, EventArgs e)

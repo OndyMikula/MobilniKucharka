@@ -11,6 +11,11 @@ public partial class RecipeDetailPage : ContentPage
     private readonly RecipeWithCost _recipeWithCost;
     private int _displayPeopleCount = Preferences.Default.Get("PeopleCount", 2);
 
+    // Jakmile uživatel s dočasně zobrazeným receptem (IsSearchTemp == true, otevřeno přes "Detail"
+    // v SearchPage) udělá cokoli navíc kromě čistého prohlížení/mazání - viz PromoteFromSearchTempAsync
+    // níže - dočasný příznak se sundá natrvalo. Guard proti opakovanému zbytečnému DB zápisu.
+    private bool _hasPromotedFromTemp = false;
+
     private static string Tr(string csText) => Translation.UiTranslator.Tr(csText);
 
     public RecipeDetailPage(RecipeWithCost selectedItem)
@@ -44,6 +49,19 @@ public partial class RecipeDetailPage : ContentPage
         BindingContext = _recipeWithCost;
         PopulateFromCurrentRecipe();
         await Task.Run(InitializeFavoriteStateAsync);
+    }
+
+    // Kterákoli akce, kterou uživatel udělá s dočasně zobrazeným receptem - kromě čistého prohlížení
+    // (otevření přes "Detail") a mazání - znamená, že o recept stojí, takže se dočasný příznak sundá
+    // a recept přežije další internetové hledání (viz BudgetPlannerService.DeleteSearchTempRecipesAsync).
+    // Volá se na začátku každého handleru, který představuje skutečnou interakci s receptem.
+    private async Task PromoteFromSearchTempAsync()
+    {
+        if (_hasPromotedFromTemp || !_recipeWithCost.Recipe.IsSearchTemp) return;
+
+        await App.Database.MarkRecipeSearchTempAsync(_recipeWithCost.Recipe.Id, isTemp: false);
+        _recipeWithCost.Recipe.IsSearchTemp = false;
+        _hasPromotedFromTemp = true;
     }
 
     private void PopulateFromCurrentRecipe()
@@ -213,6 +231,12 @@ public partial class RecipeDetailPage : ContentPage
         string action = await DisplayActionSheetAsync(ingredient.Name, "Zrušit", null,
     "Zadat vlastní cenu", "Propojit s existující surovinou", "Změnit jednotku");
 
+        // Zrušeno nebo zavřeno klepnutím mimo (DisplayActionSheetAsync vrací null) - žádná skutečná
+        // interakce s receptem se nekonala, takže se dočasný příznak nesmí sundávat.
+        if (string.IsNullOrEmpty(action) || action == "Zrušit") return;
+
+        await PromoteFromSearchTempAsync();
+
         if (action == "Zadat vlastní cenu")
         {
             if (ingredient.RawAmount <= 0)
@@ -294,6 +318,8 @@ public partial class RecipeDetailPage : ContentPage
 
     private async void OnFavoriteToggled(object sender, TappedEventArgs e)
     {
+        await PromoteFromSearchTempAsync();
+
         bool isCurrentlyFavorite = FavoriteIcon.Text == "♥";
 
         if (isCurrentlyFavorite)
@@ -347,6 +373,8 @@ public partial class RecipeDetailPage : ContentPage
     {
         if (((CheckBox)sender).BindingContext is BookmarkSelectionModel changedBookmark)
         {
+            await PromoteFromSearchTempAsync();
+
             if (e.Value)
                 await App.Database.AddRecipeToCategoryAsync(_recipeWithCost.Recipe.Id, changedBookmark.CategoryName);
             else
@@ -356,6 +384,7 @@ public partial class RecipeDetailPage : ContentPage
 
     private async void OnEditRecipeClicked(object sender, EventArgs e)
     {
+        await PromoteFromSearchTempAsync();
         await Navigation.PushAsync(new CreateRecipePage(_recipeWithCost.Recipe.Id));
     }
 
@@ -376,7 +405,10 @@ public partial class RecipeDetailPage : ContentPage
         else if (action == Tr("Přidat do záložky"))
             OnOpenBookmarksClicked(this, EventArgs.Empty);
         else if (action == Tr("Upravit recept"))
+        {
+            await PromoteFromSearchTempAsync();
             await Navigation.PushAsync(new CreateRecipePage(_recipeWithCost.Recipe.Id));
+        }
         else if (action == Tr("Smazat recept"))
             DeleteOverlay.IsVisible = true;
         else if (action == "🔧 " + Tr("Zobrazit syrová data kroků"))
@@ -385,6 +417,8 @@ public partial class RecipeDetailPage : ContentPage
 
     private async Task ShareRecipeAsync()
     {
+        await PromoteFromSearchTempAsync();
+
         try
         {
             string filePath = await RecipeShareService.ExportRecipeAsync(_recipeWithCost.Recipe);
@@ -403,6 +437,8 @@ public partial class RecipeDetailPage : ContentPage
 
     private async Task ShareRecipeViaLinkAsync()
     {
+        await PromoteFromSearchTempAsync();
+
         string? link = await RecipeLinkShareService.ShareViaLinkAsync(_recipeWithCost.Recipe);
 
         if (link == null)
@@ -466,6 +502,8 @@ public partial class RecipeDetailPage : ContentPage
             return;
         }
 
+        await PromoteFromSearchTempAsync();
+
         _recipeWithCost.Recipe.Rating = roundedValue;
         HeroRatingNumberLabel.Text = roundedValue.ToString("F1");
         StarRatingHelper.Render(HeroStarsHost, roundedValue);
@@ -482,6 +520,8 @@ public partial class RecipeDetailPage : ContentPage
             return;
         }
 
+        await PromoteFromSearchTempAsync();
+
         string text = string.Join("\n", ingredients.Select(i => $"{i.AmountText} {i.Name}"));
         await Clipboard.Default.SetTextAsync(text);
         await DisplayAlertAsync(Tr("Zkopírováno"), Tr("Suroviny byly zkopírovány do schránky."), "OK");
@@ -497,6 +537,8 @@ public partial class RecipeDetailPage : ContentPage
             await DisplayAlertAsync(Tr("Kopírování"), Tr("Není co zkopírovat."), "OK");
             return;
         }
+
+        await PromoteFromSearchTempAsync();
 
         string text = string.Join("\n\n", steps.Select((s, i) => $"{i + 1}. {s}"));
         await Clipboard.Default.SetTextAsync(text);
@@ -518,6 +560,10 @@ public partial class RecipeDetailPage : ContentPage
 
             if (int.TryParse(baseResult, out var baseParsed) && baseParsed > 0)
             {
+                // Skutečný zápis do DB (základní počet porcí receptu) - na rozdíl od větve níže
+                // (jen dočasné zobrazovací přepočítání) jde o trvalou změnu dat receptu.
+                await PromoteFromSearchTempAsync();
+
                 await App.Database.UpdateRecipeServingSizeAsync(recipe.Id, baseParsed);
                 recipe.ServingSize = baseParsed;
                 LoadIngredientsAndSteps();
@@ -526,7 +572,8 @@ public partial class RecipeDetailPage : ContentPage
         }
 
         // Základní počet porcí recept zná - tenhle prompt jen mění, pro kolik lidí se ZOBRAZUJÍ suroviny
-        // teď, ne trvalé nastavení domácnosti z onboardingu.
+        // teď, ne trvalé nastavení domácnosti z onboardingu. Nejde o zápis do DB receptu, takže se
+        // dočasný příznak tady nepromuje - je to blíž "prohlížení" než "interakci".
         string result = await DisplayPromptAsync(
             Tr("Zobrazit recept pro kolik lidí?"),
             Tr("Množství surovin se přepočítá jen pro tohle zobrazení, tvoje výchozí nastavení domácnosti se nezmění."),

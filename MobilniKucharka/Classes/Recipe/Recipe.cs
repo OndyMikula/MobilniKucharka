@@ -45,6 +45,12 @@ namespace MobilniKucharka.Classes.Recipe
         public string SourceUrl { get; set; } = string.Empty;
         public string ExternalSourceId { get; set; } = string.Empty;
 
+        // Recept dočasně uložený ze SearchPage (zobrazený přes "Detail", ale zatím NEimportovaný).
+        // Takové recepty se smažou při dalším spuštění internetového hledání (viz
+        // BudgetPlannerService.DeleteSearchTempRecipesAsync) a nezobrazují se v hlavním seznamu ani
+        // v lokálním hledání (viz GetPlanAsync/SearchRecipesAsync). Tlačítko "Importovat" přepne na false.
+        public bool IsSearchTemp { get; set; } = false;
+
         // PRO PRÁCI V KÓDU: Automatická serializace/deserializace
         [Ignore]
         public string Name

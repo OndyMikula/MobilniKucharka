@@ -1,11 +1,11 @@
 
 <details>
   <summary>EN</summary>
-  
-# Mobile Cookbook
+ 
 
-(Czech version on the bottom) 
-### An app for meal planning, recipe management, and estimating grocery costs—developed as a personal project.
+ # Mobile Cookbook
+
+An app for meal planning, recipe management, and estimating grocery costs—developed as a personal project.
 
 ## What the app can do
 

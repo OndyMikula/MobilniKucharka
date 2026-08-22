@@ -171,7 +171,7 @@ namespace MobilniKucharka.Services
             {
                 await EnsureInitializedAsync();
 
-                var recipes = (await _db.Table<Recipe>().ToListAsync()).Where(r => !r.IsDraft).ToList();
+                var recipes = (await _db.Table<Recipe>().ToListAsync()).Where(r => !r.IsDraft && !r.IsSearchTemp).ToList();
                 var allProducts = await GetProductsCachedAsync();
                 var allIngredients = await GetIngredientsCachedAsync();
                 var allAliases = await GetAliasesCachedAsync();
@@ -192,11 +192,16 @@ namespace MobilniKucharka.Services
                     if (userEquipment.Count != 0 && !recipe.Equipment.All(e => userEquipment.Contains(e)))
                         continue;
 
-                    var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(recipe, peopleCount, allProducts, allIngredients, allAliases);
+                    // Doplní jméno (a kroky) do aktuálního jazyka appky, pokud ještě chybí - díky cache uvnitř
+                    // EnsureRecipeLanguageAsync se DeepL zavolá jen jednou za (recept, jazyk) navždy; další
+                    // zobrazení seznamu je pak jen levná kontrola v DB, ne nové volání API.
+                    var displayRecipe = await EnsureRecipeLanguageAsync(recipe.Id) ?? recipe;
+
+                    var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(displayRecipe, peopleCount, allProducts, allIngredients, allAliases);
 
                     results.Add(new RecipeWithCost
                     {
-                        Recipe = recipe,
+                        Recipe = displayRecipe,
                         CalculatedCost = cost,
                         AllIngredientsPriced = allPriced,
                         AnyIngredientsPriced = anyPriced,
@@ -205,8 +210,8 @@ namespace MobilniKucharka.Services
                 }
 
                 return [.. results
-            .OrderBy(r => r.AllIngredientsPriced ? 0 : (r.AnyIngredientsPriced ? 1 : 2))
-            .ThenBy(r => r.CalculatedCost)];
+                    .OrderBy(r => r.AllIngredientsPriced ? 0 : (r.AnyIngredientsPriced ? 1 : 2))
+                    .ThenBy(r => r.CalculatedCost)];
             }
             catch (Exception ex)
             {
@@ -221,7 +226,7 @@ namespace MobilniKucharka.Services
             {
                 await EnsureInitializedAsync();
 
-                var allRecipes = (await _db.Table<Recipe>().ToListAsync()).Where(r => !r.IsDraft).ToList();
+                var allRecipes = (await _db.Table<Recipe>().ToListAsync()).Where(r => !r.IsDraft && !r.IsSearchTemp).ToList();
 
                 var matches = string.IsNullOrWhiteSpace(searchText)
                     ? allRecipes
@@ -248,18 +253,24 @@ namespace MobilniKucharka.Services
                 var allIngredients = await GetIngredientsCachedAsync();
                 var allAliases = await GetAliasesCachedAsync();
 
-                var results = matches.Select(r =>
+                var results = new List<RecipeWithCost>();
+                foreach (var match in matches)
                 {
-                    var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(r, peopleCount, allProducts, allIngredients, allAliases);
-                    return new RecipeWithCost
+                    // Stejná logika jako v GetPlanAsync - doplní překlad jména/kroků, pokud ještě chybí
+                    // (např. čerstvě naimportovaný recept ze SearchPage), s cache proti opakovaným DeepL voláním.
+                    var displayRecipe = await EnsureRecipeLanguageAsync(match.Id) ?? match;
+
+                    var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(displayRecipe, peopleCount, allProducts, allIngredients, allAliases);
+
+                    results.Add(new RecipeWithCost
                     {
-                        Recipe = r,
+                        Recipe = displayRecipe,
                         CalculatedCost = cost,
                         AllIngredientsPriced = allPriced,
                         AnyIngredientsPriced = anyPriced,
                         IsWithinBudget = allPriced && cost <= maxDailyBudget
-                    };
-                }).ToList();
+                    });
+                }
 
                 return [.. results.OrderBy(r => r.Recipe.Name_CS)];
             }
@@ -686,7 +697,8 @@ namespace MobilniKucharka.Services
         public async Task<List<Recipe>> GetAllRecipesAsync()
         {
             await EnsureInitializedAsync();
-            return await _db.Table<Recipe>().ToListAsync();
+            var recipes = await _db.Table<Recipe>().ToListAsync();
+            return [.. recipes.Where(r => !r.IsSearchTemp)];
         }
 
         public async Task<Recipe> SaveExternalRecipeAsync(MealDbRecipe mealDbRecipe)

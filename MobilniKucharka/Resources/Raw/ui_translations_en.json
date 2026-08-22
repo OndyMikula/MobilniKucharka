@@ -184,5 +184,16 @@
   "Pro kolik lidí je tento recept napsaný?": "How many people is this recipe written for?",
   "Zobrazit recept pro kolik lidí?": "Show this recipe for how many people?",
   "Množství surovin se přepočítá jen pro tohle zobrazení, tvoje výchozí nastavení domácnosti se nezmění.": "Ingredient amounts will be recalculated just for this view — your default household size won't change.",
-  "Nastavit počet porcí": "Set serving count"
+  "Nastavit počet porcí": "Set serving count",
+
+  "Hledat": "Search",
+  "Hledat recept": "Search recipe",
+  "Nic se nenašlo": "Nothing found",
+  "Nepodařilo se najít žádný recept odpovídající zadání.": "No recipe matching your search could be found.",
+  "Vyhledávání trvalo příliš dlouho. Zkontroluj internetové připojení a zkus to znovu.": "The search took too long. Check your internet connection and try again.",
+  "Hledám recepty...": "Searching for recipes...",
+  "Zadej název receptu a vyhledej ho na internetu.": "Enter a recipe name and search for it online.",
+  "Recept se nepodařilo načíst. Zkontroluj internetové připojení.": "The recipe couldn't be loaded. Check your internet connection.",
+  "Zadej, pro kolik lidí chceš recept uvařit.": "Enter how many people you want to cook the recipe for.",
+  "Hledat mezi uloženými recepty...": "Search saved recipes..."
 }

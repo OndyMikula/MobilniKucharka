@@ -37,13 +37,13 @@
 
             <Grid Grid.Row="1" ColumnDefinitions="*, Auto, Auto" Margin="15,0,15,5" ColumnSpacing="8">
                 <Entry Grid.Column="0" x:Name="SearchEntry" 
-                       Placeholder="{loc:Tr 'Hledat recept podle názvu...'}" 
+                       Placeholder="{loc:Tr 'Hledat mezi uloženými recepty...'}" 
                        TextChanged="OnSearchTextChanged" 
-                       Completed="OnSearchButtonClicked"
+                       Completed="OnLocalSearchButtonClicked"
                        VerticalOptions="Center" />
                 <Button Grid.Column="1" Text="🔍" FontSize="18" 
                         WidthRequest="44" HeightRequest="44" Padding="0" CornerRadius="22"
-                        BackgroundColor="#2196F3" TextColor="White" Clicked="OnSearchButtonClicked" />
+                        BackgroundColor="#2196F3" TextColor="White" Clicked="OnLocalSearchButtonClicked" />
                 <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" HorizontalOptions="Center" Spacing="0">
                     <CheckBox x:Name="FilterByPreferencesCheckBox" 
                               CheckedChanged="OnFilterByPreferencesChanged" 
@@ -101,9 +101,10 @@
                     BackgroundColor="#4CAF50" TextColor="White" FontAttributes="Bold" HeightRequest="50" CornerRadius="10"/>
         </Grid>
 
-        <Grid Grid.Row="3" ColumnDefinitions="*, *" Padding="10,10,10,20" BackgroundColor="{AppThemeBinding Light=#E0E0E0, Dark=#1F1F1F}">
+        <Grid Grid.Row="3" ColumnDefinitions="*, *, *" Padding="10,10,10,20" BackgroundColor="{AppThemeBinding Light=#E0E0E0, Dark=#1F1F1F}">
             <Button Grid.Column="0" Text="{loc:Tr 'Recepty'}" BackgroundColor="#2196F3" TextColor="White" FontAttributes="Bold" CornerRadius="10" Margin="5"/>
-            <Button Grid.Column="1" Text="{loc:Tr 'Záložky'}" Clicked="OnBookmarksClicked" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light=Black, Dark=White}" FontAttributes="Bold" CornerRadius="10" Margin="5"/>
+            <Button Grid.Column="1" Text="{loc:Tr 'Hledat'}" Clicked="OnSearchPageClicked" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light=Black, Dark=White}" FontAttributes="Bold" CornerRadius="10" Margin="5"/>
+            <Button Grid.Column="2" Text="{loc:Tr 'Záložky'}" Clicked="OnBookmarksClicked" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light=Black, Dark=White}" FontAttributes="Bold" CornerRadius="10" Margin="5"/>
         </Grid>
 
     </Grid>

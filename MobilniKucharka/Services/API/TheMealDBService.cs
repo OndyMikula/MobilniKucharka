@@ -39,6 +39,51 @@ namespace MobilniKucharka.Services.Api
             return await FetchSingleRecipeAsync($"https://www.themealdb.com/api/json/v1/1/lookup.php?i={mealId}");
         }
 
+        // Hledání receptů podle názvu (dotaz už bývá anglicky - viz RecipeSearchService, který ho
+        // před voláním přeloží). search.php vrací rovnou kompletní data pro každý nalezený recept,
+        // takže tady zatím NEřešíme nutrici - ta se dotáhne až pro konkrétně vybraný recept přes
+        // CompleteRecipeWithNutritionAsync, aby se Nutritionix nevolal zbytečně pro celý seznam.
+        public async Task<List<MealDbRecipe>> SearchByNameAsync(string name, CancellationToken cancellationToken)
+        {
+            string url = $"https://www.themealdb.com/api/json/v1/1/search.php?s={Uri.EscapeDataString(name)}";
+            try
+            {
+                var response = await _httpClient.GetAsync(url, cancellationToken);
+                if (!response.IsSuccessStatusCode) return [];
+
+                var contentString = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (string.IsNullOrWhiteSpace(contentString) || (!contentString.StartsWith('{') && !contentString.StartsWith('[')))
+                    return [];
+
+                var root = JsonSerializer.Deserialize<JsonElement>(contentString);
+                if (!root.TryGetProperty("meals", out var meals) || meals.ValueKind != JsonValueKind.Array)
+                    return [];
+
+                var results = new List<MealDbRecipe>();
+                foreach (var meal in meals.EnumerateArray())
+                    results.Add(ParseMealElement(meal));
+
+                return results;
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // ať volající (RecipeSearchService/SearchPage) pozná rozdíl mezi timeoutem a "nic se nenašlo"
+            }
+            catch
+            {
+                return [];
+            }
+        }
+
+        // Dopočítá nutrici (přes Nutritionix, případně lokální odhad) pro recept už vybraný
+        // uživatelem ze seznamu výsledků hledání - viz SearchByNameAsync výše.
+        public async Task<MealDbRecipe> CompleteRecipeWithNutritionAsync(MealDbRecipe recipe)
+        {
+            var ingredientPairs = recipe.Ingredients.Select(i => (i.Name, i.Measure)).ToList();
+            await FillNutritionAsync(recipe, ingredientPairs);
+            return recipe;
+        }
+
         private async Task<List<string>> GetMealIdsByCategoryAsync(string category)
         {
             string url = $"https://www.themealdb.com/api/json/v1/1/filter.php?c={category}";
@@ -87,22 +132,8 @@ namespace MobilniKucharka.Services.Api
                 if (!root.TryGetProperty("meals", out var meals) || meals.ValueKind != JsonValueKind.Array || meals.GetArrayLength() == 0)
                     return null;
 
-                var meal = meals[0];
-
-                var recipe = new MealDbRecipe
-                {
-                    ExternalId = meal.TryGetProperty("idMeal", out var idProp) ? idProp.GetString() ?? "" : "",
-                    Name = meal.GetProperty("strMeal").GetString() ?? "",
-                    Category = meal.GetProperty("strCategory").GetString() ?? "",
-                    Instructions = meal.GetProperty("strInstructions").GetString() ?? "",
-                    ImageUrl = meal.GetProperty("strMealThumb").GetString() ?? "",
-                    SourceUrl = meal.TryGetProperty("strSource", out var srcProp) ? srcProp.GetString() ?? "" : ""
-                };
-
-                var rawIngredients = ExtractIngredients(meal);
-                recipe.Ingredients = [.. rawIngredients.Select(i => new MealDbIngredient { Name = i.Ingredient, Measure = i.Measure })];
-
-                await FillNutritionAsync(recipe, rawIngredients);
+                var recipe = ParseMealElement(meals[0]);
+                await FillNutritionAsync(recipe, recipe.Ingredients.Select(i => (i.Name, i.Measure)).ToList());
 
                 return recipe;
             }
@@ -110,6 +141,27 @@ namespace MobilniKucharka.Services.Api
             {
                 return null;
             }
+        }
+
+        // Sdílený parser jednoho "meal" JSON elementu na MealDbRecipe - používá ho jak
+        // FetchSingleRecipeAsync (random/lookup), tak SearchByNameAsync (search.php).
+        // Nutrici záměrně neplní - to dělá až volající (FillNutritionAsync/CompleteRecipeWithNutritionAsync).
+        private static MealDbRecipe ParseMealElement(JsonElement meal)
+        {
+            var recipe = new MealDbRecipe
+            {
+                ExternalId = meal.TryGetProperty("idMeal", out var idProp) ? idProp.GetString() ?? "" : "",
+                Name = meal.TryGetProperty("strMeal", out var nameProp) ? nameProp.GetString() ?? "" : "",
+                Category = meal.TryGetProperty("strCategory", out var catProp) ? catProp.GetString() ?? "" : "",
+                Instructions = meal.TryGetProperty("strInstructions", out var instrProp) ? instrProp.GetString() ?? "" : "",
+                ImageUrl = meal.TryGetProperty("strMealThumb", out var thumbProp) ? thumbProp.GetString() ?? "" : "",
+                SourceUrl = meal.TryGetProperty("strSource", out var srcProp) ? srcProp.GetString() ?? "" : ""
+            };
+
+            var rawIngredients = ExtractIngredients(meal);
+            recipe.Ingredients = [.. rawIngredients.Select(i => new MealDbIngredient { Name = i.Ingredient, Measure = i.Measure })];
+
+            return recipe;
         }
 
         private static List<(string Ingredient, string Measure)> ExtractIngredients(JsonElement meal)
@@ -158,6 +210,20 @@ namespace MobilniKucharka.Services.Api
             recipe.Fat = Fat;
             recipe.Sugar = Sugar;
             recipe.IsNutritionEstimated = true; // <- sem to patří
+        }
+
+        // Odhad dietních příznaků z MealDB kategorie - použito jen pro filtrování výsledků hledání
+        // (viz RecipeSearchService). Stejná logika žije i jako soukromá kopie v
+        // BudgetPlannerService.SaveExternalRecipeAsync - úmyslně duplikováno, ať se nemusí sahat
+        // do velkého hlavního souboru kvůli jedné drobné funkci.
+        public static List<string> GuessDietFlagsFromCategory(string mealDbCategory)
+        {
+            return mealDbCategory switch
+            {
+                "Vegan" => ["Vegan", "Vegetarian"],
+                "Vegetarian" => ["Vegetarian"],
+                _ => []
+            };
         }
     }
 
