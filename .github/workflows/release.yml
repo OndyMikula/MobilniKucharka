@@ -20,17 +20,14 @@ jobs:
         run: |
           $csproj = Get-Content "MobilniKucharka/MobilniKucharka.csproj" -Raw
           $version = [regex]::Match($csproj, '<ApplicationDisplayVersion>(.*?)</ApplicationDisplayVersion>').Groups[1].Value
-          $safeTag = $version -replace '\s+', ''
           Write-Host "Verze načtená z csproj: '$version'"
-          Write-Host "Bezpečný tag (bez mezer): '$safeTag'"
           echo "version=$version" >> $env:GITHUB_OUTPUT
-          echo "safe_tag=$safeTag" >> $env:GITHUB_OUTPUT
 
       - name: Check if this version was already released
         id: check
         shell: pwsh
         run: |
-          $tag = "v${{ steps.version.outputs.safe_tag }}"
+          $tag = "v${{ steps.version.outputs.version }}"
           Write-Host "Hledám tag: $tag"
           Write-Host "Existující tagy v repozitáři:"
           git tag -l | Write-Host
@@ -88,6 +85,7 @@ jobs:
                   public const string NutritionixAppId = "TVUJ_NUTRITIONIX_APP_ID";
                   public const string NutritionixApiKey = "TVUJ_NUTRITIONIX_API_KEY";
                   public const string GitHubShareToken = "${{ secrets.SHARE_TOKEN }}";
+                  public const string DeepLApiKey = "${{ secrets.DEEPL_API_KEY }}";
               }
           }
           "@
@@ -127,7 +125,7 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.safe_tag }}
+          tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
           body_path: CHANGELOG_BODY.md
           files: ${{ steps.rename.outputs.apk_path }}
