@@ -53,7 +53,7 @@ public partial class BookmarkCategoryPage : ContentPage
         {
             MainThread.BeginInvokeOnMainThread(async () =>
             {
-                await DisplayAlert("Chyba načítání", $"Recepty se nepodařilo načíst.\nDetail: {ex.Message}", "OK");
+                await DisplayAlertAsync("Chyba načítání", $"Recepty se nepodařilo načíst.\nDetail: {ex.Message}", "OK");
             });
         }
     }

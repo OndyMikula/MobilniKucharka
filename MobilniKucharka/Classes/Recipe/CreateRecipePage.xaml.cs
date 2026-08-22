@@ -267,8 +267,9 @@ namespace MobilniKucharka.Classes.Recipe
         {
             try
             {
-                var result = await MediaPicker.Default.PickPhotoAsync();
-                if (result != null)
+				var results = await MediaPicker.Default.PickPhotosAsync();
+				var result = results.FirstOrDefault();
+				if (result != null)
                 {
                     string localFileName = $"{Guid.NewGuid()}_{result.FileName}";
                     string localFilePath = Path.Combine(FileSystem.AppDataDirectory, localFileName);
@@ -286,7 +287,7 @@ namespace MobilniKucharka.Classes.Recipe
             }
             catch (Exception ex)
             {
-                await DisplayAlert(Tr("Chyba"), $"{Tr("Nepodařilo se načíst obrázek")}: {ex.Message}", "OK");
+                await DisplayAlertAsync(Tr("Chyba"), $"{Tr("Nepodařilo se načíst obrázek")}: {ex.Message}", "OK");
             }
         }
 
@@ -539,7 +540,7 @@ namespace MobilniKucharka.Classes.Recipe
         {
             if (string.IsNullOrWhiteSpace(EntryTitle.Text))
             {
-                await DisplayAlert(Tr("Upozornění"), Tr("Zadej prosím název receptu."), "OK");
+                await DisplayAlertAsync(Tr("Upozornění"), Tr("Zadej prosím název receptu."), "OK");
                 return;
             }
 
@@ -606,7 +607,7 @@ namespace MobilniKucharka.Classes.Recipe
             }
             catch (Exception ex)
             {
-                await DisplayAlert(Tr("Chyba při ukládání"), $"{Tr("Recept se nepodařilo uložit.")}\n{Tr("Detail")}: {ex.Message}", "OK");
+                await DisplayAlertAsync(Tr("Chyba při ukládání"), $"{Tr("Recept se nepodařilo uložit.")}\n{Tr("Detail")}: {ex.Message}", "OK");
             }
         }
 

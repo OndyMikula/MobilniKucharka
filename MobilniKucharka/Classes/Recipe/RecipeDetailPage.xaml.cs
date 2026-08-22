@@ -206,11 +206,11 @@ public partial class RecipeDetailPage : ContentPage
 
         if (ingredient.ProductId <= 0)
         {
-            await DisplayAlert("Chyba", "Tuto surovinu se nepodařilo přiřadit k produktu. Zkus recept znovu otevřít.", "OK");
+            await DisplayAlertAsync("Chyba", "Tuto surovinu se nepodařilo přiřadit k produktu. Zkus recept znovu otevřít.", "OK");
             return;
         }
 
-        string action = await DisplayActionSheet(ingredient.Name, "Zrušit", null,
+        string action = await DisplayActionSheetAsync(ingredient.Name, "Zrušit", null,
     "Zadat vlastní cenu", "Propojit s existující surovinou", "Změnit jednotku");
 
         if (action == "Zadat vlastní cenu")
@@ -251,7 +251,7 @@ public partial class RecipeDetailPage : ContentPage
             }
             else
             {
-                await DisplayAlert("Neplatná hodnota", $"\"{result}\" se nepodařilo rozpoznat jako číslo. Zkus to znovu, jen s číslicemi (např. 25 nebo 25.50).", "OK");
+                await DisplayAlertAsync("Neplatná hodnota", $"\"{result}\" se nepodařilo rozpoznat jako číslo. Zkus to znovu, jen s číslicemi (např. 25 nebo 25.50).", "OK");
                 return;
             }
 
@@ -262,7 +262,7 @@ public partial class RecipeDetailPage : ContentPage
             var allProducts = await App.Database.GetAllLocalProductsAsync();
             string[] names = [.. allProducts.Select(p => p.Name_CS)];
 
-            string chosen = await DisplayActionSheet("Propojit s...", "Zrušit", null, names);
+            string chosen = await DisplayActionSheetAsync("Propojit s...", "Zrušit", null, names);
             var match = allProducts.FirstOrDefault(p => p.Name_CS == chosen);
 
             if (match != null)
@@ -274,7 +274,7 @@ public partial class RecipeDetailPage : ContentPage
         else if (action == "Změnit jednotku")
         {
             string[] unitOptions = ["g", "ml", "ks"];
-            string chosenUnit = await DisplayActionSheet("Vyber jednotku", "Zrušit", null, unitOptions);
+            string chosenUnit = await DisplayActionSheetAsync("Vyber jednotku", "Zrušit", null, unitOptions);
 
             if (unitOptions.Contains(chosenUnit))
             {
@@ -367,7 +367,7 @@ public partial class RecipeDetailPage : ContentPage
             ? [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Smazat recept"), "🔧 " + Tr("Zobrazit syrová data kroků")]
             : [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Smazat recept")];
 
-        string action = await DisplayActionSheet(Tr("Možnosti receptu"), Tr("Zrušit"), null, options);
+        string action = await DisplayActionSheetAsync(Tr("Možnosti receptu"), Tr("Zrušit"), null, options);
 
         if (action == Tr("Sdílet recept"))
             await ShareRecipeAsync();
@@ -397,7 +397,7 @@ public partial class RecipeDetailPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert(Tr("Chyba"), $"{Tr("Sdílení se nepodařilo")}: {ex.Message}", "OK");
+            await DisplayAlertAsync(Tr("Chyba"), $"{Tr("Sdílení se nepodařilo")}: {ex.Message}", "OK");
         }
     }
 
@@ -407,7 +407,7 @@ public partial class RecipeDetailPage : ContentPage
 
         if (link == null)
         {
-            await DisplayAlert(Tr("Chyba"), Tr("Odkaz se nepodařilo vytvořit. Zkontroluj internetové připojení."), "OK");
+            await DisplayAlertAsync(Tr("Chyba"), Tr("Odkaz se nepodařilo vytvořit. Zkontroluj internetové připojení."), "OK");
             return;
         }
 
@@ -435,7 +435,7 @@ public partial class RecipeDetailPage : ContentPage
             }
         }
 
-        await DisplayAlert("Syrová data kroků", sb.Length > 0 ? sb.ToString() : "Žádné kroky.", "OK");
+        await DisplayAlertAsync("Syrová data kroků", sb.Length > 0 ? sb.ToString() : "Žádné kroky.", "OK");
     }
 
     private void OnCancelDeleteClicked(object sender, EventArgs e)
@@ -478,13 +478,13 @@ public partial class RecipeDetailPage : ContentPage
     {
         if (BindableLayout.GetItemsSource(IngredientsLayout) is not IEnumerable<DisplayIngredient> ingredients || !ingredients.Any())
         {
-            await DisplayAlert(Tr("Kopírování"), Tr("Není co zkopírovat."), "OK");
+            await DisplayAlertAsync(Tr("Kopírování"), Tr("Není co zkopírovat."), "OK");
             return;
         }
 
         string text = string.Join("\n", ingredients.Select(i => $"{i.AmountText} {i.Name}"));
         await Clipboard.Default.SetTextAsync(text);
-        await DisplayAlert(Tr("Zkopírováno"), Tr("Suroviny byly zkopírovány do schránky."), "OK");
+        await DisplayAlertAsync(Tr("Zkopírováno"), Tr("Suroviny byly zkopírovány do schránky."), "OK");
     }
 
     private async void OnCopyStepsClicked(object sender, EventArgs e)
@@ -494,13 +494,13 @@ public partial class RecipeDetailPage : ContentPage
 
         if (steps.Count == 0)
         {
-            await DisplayAlert(Tr("Kopírování"), Tr("Není co zkopírovat."), "OK");
+            await DisplayAlertAsync(Tr("Kopírování"), Tr("Není co zkopírovat."), "OK");
             return;
         }
 
         string text = string.Join("\n\n", steps.Select((s, i) => $"{i + 1}. {s}"));
         await Clipboard.Default.SetTextAsync(text);
-        await DisplayAlert(Tr("Zkopírováno"), Tr("Postup přípravy byl zkopírován do schránky."), "OK");
+        await DisplayAlertAsync(Tr("Zkopírováno"), Tr("Postup přípravy byl zkopírován do schránky."), "OK");
     }
 
     private async void OnPeopleCountBadgeTapped(object sender, TappedEventArgs e)

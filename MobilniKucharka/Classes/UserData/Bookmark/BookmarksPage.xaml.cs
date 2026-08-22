@@ -50,8 +50,8 @@ public partial class BookmarksPage : ContentPage
         string pinLabel = (bookmark?.IsPinned ?? false) ? "Odepnout" : "Připnout";
 
         string action = isProtected
-            ? await DisplayActionSheet(categoryName, "Zrušit", null, "Upravit recepty ve složce", pinLabel)
-            : await DisplayActionSheet(categoryName, "Zrušit", null, "Upravit recepty ve složce", pinLabel, "Smazat záložku");
+            ? await DisplayActionSheetAsync(categoryName, "Zrušit", null, "Upravit recepty ve složce", pinLabel)
+            : await DisplayActionSheetAsync(categoryName, "Zrušit", null, "Upravit recepty ve složce", pinLabel, "Smazat záložku");
 
         if (action == "Upravit recepty ve složce")
         {
@@ -64,7 +64,7 @@ public partial class BookmarksPage : ContentPage
         }
         else if (action == "Smazat záložku")
         {
-            bool confirm = await DisplayAlert("Smazat záložku", $"Opravdu chceš smazat záložku \"{categoryName}\"? Recepty samotné zůstanou zachované.", "Smazat", "Zrušit");
+            bool confirm = await DisplayAlertAsync("Smazat záložku", $"Opravdu chceš smazat záložku \"{categoryName}\"? Recepty samotné zůstanou zachované.", "Smazat", "Zrušit");
             if (confirm)
             {
                 await App.Database.DeleteBookmarkAsync(categoryName);
@@ -113,7 +113,7 @@ public partial class BookmarksPage : ContentPage
 
     private async void OnPageOptionsClicked(object sender, TappedEventArgs e)
     {
-        string action = await DisplayActionSheet("Možnosti", "Zrušit", null, "Upravit pořadí záložek");
+        string action = await DisplayActionSheetAsync("Možnosti", "Zrušit", null, "Upravit pořadí záložek");
         if (action == "Upravit pořadí záložek")
             await OpenReorderOverlayAsync();
     }

@@ -49,7 +49,7 @@ namespace MobilniKucharka
 
             if (info != null && info.IsUpdateAvailable)
             {
-                bool download = await DisplayAlert(
+                bool download = await DisplayAlertAsync(
                     Tr("Nová verze je k dispozici"),
                     string.Format(Tr("Je dostupná nová verze aplikace ({0}). Chceš ji nainstalovat? Všechny recepty, záložky a nastavení zůstanou zachovány."), info.LatestVersion),
                     Tr("Instalovat"),
@@ -81,7 +81,7 @@ namespace MobilniKucharka
 
             if (found == null)
             {
-                await DisplayAlert(Tr("Chyba"), Tr("Nepodařilo se najít žádný recept. Zkontroluj internetové připojení."), "OK");
+                await DisplayAlertAsync(Tr("Chyba"), Tr("Nepodařilo se najít žádný recept. Zkontroluj internetové připojení."), "OK");
                 return;
             }
 
@@ -201,18 +201,18 @@ namespace MobilniKucharka
 
         private async void OnResetDatabaseClicked(object sender, EventArgs e)
         {
-            bool confirm = await DisplayAlert(Tr("Reset databáze"), Tr("Tohle smaže VŠECHNY recepty a záložky a nahradí je testovacími daty. Pokračovat?"), Tr("Ano"), Tr("Zrušit"));
+            bool confirm = await DisplayAlertAsync(Tr("Reset databáze"), Tr("Tohle smaže VŠECHNY recepty a záložky a nahradí je testovacími daty. Pokračovat?"), Tr("Ano"), Tr("Zrušit"));
             if (!confirm) return;
 
             await _budgetService.ResetDatabaseAsync();
             await LoadRecipesDataAsync();
-            await DisplayAlert(Tr("Hotovo"), Tr("Databáze byla resetována na testovací data."), "OK");
+            await DisplayAlertAsync(Tr("Hotovo"), Tr("Databáze byla resetována na testovací data."), "OK");
         }
 
         private async void OnRepairStepsClicked(object sender, EventArgs e)
         {
             int fixedCount = await _budgetService.RepairAllRecipeStepsAsync();
-            await DisplayAlert(Tr("Hotovo"), string.Format(Tr("Opraveno receptů: {0}"), fixedCount), "OK");
+            await DisplayAlertAsync(Tr("Hotovo"), string.Format(Tr("Opraveno receptů: {0}"), fixedCount), "OK");
         }
 
         private async Task HandlePendingImportAsync(string guid) //link-sharing
@@ -222,12 +222,12 @@ namespace MobilniKucharka
             {
                 int newId = await _budgetService.ImportSharedRecipeAsync(recipe);
                 await _budgetService.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
-                await DisplayAlert(Tr("Recept naimportován"), string.Format(Tr("\"{0}\" byl přidán do tvých receptů."), recipe.Name), "OK");
+                await DisplayAlertAsync(Tr("Recept naimportován"), string.Format(Tr("\"{0}\" byl přidán do tvých receptů."), recipe.Name), "OK");
                 await LoadRecipesDataAsync();
             }
             else
             {
-                await DisplayAlert(Tr("Odkaz neplatný"), Tr("Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit)."), "OK");
+                await DisplayAlertAsync(Tr("Odkaz neplatný"), Tr("Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit)."), "OK");
             }
         }
     }

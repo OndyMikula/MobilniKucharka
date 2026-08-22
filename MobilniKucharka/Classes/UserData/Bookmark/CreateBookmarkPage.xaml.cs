@@ -15,11 +15,8 @@ public partial class CreateBookmarkPage : ContentPage
     {
         try
         {
-            var result = await MediaPicker.Default.PickPhotoAsync(new MediaPickerOptions
-            {
-                Title = "Vyberte obrázek složky"
-            });
-
+            var results = await MediaPicker.Default.PickPhotosAsync();
+            var result = results.FirstOrDefault();
             if (result != null)
             {
                 _selectedImagePath = result.FullPath;
@@ -31,15 +28,15 @@ public partial class CreateBookmarkPage : ContentPage
         }
         catch (FeatureNotSupportedException)
         {
-            await DisplayAlert("Chyba", "Tato funkce není na vašem zařízení podporována.", "OK");
+            await DisplayAlertAsync("Chyba", "Tato funkce není na vašem zařízení podporována.", "OK");
         }
         catch (PermissionException)
         {
-            await DisplayAlert("Práva", "Aplikace nemá oprávnění přistupovat k fotkám.", "OK");
+            await DisplayAlertAsync("Práva", "Aplikace nemá oprávnění přistupovat k fotkám.", "OK");
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Chyba", $"Obrázek se nepodařilo načíst: {ex.Message}", "OK");
+            await DisplayAlertAsync("Chyba", $"Obrázek se nepodařilo načíst: {ex.Message}", "OK");
         }
     }
 
@@ -49,7 +46,7 @@ public partial class CreateBookmarkPage : ContentPage
 
         if (string.IsNullOrWhiteSpace(folderName))
         {
-            await DisplayAlert("Upozornění", "Název složky nesmí být prázdný.", "OK");
+            await DisplayAlertAsync("Upozornění", "Název složky nesmí být prázdný.", "OK");
             return;
         }
 
@@ -60,7 +57,7 @@ public partial class CreateBookmarkPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Chyba", $"Nepodařilo se uložit složku: {ex.Message}", "OK");
+            await DisplayAlertAsync("Chyba", $"Nepodařilo se uložit složku: {ex.Message}", "OK");
         }
     }
 }

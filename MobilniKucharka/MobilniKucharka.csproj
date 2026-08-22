@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net9.0-android</TargetFrameworks>
+		<TargetFrameworks>net10.0-android</TargetFrameworks>
 		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
 		<!-- <TargetFrameworks>$(TargetFrameworks);net9.0-tizen</TargetFrameworks> -->
 
@@ -28,9 +28,19 @@
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.5.1</ApplicationDisplayVersion> <!-- Co vidí user (1.5), "- beta" pro oznaceni beta verze -->
 		<ApplicationVersion>10</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(10) -->
-		
+
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+
+		<PackageIcon>appicon.png</PackageIcon>
+
+		<RepositoryUrl>https://github.com/OndyMikula/MobilniKucharka</RepositoryUrl>
 		
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
+	  <Optimize>True</Optimize>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -50,11 +60,17 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="CommunityToolkit.Maui" Version="12.2.0" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.111" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
+	  <None Include="..\README.md">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="CommunityToolkit.Maui" Version="15.0.0" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.90" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.11" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
-		<PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="10.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -79,6 +95,13 @@
 	  <MauiXaml Update="Classes\Recipe\RecipeDetailPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Update="Resources\AppIcon\appicon.png">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
 	</ItemGroup>
 
 </Project>

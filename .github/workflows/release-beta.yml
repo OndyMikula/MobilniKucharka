@@ -67,7 +67,7 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Install MAUI Android workload
         if: steps.check.outputs.exists == 'false'
@@ -103,7 +103,7 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         shell: pwsh
         run: |
-          dotnet publish MobilniKucharka/MobilniKucharka.csproj -f net9.0-android -c Release `
+          dotnet publish MobilniKucharka/MobilniKucharka.csproj -f net10.0-android -c Release `
             -p:AndroidKeyStore=true `
             -p:AndroidSigningKeyStore=../release.keystore `
             -p:AndroidSigningKeyAlias=${{ secrets.ANDROID_KEY_ALIAS }} `
@@ -115,7 +115,7 @@ jobs:
         id: rename
         shell: pwsh
         run: |
-          $apkFile = Get-ChildItem -Path "MobilniKucharka/bin/Release/net9.0-android" -Filter "*Signed.apk" -Recurse | Select-Object -First 1
+          $apkFile = Get-ChildItem -Path "MobilniKucharka/bin/Release/net10.0-android" -Filter "*Signed.apk" -Recurse | Select-Object -First 1
           $newName = "MobilniKucharka-v${{ steps.version.outputs.safe_tag }}.apk"
           $newPath = Join-Path $apkFile.DirectoryName $newName
           Copy-Item $apkFile.FullName $newPath -Force

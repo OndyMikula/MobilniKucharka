@@ -37,7 +37,7 @@ public partial class SettingsPage : ContentPage
             Preferences.Default.Set("IsDeveloperMode", newState);
             UpdateBetaSectionVisibility();
 
-            await DisplayAlert(Tr("Vývojářský režim"),
+            await DisplayAlertAsync(Tr("Vývojářský režim"),
                 newState ? Tr("Vývojářský režim byl aktivován.") : Tr("Vývojářský režim byl deaktivován."), "OK");
         }
     }
@@ -91,7 +91,7 @@ public partial class SettingsPage : ContentPage
         string accept = newCultureCode == "en" ? "Restart" : "Restartovat";
         string cancel = newCultureCode == "en" ? "Cancel" : "Zrušit";
 
-        bool shouldRestart = await DisplayAlert(title, message, accept, cancel);
+        bool shouldRestart = await DisplayAlertAsync(title, message, accept, cancel);
 
         if (shouldRestart)
         {
@@ -137,7 +137,7 @@ public partial class SettingsPage : ContentPage
         catch (Exception ex)
         {
             BackupProgressOverlay.IsVisible = false;
-            await DisplayAlert(Tr("Chyba"), $"{Tr("Export se nepodařil")}: {ex.Message}", "OK");
+            await DisplayAlertAsync(Tr("Chyba"), $"{Tr("Export se nepodařil")}: {ex.Message}", "OK");
         }
     }
 
@@ -157,7 +157,7 @@ public partial class SettingsPage : ContentPage
             });
             if (result == null) return;
 
-            bool confirm = await DisplayAlert(Tr("Načíst zálohu"), Tr("Tímto se přepíší všechna aktuální data v aplikaci. Pokračovat?"), Tr("Ano"), Tr("Zrušit"));
+            bool confirm = await DisplayAlertAsync(Tr("Načíst zálohu"), Tr("Tímto se přepíší všechna aktuální data v aplikaci. Pokračovat?"), Tr("Ano"), Tr("Zrušit"));
             if (!confirm) return;
 
             BackupProgressOverlay.IsVisible = true;
@@ -181,13 +181,13 @@ public partial class SettingsPage : ContentPage
             File.Delete(localCopyPath);
 
             BackupProgressOverlay.IsVisible = false;
-            await DisplayAlert(Tr("Hotovo"), Tr("Data byla načtena. Aplikace se nyní restartuje."), Tr("Restartovat"));
+            await DisplayAlertAsync(Tr("Hotovo"), Tr("Data byla načtena. Aplikace se nyní restartuje."), Tr("Restartovat"));
             RestartApp();
         }
         catch (Exception ex)
         {
             BackupProgressOverlay.IsVisible = false;
-            await DisplayAlert(Tr("Chyba"), $"{Tr("Načtení se nepodařilo")}: {ex.Message}", "OK");
+            await DisplayAlertAsync(Tr("Chyba"), $"{Tr("Načtení se nepodařilo")}: {ex.Message}", "OK");
         }
     }
 
@@ -211,12 +211,12 @@ public partial class SettingsPage : ContentPage
             var result = await FileSaver.Default.SaveAsync(Path.GetFileName(zipPath), stream, CancellationToken.None);
 
             if (result.IsSuccessful)
-                await DisplayAlert(Tr("Hotovo"), $"{Tr("Záloha byla uložena do")}: {result.FilePath}", "OK");
+                await DisplayAlertAsync(Tr("Hotovo"), $"{Tr("Záloha byla uložena do")}: {result.FilePath}", "OK");
         }
         catch (Exception ex)
         {
             BackupProgressOverlay.IsVisible = false;
-            await DisplayAlert(Tr("Chyba"), $"{Tr("Uložení se nepodařilo")}: {ex.Message}", "OK");
+            await DisplayAlertAsync(Tr("Chyba"), $"{Tr("Uložení se nepodařilo")}: {ex.Message}", "OK");
         }
     }
 
@@ -232,11 +232,11 @@ public partial class SettingsPage : ContentPage
             int newId = await App.Database.ImportSharedRecipeAsync(recipe);
             await App.Database.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
 
-            await DisplayAlert(Tr("Hotovo"), string.Format(Tr("Recept \"{0}\" byl naimportován."), recipe.Name), "OK");
+            await DisplayAlertAsync(Tr("Hotovo"), string.Format(Tr("Recept \"{0}\" byl naimportován."), recipe.Name), "OK");
         }
         catch (Exception ex)
         {
-            await DisplayAlert(Tr("Chyba"), $"{Tr("Import se nepodařil")}: {ex.Message}", "OK");
+            await DisplayAlertAsync(Tr("Chyba"), $"{Tr("Import se nepodařil")}: {ex.Message}", "OK");
         }
     }
 
@@ -245,21 +245,21 @@ public partial class SettingsPage : ContentPage
         string? link = RecipeLinkEntry.Text?.Trim();
         if (string.IsNullOrWhiteSpace(link))
         {
-            await DisplayAlert(Tr("Chyba"), Tr("Nejdřív vlož odkaz."), "OK");
+            await DisplayAlertAsync(Tr("Chyba"), Tr("Nejdřív vlož odkaz."), "OK");
             return;
         }
 
         string? guid = ExtractGuidFromLink(link);
         if (guid == null)
         {
-            await DisplayAlert(Tr("Chyba"), Tr("Tento odkaz nevypadá jako platný odkaz na recept."), "OK");
+            await DisplayAlertAsync(Tr("Chyba"), Tr("Tento odkaz nevypadá jako platný odkaz na recept."), "OK");
             return;
         }
 
         var recipe = await RecipeLinkShareService.ImportFromLinkAsync(guid);
         if (recipe == null)
         {
-            await DisplayAlert(Tr("Odkaz neplatný"), Tr("Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit)."), "OK");
+            await DisplayAlertAsync(Tr("Odkaz neplatný"), Tr("Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit)."), "OK");
             return;
         }
 
@@ -267,7 +267,7 @@ public partial class SettingsPage : ContentPage
         await App.Database.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
 
         RecipeLinkEntry.Text = "";
-        await DisplayAlert(Tr("Hotovo"), string.Format(Tr("Recept \"{0}\" byl naimportován."), recipe.Name), "OK");
+        await DisplayAlertAsync(Tr("Hotovo"), string.Format(Tr("Recept \"{0}\" byl naimportován."), recipe.Name), "OK");
     }
 
     [GeneratedRegex(@"[?&]id=([a-fA-F0-9]+)")]
@@ -294,17 +294,17 @@ public partial class SettingsPage : ContentPage
 
         if (info == null)
         {
-            await DisplayAlert(Tr("Kontrola aktualizací"), Tr("Nepodařilo se zkontrolovat aktualizace. Zkontroluj internetové připojení."), "OK");
+            await DisplayAlertAsync(Tr("Kontrola aktualizací"), Tr("Nepodařilo se zkontrolovat aktualizace. Zkontroluj internetové připojení."), "OK");
             return;
         }
 
         if (!info.IsUpdateAvailable)
         {
-            await DisplayAlert(Tr("Kontrola aktualizací"), Tr("Používáš nejnovější verzi."), "OK");
+            await DisplayAlertAsync(Tr("Kontrola aktualizací"), Tr("Používáš nejnovější verzi."), "OK");
             return;
         }
 
-        bool download = await DisplayAlert(
+        bool download = await DisplayAlertAsync(
             Tr("Nová verze je k dispozici"),
             string.Format(Tr("Je dostupná nová verze aplikace ({0}). Chceš ji instalovat? Všechny recepty, záložky a nastavení zůstanou zachovány."), info.LatestVersion),
             Tr("Instalovat"), Tr("Pokračovat bez instalace"));
@@ -351,11 +351,11 @@ public partial class SettingsPage : ContentPage
             Preferences.Default.Set("IsBetaOptedIn", true);
             BetaCodeEntry.Text = "";
             UpdateBetaSectionVisibility();
-            await DisplayAlert(Tr("Hotovo"), Tr("Jsi přihlášen jako beta tester. Nyní budeš dostávat i beta verze."), "OK");
+            await DisplayAlertAsync(Tr("Hotovo"), Tr("Jsi přihlášen jako beta tester. Nyní budeš dostávat i beta verze."), "OK");
         }
         else
         {
-            await DisplayAlert(Tr("Špatný kód"), Tr("Zadaný kód není správný."), "OK");
+            await DisplayAlertAsync(Tr("Špatný kód"), Tr("Zadaný kód není správný."), "OK");
         }
     }
 
@@ -363,7 +363,7 @@ public partial class SettingsPage : ContentPage
     {
         Preferences.Default.Set("IsBetaOptedIn", false);
         UpdateBetaSectionVisibility();
-        await DisplayAlert(Tr("Hotovo"), Tr("Byl jsi odhlášen z beta programu."), "OK");
+        await DisplayAlertAsync(Tr("Hotovo"), Tr("Byl jsi odhlášen z beta programu."), "OK");
     }
 
     private static void RestartApp()
