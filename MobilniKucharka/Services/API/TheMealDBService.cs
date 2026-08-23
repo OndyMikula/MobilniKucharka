@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-using MobilniKucharka.Services;
 
 namespace MobilniKucharka.Services.Api
 {

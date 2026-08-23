@@ -1,7 +1,5 @@
-﻿using MobilniKucharka.Classes;
-using MobilniKucharka.Classes.Recipe;
+﻿using MobilniKucharka.Classes.Recipe;
 using SQLite;
-using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace MobilniKucharka.Services.Api

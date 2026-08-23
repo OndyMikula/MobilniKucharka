@@ -1,11 +1,10 @@
-using SQLite;
 using MobilniKucharka.Classes;
-using System.Text.Json;
 using MobilniKucharka.Classes.Recipe;
 using MobilniKucharka.Classes.UserData.Bookmark;
 using MobilniKucharka.Services.Api;
-using MobilniKucharka.Classes.Recipe.Sharing;
+using SQLite;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace MobilniKucharka.Services
@@ -295,8 +294,21 @@ namespace MobilniKucharka.Services
 
                 var recipeIds = links.Select(l => l.RecipeId).ToHashSet();
                 var allRecipes = await _db.Table<Recipe>().ToListAsync();
+                var matchedRecipes = allRecipes.Where(r => recipeIds.Contains(r.Id)).ToList();
 
-                return [.. allRecipes.Where(r => recipeIds.Contains(r.Id))];
+                // Stejný "translate-on-read" vzor jako GetPlanAsync/SearchRecipesAsync - recept
+                // naimportovaný jen v jednom jazyce (např. přes SearchPage, který ukládá jen Name_EN)
+                // se tu doplní do aktuálního jazyka appky, pokud ještě nebyl zobrazen přes
+                // RecipeDetailPage. Díky tomu se i "Vytvořené recepty" (kam Import odkládá recepty)
+                // zobrazují správně přeložené. Cache uvnitř EnsureRecipeLanguageAsync zajistí, že se
+                // DeepL nezavolá znovu, pokud už překlad existuje.
+                var displayRecipes = new List<Recipe>();
+                foreach (var recipe in matchedRecipes)
+                {
+                    displayRecipes.Add(await EnsureRecipeLanguageAsync(recipe.Id) ?? recipe);
+                }
+
+                return displayRecipes;
             }
             catch (Exception ex)
             {

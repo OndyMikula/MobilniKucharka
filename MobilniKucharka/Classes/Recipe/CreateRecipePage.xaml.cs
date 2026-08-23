@@ -22,6 +22,14 @@ namespace MobilniKucharka.Classes.Recipe
         // ExternalSourceId, BookmarkId, DietaryFlagsJson...). Stejná třída bugu jako kdysi u RatingSlideru.
         private Recipe _recipe = new();
 
+        // Speciální položka v Pickeru jednotek - přepne pole množství na textovou klávesnici, aby šlo
+        // napsat cokoliv (špetka, trochu, podle chuti...). Slovo "Vlastní" samotné se nikdy neukládá
+        // ani nezobrazuje - je to jen řídicí hodnota v UI (viz CollectIngredientRows). Necháno
+        // nepřeložené stejně jako sousední "lžíce"/"lžička" v tomhle seznamu - důsledně, ne omylem.
+        private const string CustomUnitKey = "Vlastní";
+
+        private static readonly string[] UnitOptions = [CustomUnitKey, "g", "kg", "ml", "l", "lžíce", "lžička", "ks"];
+
         private readonly HashSet<string> _selectedTags = [];
         private readonly Dictionary<string, Border> _tagButtons = [];
 
@@ -164,7 +172,10 @@ namespace MobilniKucharka.Classes.Recipe
             if (string.IsNullOrWhiteSpace(amount)) return ("", "g");
 
             var match = AmountSplitRegexGen().Match(amount.Trim());
-            if (!match.Success) return (amount, ""); // volný text (např. "podle chuti") -> žádná jednotka se nevymýšlí
+            // Volný text bez vedoucího čísla (např. "špetka", "podle chuti") - vrátíme rovnou
+            // "Vlastní", ať se při úpravě receptu Picker i klávesnice nastaví správně
+            // (viz UpdateAmountFieldForUnit) a ne jako prázdný, ničemu neodpovídající výběr.
+            if (!match.Success) return (amount, CustomUnitKey);
 
             string quantity = match.Groups[1].Value;
             string unitRaw = match.Groups[2].Value.Trim().ToLowerInvariant();
@@ -267,9 +278,9 @@ namespace MobilniKucharka.Classes.Recipe
         {
             try
             {
-				var results = await MediaPicker.Default.PickPhotosAsync();
-				var result = results.FirstOrDefault();
-				if (result != null)
+                var results = await MediaPicker.Default.PickPhotosAsync();
+                var result = results.FirstOrDefault();
+                if (result != null)
                 {
                     string localFileName = $"{Guid.NewGuid()}_{result.FileName}";
                     string localFilePath = Path.Combine(FileSystem.AppDataDirectory, localFileName);
@@ -309,8 +320,6 @@ namespace MobilniKucharka.Classes.Recipe
             _ = TriggerAutoSaveAsync();
         }
 
-        private static readonly string[] UnitOptions = ["g", "kg", "ml", "l", "lžíce", "lžička", "ks"];
-
         private void AddIngredientRow(string initialName = "", string initialAmount = "", string initialUnit = "g")
         {
             var grid = new Grid
@@ -329,13 +338,47 @@ namespace MobilniKucharka.Classes.Recipe
             var amountEntry = new Entry { Placeholder = Tr("Množství"), WidthRequest = 70, Keyboard = Keyboard.Numeric, Text = initialAmount };
             amountEntry.TextChanged += OnFieldChanged;
 
-            var unitPicker = new Picker { WidthRequest = 90, ItemsSource = UnitOptions, SelectedItem = initialUnit };
-            unitPicker.SelectedIndexChanged += (s, e) => _ = TriggerAutoSaveAsync();
+            var unitOptions = BuildUnitPickerOptions();
+            var unitPicker = new Picker
+            {
+                WidthRequest = 90,
+                ItemsSource = unitOptions,
+                ItemDisplayBinding = new Binding(nameof(UnitPickerOption.DisplayText)),
+                SelectedItem = FindUnitOption(unitOptions, initialUnit) ?? unitOptions[0]
+            };
+            unitPicker.SelectedIndexChanged += (s, e) =>
+            {
+                string selectedKey = (unitPicker.SelectedItem as UnitPickerOption)?.Key ?? "g";
+                UpdateAmountFieldForUnit(amountEntry, selectedKey);
+                _ = TriggerAutoSaveAsync();
+            };
+
+            // Rovnou při vytvoření řádku nastaví správnou klávesnici/placeholder podle initialUnit -
+            // důležité při načítání existujícího receptu k úpravě (viz SplitAmountForEditing), kde se
+            // ingredience s volným textem (bez čísla) vrací rovnou s initialUnit = CustomUnitKey.
+            UpdateAmountFieldForUnit(amountEntry, initialUnit);
 
             grid.Add(nameEntry, 0);
             grid.Add(amountEntry, 1);
             grid.Add(unitPicker, 2);
             IngredientsContainer.Add(grid);
+        }
+
+        // Přepne klávesnici a placeholder podle vybrané jednotky - "Vlastní" umožní napsat cokoliv
+        // (špetka, trochu, podle chuti...), ostatní jednotky očekávají číslo. Samotné slovo "Vlastní"
+        // se nikam neukládá, jde jen o řídicí hodnotu v Pickeru (viz CollectIngredientRows).
+        private void UpdateAmountFieldForUnit(Entry amountEntry, string? unit)
+        {
+            if (unit == CustomUnitKey)
+            {
+                amountEntry.Keyboard = Keyboard.Text;
+                amountEntry.Placeholder = Tr("Špetka");
+            }
+            else
+            {
+                amountEntry.Keyboard = Keyboard.Numeric;
+                amountEntry.Placeholder = Tr("Množství");
+            }
         }
 
         private void AddStepRow(string initialText = "")
@@ -394,13 +437,31 @@ namespace MobilniKucharka.Classes.Recipe
                 {
                     string name = (grid.Children[0] as Entry)?.Text?.Trim() ?? "";
                     string quantity = (grid.Children[1] as Entry)?.Text?.Trim() ?? "";
-                    string unit = (grid.Children[2] as Picker)?.SelectedItem as string ?? "g";
+
+                    // Picker.SelectedItem je teď UnitPickerOption (kvůli přeloženému zobrazení - viz
+                    // BuildUnitPickerOptions), ne holý string. Pro ukládání/porovnávání vždy bereme
+                    // kanonický .Key, nikdy přeložený .DisplayText, aby uložená data v DB byla
+                    // nezávislá na jazyce appky v okamžiku uložení.
+                    string unit = (grid.Children[2] as Picker)?.SelectedItem is UnitPickerOption selectedOption
+                        ? selectedOption.Key
+                        : "g";
 
                     if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(quantity)) continue;
 
-                    // Jednotku přidáváme jen tehdy, když je v množství skutečně číslo -
-                    // u volného textu (např. "podle chuti") by přidaná jednotka nedávala smysl a jen by se hromadila při každé úpravě.
-                    string combinedAmount = quantity.Any(char.IsDigit) ? $"{quantity} {unit}" : quantity;
+                    string combinedAmount;
+                    if (unit == CustomUnitKey)
+                    {
+                        // "Vlastní" je jen řídicí volba v UI (přepne klávesnici na text) - nikdy se
+                        // neukládá jako součást množství. Uloží se přesně to, co uživatel napsal
+                        // (např. "špetka"), bez ohledu na to, jestli obsahuje číslici.
+                        combinedAmount = quantity;
+                    }
+                    else
+                    {
+                        // Jednotku přidáváme jen tehdy, když je v množství skutečně číslo -
+                        // u volného textu (např. "podle chuti") by přidaná jednotka nedávala smysl a jen by se hromadila při každé úpravě.
+                        combinedAmount = quantity.Any(char.IsDigit) ? $"{quantity} {unit}" : quantity;
+                    }
 
                     result.Add((name, combinedAmount));
                 }
@@ -635,6 +696,22 @@ namespace MobilniKucharka.Classes.Recipe
                 }
             }
         }
+
+        // Spojuje kanonický (neměnný, ukládaný/porovnávaný) klíč jednotky s jejím přeloženým
+        // zobrazovaným textem - díky tomu Picker může v anglickém režimu ukazovat "Custom", ale
+        // CollectIngredientRows a UpdateAmountFieldForUnit pořád porovnávají proti stabilnímu
+        // "Vlastní" bez ohledu na aktuální jazyk appky.
+        private class UnitPickerOption
+        {
+            public string Key { get; set; } = string.Empty;
+            public string DisplayText { get; set; } = string.Empty;
+        }
+
+        private static List<UnitPickerOption> BuildUnitPickerOptions() =>
+            [.. UnitOptions.Select(key => new UnitPickerOption { Key = key, DisplayText = Tr(key) })];
+
+        private static UnitPickerOption? FindUnitOption(List<UnitPickerOption> options, string key) =>
+            options.FirstOrDefault(o => o.Key == key);
 
         private void OnPageUnloaded(object sender, EventArgs e) { }
     }

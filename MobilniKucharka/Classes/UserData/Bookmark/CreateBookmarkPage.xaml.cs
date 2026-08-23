@@ -1,6 +1,4 @@
-﻿using MobilniKucharka.Services;
-
-namespace MobilniKucharka.Classes.UserData.Bookmark;
+﻿namespace MobilniKucharka.Classes.UserData.Bookmark;
 
 public partial class CreateBookmarkPage : ContentPage
 {

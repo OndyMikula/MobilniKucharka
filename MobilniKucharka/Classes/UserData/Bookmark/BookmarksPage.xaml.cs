@@ -82,10 +82,15 @@ public partial class BookmarksPage : ContentPage
         var recipesInBookmark = await App.Database.GetRecipesByCategoryAsync(categoryName);
         var idsInBookmark = recipesInBookmark.Select(r => r.Id).ToHashSet();
 
+        // Dřív natvrdo r.Name_CS - v anglickém režimu appky (nebo u receptu bez vyplněné češtiny,
+        // např. čerstvě naimportovaného ze SearchPage) to ukazovalo špatný/prázdný název. r.Name je
+        // jazykově správná vlastnost s fallbackem na druhý jazyk (viz Recipe.cs). Záměrně tu NEVOLÁME
+        // EnsureRecipeLanguageAsync pro každý recept - tenhle seznam natahuje VŠECHNY recepty v appce
+        // najednou, takže hromadné DeepL volání při každém otevření tohodle přehledu by bylo zbytečně drahé.
         var selectionList = allRecipes.Select(r => new BookmarkedRecipeSelectionModel
         {
             RecipeId = r.Id,
-            RecipeName = r.Name_CS,
+            RecipeName = r.Name,
             IsInBookmark = idsInBookmark.Contains(r.Id)
         }).ToList();
 
