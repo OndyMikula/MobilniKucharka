@@ -367,7 +367,7 @@ namespace MobilniKucharka.Classes.Recipe
         // Přepne klávesnici a placeholder podle vybrané jednotky - "Vlastní" umožní napsat cokoliv
         // (špetka, trochu, podle chuti...), ostatní jednotky očekávají číslo. Samotné slovo "Vlastní"
         // se nikam neukládá, jde jen o řídicí hodnotu v Pickeru (viz CollectIngredientRows).
-        private void UpdateAmountFieldForUnit(Entry amountEntry, string? unit)
+        private static void UpdateAmountFieldForUnit(Entry amountEntry, string? unit)
         {
             if (unit == CustomUnitKey)
             {
@@ -442,7 +442,7 @@ namespace MobilniKucharka.Classes.Recipe
                     // BuildUnitPickerOptions), ne holý string. Pro ukládání/porovnávání vždy bereme
                     // kanonický .Key, nikdy přeložený .DisplayText, aby uložená data v DB byla
                     // nezávislá na jazyce appky v okamžiku uložení.
-                    string unit = (grid.Children[2] as Picker)?.SelectedItem is UnitPickerOption selectedOption
+                    string unit = grid.Children[2] is Picker { SelectedItem: UnitPickerOption selectedOption }
                         ? selectedOption.Key
                         : "g";
 

@@ -27,16 +27,11 @@ namespace MobilniKucharka.Services
     // hledání i pro česky napsané názvy receptů, ne jen anglické. Zobrazované názvy výsledků se
     // (v českém režimu appky) přeloží zpátky pro zobrazení v SearchPage - viz
     // TranslateResultNamesForDisplayAsync.
-    public class RecipeSearchService
+    public class RecipeSearchService(string dbPath)
     {
         private readonly TheMealDbService _mealDbService = new();
-        private readonly SpoonacularService _spoonacularService;
+        private readonly SpoonacularService _spoonacularService = new(dbPath);
         private readonly TranslationService _translationService = new();
-
-        public RecipeSearchService(string dbPath)
-        {
-            _spoonacularService = new SpoonacularService(dbPath);
-        }
 
         public async Task<List<ExternalRecipeSearchResult>> SearchAsync(string rawQuery, bool applyDietFilter, CancellationToken cancellationToken)
         {

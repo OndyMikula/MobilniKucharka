@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Maui.Storage;
+using MobilniKucharka.Classes.Legal;
 using MobilniKucharka.Classes.Recipe.Sharing;
 using MobilniKucharka.Services;
 using System.Globalization;
@@ -315,6 +316,28 @@ public partial class SettingsPage : ContentPage
             if (!string.IsNullOrWhiteSpace(urlToOpen))
                 await Launcher.Default.OpenAsync(urlToOpen);
         }
+    }
+
+    // Jeden odkaz "Právní informace" místo čtyř samostatných tlačítek - klepnutím nabídne action
+    // sheet se všemi 4 dokumenty. License jde do vlastní LicensePage (plné znění Apache 2.0),
+    // zbylé tři přes generickou LegalDocumentPage (viz LegalContent).
+    private async void OnLegalInfoTapped(object sender, TappedEventArgs e)
+    {
+        string tos = Tr("Podmínky použití");
+        string privacy = Tr("Zásady ochrany osobních údajů");
+        string license = Tr("Licence");
+        string thirdParty = Tr("Zdroje a licence třetích stran");
+
+        string action = await DisplayActionSheetAsync(Tr("Právní informace"), Tr("Zrušit"), null, tos, privacy, license, thirdParty);
+
+        if (action == tos)
+            await Navigation.PushAsync(new LegalDocumentPage(LegalDocumentType.TermsOfService));
+        else if (action == privacy)
+            await Navigation.PushAsync(new LegalDocumentPage(LegalDocumentType.PrivacyPolicy));
+        else if (action == license)
+            await Navigation.PushAsync(new LicensePage());
+        else if (action == thirdParty)
+            await Navigation.PushAsync(new LegalDocumentPage(LegalDocumentType.ThirdPartyNotices));
     }
 
     private void UpdateBetaSectionVisibility()

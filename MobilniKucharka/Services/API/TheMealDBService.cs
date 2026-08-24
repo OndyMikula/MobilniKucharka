@@ -132,7 +132,7 @@ namespace MobilniKucharka.Services.Api
                     return null;
 
                 var recipe = ParseMealElement(meals[0]);
-                await FillNutritionAsync(recipe, recipe.Ingredients.Select(i => (i.Name, i.Measure)).ToList());
+                await FillNutritionAsync(recipe, [.. recipe.Ingredients.Select(i => (i.Name, i.Measure))]);
 
                 return recipe;
             }
