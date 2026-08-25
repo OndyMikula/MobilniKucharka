@@ -17,8 +17,13 @@ namespace MobilniKucharka
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
+            // Blazor Hybrid - zatím jen zkušebně pro porovnání BottomNavBar (viz /Components).
+            // Zbytek appky zůstává čistě XAML/MAUI, tohle nijak neovlivňuje.
+            builder.Services.AddMauiBlazorWebView();
+
 #if DEBUG
             builder.Logging.AddDebug();
+            builder.Services.AddBlazorWebViewDeveloperTools();
 #endif
 
             return builder.Build();

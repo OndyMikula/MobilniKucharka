@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using MobilniKucharka.Classes.Navigation;
+using System.Collections.ObjectModel;
 
 namespace MobilniKucharka.Classes.UserData.Bookmark;
 
@@ -11,6 +12,7 @@ public partial class BookmarksPage : ContentPage
     {
         InitializeComponent();
         BookmarksCollectionView.ItemsSource = Bookmarks;
+        BottomNav.SetActiveTab(AppTab.Bookmarks);
     }
 
     protected override async void OnAppearing()
@@ -25,6 +27,12 @@ public partial class BookmarksPage : ContentPage
         Bookmarks.Clear();
         foreach (var b in bookmarks)
             Bookmarks.Add(b);
+    }
+
+    // Patička (BottomNavBar) požádala o přepnutí na jinou hlavní záložku.
+    private async void OnBottomNavTabRequested(object sender, AppTab tab)
+    {
+        await AppTabNavigation.GoToTabAsync(Navigation, tab);
     }
 
     private async void OnCategoryTapped(object sender, TappedEventArgs e)
@@ -82,11 +90,6 @@ public partial class BookmarksPage : ContentPage
         var recipesInBookmark = await App.Database.GetRecipesByCategoryAsync(categoryName);
         var idsInBookmark = recipesInBookmark.Select(r => r.Id).ToHashSet();
 
-        // Dřív natvrdo r.Name_CS - v anglickém režimu appky (nebo u receptu bez vyplněné češtiny,
-        // např. čerstvě naimportovaného ze SearchPage) to ukazovalo špatný/prázdný název. r.Name je
-        // jazykově správná vlastnost s fallbackem na druhý jazyk (viz Recipe.cs). Záměrně tu NEVOLÁME
-        // EnsureRecipeLanguageAsync pro každý recept - tenhle seznam natahuje VŠECHNY recepty v appce
-        // najednou, takže hromadné DeepL volání při každém otevření tohodle přehledu by bylo zbytečně drahé.
         var selectionList = allRecipes.Select(r => new BookmarkedRecipeSelectionModel
         {
             RecipeId = r.Id,

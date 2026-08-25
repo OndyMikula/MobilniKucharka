@@ -1,0 +1,35 @@
+﻿@namespace MobilniKucharka.Components
+
+<div class="nav-bar">
+    <div class="nav-pill" style="@PillStyle"></div>
+
+    <button class="nav-button @(ActiveTab == AppTab.Recipes ? "active" : "")" @onclick="() => RequestTab(AppTab.Recipes)">
+        @Tr("Recepty")
+    </button>
+    <button class="nav-button @(ActiveTab == AppTab.Search ? "active" : "")" @onclick="() => RequestTab(AppTab.Search)">
+        @Tr("Hledat")
+    </button>
+    <button class="nav-button @(ActiveTab == AppTab.Bookmarks ? "active" : "")" @onclick="() => RequestTab(AppTab.Bookmarks)">
+        @Tr("Záložky")
+    </button>
+</div>
+
+@code {
+    [Parameter] public AppTab ActiveTab { get; set; } = AppTab.Recipes;
+    [Parameter] public EventCallback<AppTab> TabRequested { get; set; }
+
+    // Stejná runtime instance UiTranslator.Tr() jako v XAML verzi - stejná appka, stejný proces,
+    // žádné zdvojení překladové logiky mezi XAML a Razor stránkami.
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    // translateX(100%) je relativní k VLASTNÍ šířce pilulky, ne k rodiči - takže přesun o jeden
+    // sloupec doprava je vždy přesně "posuň se o svou vlastní šířku", bez ohledu na skutečnou
+    // pixelovou šířku obrazovky. Žádné SizeChanged/měření jako u XAML verze není potřeba.
+    private string PillStyle => $"transform: translateX({(int)ActiveTab * 100}%);";
+
+    private async Task RequestTab(AppTab tab)
+    {
+        if (tab == ActiveTab) return; // klepnutí na už aktivní záložku - nic se neděje
+        await TabRequested.InvokeAsync(tab);
+    }
+}

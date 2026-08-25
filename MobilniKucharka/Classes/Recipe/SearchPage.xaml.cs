@@ -1,5 +1,5 @@
+using MobilniKucharka.Classes.Navigation;
 using MobilniKucharka.Services;
-using MobilniKucharka.Services.Api;
 
 namespace MobilniKucharka.Classes.Recipe
 {
@@ -16,6 +16,7 @@ namespace MobilniKucharka.Classes.Recipe
             InitializeComponent();
             string dbPath = Path.Combine(FileSystem.AppDataDirectory, "kucharka.db3");
             _searchService = new RecipeSearchService(dbPath);
+            BottomNav.SetActiveTab(AppTab.Search);
         }
 
         private async void OnSearchButtonClicked(object sender, EventArgs e)
@@ -73,6 +74,12 @@ namespace MobilniKucharka.Classes.Recipe
             _searchCts?.Cancel();
         }
 
+        // Patička (BottomNavBar) požádala o přepnutí na jinou hlavní záložku.
+        private async void OnBottomNavTabRequested(object sender, AppTab tab)
+        {
+            await AppTabNavigation.GoToTabAsync(Navigation, tab);
+        }
+
         private async void OnResultDetailClicked(object sender, EventArgs e)
         {
             if (sender is not Button btn || btn.CommandParameter is not ExternalRecipeSearchResult result) return;
@@ -98,9 +105,7 @@ namespace MobilniKucharka.Classes.Recipe
 
                 // Recept zobrazený jen přes Detail zůstává dočasný (smaže se při dalším hledání) -
                 // naimportovaný recept se označí jako trvalý a příštímu úklidu unikne. Nastavujeme
-                // i lokální kopii (savedRecipe.IsSearchTemp), ne jen řádek v DB - RecipeDetailPage níž
-                // dostane přímo tenhle objekt, takže bez týhle druhé řádky by chvíli (do doběhnutí
-                // OnAppearing) ukazoval zastaralou hodnotu.
+                // i lokální kopii (savedRecipe.IsSearchTemp), ne jen řádek v DB.
                 await App.Database.MarkRecipeSearchTempAsync(savedRecipe.Id, isTemp: !isImport);
                 savedRecipe.IsSearchTemp = !isImport;
 

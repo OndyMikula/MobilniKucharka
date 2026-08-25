@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
 	<PropertyGroup>
 		<TargetFrameworks>net10.0-android</TargetFrameworks>
@@ -26,7 +26,7 @@
 		<ApplicationId>com.ondymikula.mobilnikucharka</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.5.4</ApplicationDisplayVersion> <!-- Co vidí user (1.5.4), "- beta" pro oznaceni beta verze -->
+		<ApplicationDisplayVersion>1.5.5 - beta</ApplicationDisplayVersion> <!-- Co vidí user (1.5.5 - beta), "- beta" pro oznaceni beta verze -->
 		<ApplicationVersion>10</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(10) -->
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
@@ -71,6 +71,7 @@
 		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.100" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.11" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.90" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -78,6 +79,12 @@
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	  <MauiXaml Update="Classes\Legal\LicensePage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
+	  <MauiXaml Update="Classes\Navigation\BlazorNavBarTestPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
+	  <MauiXaml Update="Classes\Navigation\BottomNavBar.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	  <MauiXaml Update="Classes\Recipe\CreateRecipePage.xaml">

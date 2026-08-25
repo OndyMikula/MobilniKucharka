@@ -1,0 +1,130 @@
+﻿html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f5f5f5;
+    color: #111;
+    -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+    html, body {
+        background-color: #121212;
+        color: #fff;
+    }
+}
+
+#blazor-error-ui {
+    display: none;
+    background: #F87171;
+    color: white;
+    bottom: 0;
+    box-sizing: border-box;
+    padding: 10px;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        float: right;
+    }
+
+/* --- BottomNavBar - záměrně tady v globálním app.css, ne v izolovaném BottomNavBar.razor.css.
+   .NET 10 má aktuálně otevřený bug (dotnet/maui#33718), kde se scoped-CSS bundle
+   ({AssemblyName}.styles.css) při buildu negeneruje, takže .razor.css izolace se nikdy nenačte.
+   Až Microsoft bug opraví, tenhle blok jde přesunout zpátky do BottomNavBar.razor.css beze
+   změny syntaxe - jde jen o to, ve kterém souboru fyzicky leží. --- */
+
+.nav-bar {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    height: 64px;
+    padding: 8px;
+    box-sizing: border-box;
+    background-color: #e0e0e0;
+}
+
+.nav-pill {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: calc((100% - 16px) / 3);
+    height: calc(100% - 16px);
+    background-color: #2196F3;
+    border-radius: 10px;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 0;
+}
+
+.nav-button {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 0;
+    box-sizing: border-box;
+    border: none;
+    background: transparent;
+    font-weight: bold;
+    font-size: 14px;
+    color: #000;
+    margin: 0 3px;
+    padding: 0 4px;
+    border-radius: 10px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.28s ease;
+}
+
+    .nav-button:focus,
+    .nav-button:active {
+        outline: none;
+        background: transparent;
+    }
+
+    .nav-button.active {
+        color: #fff;
+    }
+
+@media (prefers-color-scheme: dark) {
+    .nav-bar {
+        background-color: #1f1f1f;
+    }
+
+    .nav-button {
+        color: #fff;
+    }
+}
+
+/* --- BlazorNavBarTest - layout for the test harness page only, not part of the real migration --- */
+
+.test-page {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    box-sizing: border-box;
+}
+
+.test-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    gap: 12px;
+}
+
+    .test-content h2 {
+        margin: 0;
+        font-size: 22px;
+    }
+
+    .test-content p {
+        margin: 0;
+        color: gray;
+        max-width: 280px;
+    }

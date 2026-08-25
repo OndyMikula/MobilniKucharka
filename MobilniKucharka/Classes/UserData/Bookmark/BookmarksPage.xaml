@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:bookmarks="clr-namespace:MobilniKucharka.Classes.UserData.Bookmark"
              xmlns:loc="clr-namespace:MobilniKucharka.Translation"
+             xmlns:navigation="clr-namespace:MobilniKucharka.Classes.Navigation"
              x:Class="MobilniKucharka.Classes.UserData.Bookmark.BookmarksPage"
              BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#121212}">
 
@@ -11,7 +12,7 @@
     </ContentPage.Resources>
 
     <Grid>
-        <Grid RowDefinitions="Auto, *, Auto">
+        <Grid RowDefinitions="Auto, *, Auto, Auto">
 
             <!-- HLAVIČKA S KEBAB MENU -->
             <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Padding="15,10,15,0">
@@ -78,6 +79,8 @@
                 BackgroundColor="#2196F3"
                 TextColor="White"
                 FontAttributes="Bold" />
+
+            <navigation:BottomNavBar Grid.Row="3" x:Name="BottomNav" TabRequested="OnBottomNavTabRequested" />
         </Grid>
 
         <!-- OVERLAY: ÚPRAVA RECEPTŮ VE ZLOŽCE -->

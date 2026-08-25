@@ -1,4 +1,5 @@
 ﻿#nullable disable
+using MobilniKucharka.Classes.Navigation;
 using MobilniKucharka.Classes.Recipe;
 using MobilniKucharka.Classes.Recipe.Sharing;
 using MobilniKucharka.Classes.UserData;
@@ -16,6 +17,7 @@ namespace MobilniKucharka
         {
             InitializeComponent();
             _budgetService = App.Database;
+            BottomNav.SetActiveTab(AppTab.Recipes);
         }
 
         private static string Tr(string csText) => MobilniKucharka.Translation.UiTranslator.Tr(csText);
@@ -28,6 +30,7 @@ namespace MobilniKucharka
             UpdateSummaryUI();
             ResetDatabaseButton.IsVisible = Preferences.Default.Get("IsDeveloperMode", false);
             RepairStepsButton.IsVisible = Preferences.Default.Get("IsDeveloperMode", false);
+            BlazorNavTestButton.IsVisible = Preferences.Default.Get("IsDeveloperMode", false);
             _ = CheckForUpdatesAsync();
 
             // Levný "nudge" pro překreslení - žádné čekání, žádný přepočet layoutu.
@@ -165,12 +168,11 @@ namespace MobilniKucharka
             await Navigation.PushAsync(new SettingsPage());
         }
 
-        // Tlačítko "Hledat" v patičce - otevře stránku pro hledání receptů na INTERNETU (SearchPage).
-        // Nezaměňovat s lokálním vyhledávacím řádkem výše (OnLocalSearchButtonClicked), který hledá
-        // jen mezi recepty už uloženými v appce.
-        private async void OnSearchPageClicked(object sender, EventArgs e)
+        // Patička (BottomNavBar) požádala o přepnutí na jinou hlavní záložku - skutečnou navigaci
+        // (pop-to-root + případný push) řeší sdílený AppTabNavigation, ne tahle stránka přímo.
+        private async void OnBottomNavTabRequested(object sender, AppTab tab)
         {
-            await Navigation.PushAsync(new SearchPage());
+            await AppTabNavigation.GoToTabAsync(Navigation, tab);
         }
 
         private async void OnBookmarksClicked(object sender, EventArgs e)
@@ -239,6 +241,11 @@ namespace MobilniKucharka
             {
                 await DisplayAlertAsync(Tr("Odkaz neplatný"), Tr("Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit)."), "OK");
             }
+        }
+
+        private async void OnBlazorNavTestClicked(object sender, EventArgs e)
+        {
+            await Navigation.PushAsync(new Classes.Navigation.BlazorNavBarTestPage());
         }
     }
 }
