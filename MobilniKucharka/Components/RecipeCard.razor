@@ -1,0 +1,72 @@
+@namespace MobilniKucharka.Components
+@inject NavigationManager NavigationManager
+
+<div class="recipe-card" @onclick="OnClick">
+    <div class="recipe-card-img-wrap">
+        @if (!string.IsNullOrWhiteSpace(Item.Recipe.ImageUrl))
+        {
+            <img src="@ResolvedImageSrc" alt="@Item.Recipe.Name" class="recipe-card-img" loading="lazy" />
+        }
+        else
+        {
+            <div class="recipe-card-img-placeholder">
+                <span>🍲</span>
+            </div>
+        }
+    </div>
+
+    <div class="recipe-card-info">
+        <h3 class="recipe-card-title">@Item.Recipe.Name</h3>
+
+        @if (Item.Recipe.HasPrepTime)
+        {
+            <div class="recipe-card-preptime">
+                ⏱ @string.Format(Tr("Čas: {0} min"), Item.Recipe.PrepTime)
+            </div>
+        }
+
+        <div class="recipe-card-cost-wrap">
+            <span class="recipe-card-cost" style="color: @CostColorHex">@Item.CostDisplayText</span>
+            @if (!string.IsNullOrWhiteSpace(Item.BudgetStatusText))
+            {
+                <span class="recipe-card-status" style="color: @CostColorHex">@Item.BudgetStatusText</span>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RecipeWithCost Item { get; set; } = default!;
+    [Parameter] public EventCallback<RecipeWithCost> CardClicked { get; set; }
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    private string ResolvedImageSrc => ImageHelper.ResolveImageSrc(Item.Recipe.ImageUrl);
+
+    private string CostColorHex => !string.IsNullOrWhiteSpace(Item.CostColor)
+        ? Item.CostColor
+        : (Item.IsWithinBudget ? "#4CAF50" : "#F44336");
+
+    private async Task OnClick()
+    {
+        if (CardClicked.HasDelegate)
+        {
+            await CardClicked.InvokeAsync(Item);
+        }
+        else
+        {
+            var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+            if (nav != null)
+            {
+                if (Item.Recipe.IsDraft)
+                {
+                    await nav.PushAsync(new Classes.Recipe.CreateRecipePage(Item.Recipe.Id));
+                }
+                else
+                {
+                    await nav.PushAsync(new Classes.Recipe.RecipeDetailPage(Item));
+                }
+            }
+        }
+    }
+}

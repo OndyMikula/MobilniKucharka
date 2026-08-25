@@ -657,7 +657,7 @@ namespace MobilniKucharka.Services
 
             return anyManualOrder
                 ? [.. bookmarks.OrderByDescending(b => b.IsPinned).ThenBy(b => b.SortOrder)]
-                : [.. bookmarks.OrderByDescending(b => b.IsPinned).ThenByDescending(b => b.LastEditedUtc)];
+                : [.. bookmarks.OrderByDescending(b => b.IsPinned).ThenBy(b => b.Id)];
         }
 
         public async Task TogglePinAsync(string categoryName)

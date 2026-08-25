@@ -1,35 +1,43 @@
-﻿@namespace MobilniKucharka.Components
+@namespace MobilniKucharka.Components
+@inject NavigationManager NavigationManager
 
 <div class="nav-bar">
     <div class="nav-pill" style="@PillStyle"></div>
 
-    <button class="nav-button @(ActiveTab == AppTab.Recipes ? "active" : "")" @onclick="() => RequestTab(AppTab.Recipes)">
+    <button type="button" class="nav-button @(ActiveTab == AppTab.Recipes ? "active" : "")" @onclick="() => SelectTab(AppTab.Recipes)">
         @Tr("Recepty")
     </button>
-    <button class="nav-button @(ActiveTab == AppTab.Search ? "active" : "")" @onclick="() => RequestTab(AppTab.Search)">
+    <button type="button" class="nav-button @(ActiveTab == AppTab.Search ? "active" : "")" @onclick="() => SelectTab(AppTab.Search)">
         @Tr("Hledat")
     </button>
-    <button class="nav-button @(ActiveTab == AppTab.Bookmarks ? "active" : "")" @onclick="() => RequestTab(AppTab.Bookmarks)">
+    <button type="button" class="nav-button @(ActiveTab == AppTab.Bookmarks ? "active" : "")" @onclick="() => SelectTab(AppTab.Bookmarks)">
         @Tr("Záložky")
     </button>
 </div>
 
 @code {
     [Parameter] public AppTab ActiveTab { get; set; } = AppTab.Recipes;
-    [Parameter] public EventCallback<AppTab> TabRequested { get; set; }
+    [Parameter] public EventCallback<AppTab> ActiveTabChanged { get; set; }
 
-    // Stejná runtime instance UiTranslator.Tr() jako v XAML verzi - stejná appka, stejný proces,
-    // žádné zdvojení překladové logiky mezi XAML a Razor stránkami.
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
-    // translateX(100%) je relativní k VLASTNÍ šířce pilulky, ne k rodiči - takže přesun o jeden
-    // sloupec doprava je vždy přesně "posuň se o svou vlastní šířku", bez ohledu na skutečnou
-    // pixelovou šířku obrazovky. Žádné SizeChanged/měření jako u XAML verze není potřeba.
     private string PillStyle => $"transform: translateX({(int)ActiveTab * 100}%);";
 
-    private async Task RequestTab(AppTab tab)
+    private async Task SelectTab(AppTab tab)
     {
-        if (tab == ActiveTab) return; // klepnutí na už aktivní záložku - nic se neděje
-        await TabRequested.InvokeAsync(tab);
+        if (tab == ActiveTab) return;
+
+        ActiveTab = tab;
+        await ActiveTabChanged.InvokeAsync(tab);
+
+        string route = tab switch
+        {
+            AppTab.Recipes => "/",
+            AppTab.Search => "/search",
+            AppTab.Bookmarks => "/bookmarks",
+            _ => "/"
+        };
+
+        NavigationManager.NavigateTo(route);
     }
 }

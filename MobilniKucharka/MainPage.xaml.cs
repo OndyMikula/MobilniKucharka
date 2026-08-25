@@ -1,4 +1,4 @@
-﻿#nullable disable
+#nullable disable
 using MobilniKucharka.Classes.Navigation;
 using MobilniKucharka.Classes.Recipe;
 using MobilniKucharka.Classes.Recipe.Sharing;
@@ -170,7 +170,7 @@ namespace MobilniKucharka
 
         // Patička (BottomNavBar) požádala o přepnutí na jinou hlavní záložku - skutečnou navigaci
         // (pop-to-root + případný push) řeší sdílený AppTabNavigation, ne tahle stránka přímo.
-        private async void OnBottomNavTabRequested(object sender, AppTab tab)
+        private async void OnBottomNavTabRequested(object _, AppTab tab)
         {
             await AppTabNavigation.GoToTabAsync(Navigation, tab);
         }
@@ -245,7 +245,7 @@ namespace MobilniKucharka
 
         private async void OnBlazorNavTestClicked(object sender, EventArgs e)
         {
-            await Navigation.PushAsync(new Classes.Navigation.BlazorNavBarTestPage());
+            await Navigation.PushAsync(new Classes.Navigation.BlazorShellPage());
         }
     }
 }

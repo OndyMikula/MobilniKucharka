@@ -1,4 +1,4 @@
-﻿namespace MobilniKucharka.Classes.UserData
+namespace MobilniKucharka.Classes.UserData
 {
     public partial class OnboardingPage : ContentPage
     {
@@ -50,7 +50,7 @@
             {
                 SaveFinalData();
                 Preferences.Default.Set("IsOnboardingComplete", true);
-                Application.Current!.Windows[0].Page = new NavigationPage(new MainPage());
+                Application.Current!.Windows[0].Page = new AppShell();
             }
         }
 

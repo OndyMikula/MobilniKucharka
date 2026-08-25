@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Maui.Storage;
+using CommunityToolkit.Maui.Storage;
 using MobilniKucharka.Classes.Legal;
 using MobilniKucharka.Classes.Recipe.Sharing;
 using MobilniKucharka.Services;
@@ -392,6 +392,6 @@ public partial class SettingsPage : ContentPage
     private static void RestartApp()
     {
         App.ResetDatabase();
-        Application.Current!.Windows[0].Page = new NavigationPage(new MainPage());
+        Application.Current!.Windows[0].Page = new AppShell();
     }
 }

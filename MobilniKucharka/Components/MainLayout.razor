@@ -1,0 +1,62 @@
+@namespace MobilniKucharka.Components
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager NavigationManager
+
+<div class="page-shell">
+    <main class="page-content">
+        @Body
+    </main>
+
+    <BottomNavBar ActiveTab="_activeTab" ActiveTabChanged="OnTabChanged" />
+</div>
+
+@code {
+    private AppTab _activeTab = AppTab.Recipes;
+
+    protected override void OnInitialized()
+    {
+        UpdateActiveTabFromUri(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        UpdateActiveTabFromUri(e.Location);
+        StateHasChanged();
+    }
+
+    private void UpdateActiveTabFromUri(string uri)
+    {
+        var relative = NavigationManager.ToBaseRelativePath(uri);
+        int queryIndex = relative.IndexOf('?');
+        if (queryIndex >= 0)
+        {
+            relative = relative.Substring(0, queryIndex);
+        }
+        relative = relative.Trim('/');
+
+        if (string.IsNullOrEmpty(relative) || relative.Equals("recipes", StringComparison.OrdinalIgnoreCase))
+        {
+            _activeTab = AppTab.Recipes;
+        }
+        else if (relative.StartsWith("search", StringComparison.OrdinalIgnoreCase))
+        {
+            _activeTab = AppTab.Search;
+        }
+        else if (relative.StartsWith("bookmarks", StringComparison.OrdinalIgnoreCase))
+        {
+            _activeTab = AppTab.Bookmarks;
+        }
+    }
+
+    private void OnTabChanged(AppTab tab)
+    {
+        _activeTab = tab;
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}

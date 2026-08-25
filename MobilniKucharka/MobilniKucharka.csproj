@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
 	<PropertyGroup>
 		<TargetFrameworks>net10.0-android</TargetFrameworks>
@@ -26,10 +26,10 @@
 		<ApplicationId>com.ondymikula.mobilnikucharka</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.5.5 - beta</ApplicationDisplayVersion> <!-- Co vidí user (1.5.5 - beta), "- beta" pro oznaceni beta verze -->
+		<ApplicationDisplayVersion>1.5.6</ApplicationDisplayVersion> <!-- Co vidí user (1.5.6 - beta), "- beta" pro oznaceni beta verze -->
 		<ApplicationVersion>10</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(10) -->
 
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
 
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 
@@ -37,6 +37,11 @@
 
 		<RepositoryUrl>https://github.com/OndyMikula/MobilniKucharka</RepositoryUrl>
 		
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(AndroidSdkDirectory)' == '' and Exists('D:\Program Files (x86)\Microsoft Visual Studio\Shared\Android\android-sdk')">
+		<AndroidSdkDirectory>D:\Program Files (x86)\Microsoft Visual Studio\Shared\Android\android-sdk</AndroidSdkDirectory>
+		<JavaSdkDirectory>D:\Program Files (x86)\Microsoft Visual Studio\Shared\Android\openjdk\jdk-21.0.8</JavaSdkDirectory>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
@@ -108,10 +113,10 @@
 	  <MauiXaml Update="Classes\UserData\SettingsPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
-	  <MauiXaml Update="Classes\Recipe\RecipeDetailPage.xaml">
+	  <MauiXaml Update="Classes\Navigation\BlazorShellPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
-			  <MauiXaml Update="Classes\Recipe\SearchPage.xaml">
+	  <MauiXaml Update="Classes\Recipe\RecipeDetailPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	</ItemGroup>

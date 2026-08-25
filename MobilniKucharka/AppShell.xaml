@@ -3,12 +3,12 @@
     x:Class="MobilniKucharka.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:MobilniKucharka"
+    xmlns:navigation="clr-namespace:MobilniKucharka.Classes.Navigation"
     Title="MobilniKucharka">
 
     <ShellContent
         Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
+        ContentTemplate="{DataTemplate navigation:BlazorShellPage}"
+        Route="BlazorShellPage" />
 
 </Shell>

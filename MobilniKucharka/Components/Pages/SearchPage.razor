@@ -1,0 +1,253 @@
+@page "/search"
+@namespace MobilniKucharka.Components.Pages
+@implements IDisposable
+@inject IDialogService DialogService
+
+<div class="hub-page">
+    <div class="hub-header">
+        <h1 class="hub-title">@Tr("Hledat recept")</h1>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="search-bar-row">
+        <input type="text"
+               class="search-input"
+               placeholder="@Tr("Hledat recept podle názvu...")"
+               @bind="_query"
+               @onkeydown="OnKeyDown"
+               disabled="@_isLoading" />
+
+        <button type="button" class="btn-search-icon" @onclick="OnSearchClicked" disabled="@_isLoading">🔍</button>
+
+        <label class="pref-checkbox-label">
+            <input type="checkbox" @bind="_filterByPreferences" disabled="@_isLoading" />
+            <span>@Tr("Dle preferencí")</span>
+        </label>
+    </div>
+
+    <!-- Results list -->
+    <div class="search-results-container">
+        @if (_hasSearched && (_results == null || _results.Count == 0))
+        {
+            <div class="empty-state">
+                <span class="empty-icon">🔎</span>
+                <p>@Tr("Nepodařilo se najít žádný recept odpovídající zadání.")</p>
+            </div>
+        }
+        else if (!_hasSearched && (_results == null || _results.Count == 0))
+        {
+            <div class="empty-state">
+                <span class="empty-icon">🔎</span>
+                <p>@Tr("Zadej název receptu a vyhledej ho na internetu.")</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var result in _results!)
+            {
+                <div class="search-result-card" @key="result.ExternalId ?? result.Name">
+                    <div class="search-result-img-wrap">
+                        @if (!string.IsNullOrWhiteSpace(result.ImageUrl))
+                        {
+                            <img src="@ImageHelper.ResolveImageSrc(result.ImageUrl)" alt="@result.Name" class="search-result-img" loading="lazy" />
+                        }
+                        else
+                        {
+                            <div class="search-result-img-placeholder">🍲</div>
+                        }
+                    </div>
+
+                    <div class="search-result-body">
+                        <h3 class="search-result-title">@result.Name</h3>
+
+                        <div class="search-result-actions">
+                            <button type="button" class="btn-text-primary" @onclick="() => OnDetailClicked(result)">
+                                @Tr("Detail")
+                            </button>
+                            <button type="button" class="btn-sm-success" @onclick="() => OnImportClicked(result)">
+                                @Tr("Importovat")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <!-- Loading Overlay -->
+    @if (_isLoading)
+    {
+        <div class="modal-overlay">
+            <div class="modal-card loading-modal">
+                <div class="spinner"></div>
+                <p class="loading-text">@Tr("Hledám recepty...")</p>
+                <button type="button" class="btn-cancel" @onclick="OnCancelSearch">@Tr("Zrušit")</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private RecipeSearchService? _searchService;
+    private string _query = string.Empty;
+    private bool _filterByPreferences = false;
+    private List<ExternalRecipeSearchResult>? _results;
+    private bool _isLoading = false;
+    private bool _hasSearched = false;
+    private CancellationTokenSource? _searchCts;
+    private bool _isManualCancel = false;
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    protected override void OnInitialized()
+    {
+        string dbPath = Path.Combine(FileSystem.AppDataDirectory, "kucharka.db3");
+        _searchService = new RecipeSearchService(dbPath);
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await OnSearchClicked();
+        }
+    }
+
+    private async Task OnSearchClicked()
+    {
+        string query = _query?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(query)) return;
+
+        _isManualCancel = false;
+        _searchCts?.Dispose();
+        _searchCts = new CancellationTokenSource();
+        _searchCts.CancelAfter(TimeSpan.FromSeconds(30));
+
+        await App.Database.DeleteSearchTempRecipesAsync();
+
+        _results = null;
+        _isLoading = true;
+        _hasSearched = true;
+
+        try
+        {
+            if (_searchService != null)
+            {
+                _results = await _searchService.SearchAsync(query, _filterByPreferences, _searchCts.Token);
+                if (_results.Count == 0)
+                {
+                    await DialogService.ShowAlertAsync(Tr("Nic se nenašlo"), Tr("Nepodařilo se najít žádný recept odpovídající zadání."), "OK");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            if (!_isManualCancel)
+            {
+                await DialogService.ShowAlertAsync(Tr("Nic se nenašlo"), Tr("Vyhledávání trvalo příliš dlouho. Zkontroluj internetové připojení a zkus to znovu."), "OK");
+            }
+        }
+        catch (Exception ex)
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), $"{Tr("Vyhledávání selhalo")}: {ex.Message}", "OK");
+        }
+        finally
+        {
+            _isLoading = false;
+            _searchCts?.Dispose();
+            _searchCts = null;
+        }
+    }
+
+    private void OnCancelSearch()
+    {
+        _isManualCancel = true;
+        _searchCts?.Cancel();
+    }
+
+    private async Task OnDetailClicked(ExternalRecipeSearchResult result)
+    {
+        await OpenRecipeAsync(result, isImport: false);
+    }
+
+    private async Task OnImportClicked(ExternalRecipeSearchResult result)
+    {
+        await OpenRecipeAsync(result, isImport: true);
+    }
+
+    private async Task OpenRecipeAsync(ExternalRecipeSearchResult result, bool isImport)
+    {
+        try
+        {
+            var savedRecipe = await ResolveAndSaveRecipeAsync(result);
+            if (savedRecipe == null)
+            {
+                await DialogService.ShowAlertAsync(Tr("Chyba"), Tr("Recept se nepodařilo načíst. Zkontroluj internetové připojení."), "OK");
+                return;
+            }
+
+            await App.Database.MarkRecipeSearchTempAsync(savedRecipe.Id, isTemp: !isImport);
+            savedRecipe.IsSearchTemp = !isImport;
+
+            if (savedRecipe.ServingSize <= 0)
+            {
+                string? promptResult = await DialogService.ShowPromptAsync(
+                    Tr("Pro kolik lidí by měl recept být?"),
+                    Tr("Zadej, pro kolik lidí chceš recept uvařit."),
+                    "OK", initialValue: string.Empty, keyboard: Keyboard.Numeric);
+
+                if (int.TryParse(promptResult, out var parsed) && parsed > 0)
+                {
+                    await App.Database.UpdateRecipeServingSizeAsync(savedRecipe.Id, parsed);
+                    savedRecipe.ServingSize = parsed;
+                }
+            }
+
+            if (isImport)
+            {
+                await App.Database.AddRecipeToCategoryAsync(savedRecipe.Id, "Vytvořené recepty");
+            }
+
+            var recipeWithCost = new RecipeWithCost
+            {
+                Recipe = savedRecipe,
+                CalculatedCost = 0,
+                IsWithinBudget = true
+            };
+
+            var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+            if (nav != null)
+            {
+                await nav.PushAsync(new Classes.Recipe.RecipeDetailPage(recipeWithCost));
+            }
+        }
+        catch (Exception ex)
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), $"{Tr("Recept se nepodařilo uložit.")}\n{Tr("Detail")}: {ex.Message}", "OK");
+        }
+    }
+
+    private async Task<Recipe?> ResolveAndSaveRecipeAsync(ExternalRecipeSearchResult result)
+    {
+        if (_searchService == null) return null;
+
+        if (result.Source == ExternalRecipeSource.MealDb && result.MealDbData != null)
+        {
+            var completed = await _searchService.CompleteMealDbResultAsync(result);
+            if (completed == null) return null;
+            return await App.Database.SaveExternalRecipeAsync(completed);
+        }
+
+        if (result.Source == ExternalRecipeSource.Spoonacular && int.TryParse(result.ExternalId, out int spoonacularId))
+        {
+            return await _searchService.GetSpoonacularRecipeAsync(spoonacularId);
+        }
+
+        return null;
+    }
+
+    public void Dispose()
+    {
+        _searchCts?.Dispose();
+    }
+}

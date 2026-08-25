@@ -51,7 +51,7 @@ namespace MobilniKucharka.Classes.Navigation
         private async Task AnimateToActiveTab()
         {
             double targetX = _columnWidth * (int)_activeTab;
-            await IndicatorPill.TranslateTo(targetX, 0, AnimationDurationMs, Easing.CubicInOut);
+            await IndicatorPill.TranslateToAsync(targetX, 0, AnimationDurationMs, Easing.CubicInOut);
         }
 
         private void UpdateButtonTextColors()
