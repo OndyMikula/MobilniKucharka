@@ -713,7 +713,7 @@ namespace MobilniKucharka.Services
             return [.. recipes.Where(r => !r.IsSearchTemp)];
         }
 
-        public async Task<Recipe> SaveExternalRecipeAsync(MealDbRecipe mealDbRecipe)
+        public async Task<Recipe> SaveExternalRecipeAsync(MealDbRecipe mealDbRecipe, string? translatedNameCs = null)
         {
             await EnsureInitializedAsync();
             string externalId = $"mealdb_{mealDbRecipe.ExternalId}";
@@ -722,9 +722,12 @@ namespace MobilniKucharka.Services
             var recipe = new Recipe
             {
                 Name_EN = mealDbRecipe.Name,
-                // Name_CS necháváme prázdné - zdroj je anglický, EnsureRecipeLanguageAsync doplní češtinu
-                // při prvním zobrazení (viz RecipeDetailPage.OnAppearing). Dřív se sem plnilo Name_CS
-                // stejným textem jako Name_EN, takže "už přeložený" recept se nikdy doopravdy nepřeložil.
+                // Pokud appka recept už jednou přeložila pro zobrazení v seznamu výsledků hledání
+                // (viz RecipeSearchService.TranslateResultNamesForDisplayAsync), použijeme ten
+                // překlad rovnou - ať se za tutéž větu neplatí DeepL kvóta podruhé jen proto, že
+                // recept mezitím "přešel" ze seznamu do uloženého receptu. Bez něj zůstane prázdné
+                // a doplní ho EnsureRecipeLanguageAsync při prvním zobrazení, stejně jako dřív.
+                Name_CS = translatedNameCs ?? string.Empty,
                 ExternalSourceId = externalId,
                 ImageUrl = mealDbRecipe.ImageUrl,
                 Category = "Objevené recepty",
@@ -734,7 +737,8 @@ namespace MobilniKucharka.Services
                 Sugar = mealDbRecipe.Sugar,
                 IsNutritionEstimated = mealDbRecipe.IsNutritionEstimated,
                 StepsJson_EN = JsonSerializer.Serialize(SplitInstructions(mealDbRecipe.Instructions)),
-                // StepsJson_CS necháváme prázdné ze stejného důvodu jako Name_CS výše.
+                // StepsJson_CS necháváme prázdné ze stejného důvodu jako dřív - hledání nikdy
+                // nepřekládá kroky, jen zobrazované názvy v seznamu.
                 EquipmentJson = "[]",
                 DietaryFlagsJson = JsonSerializer.Serialize(GuessDietFlags(mealDbRecipe.Category)),
                 IngredientsRaw = string.Join("\n", mealDbRecipe.Ingredients.Select(i => $"{i.Name}|{i.Measure}")),

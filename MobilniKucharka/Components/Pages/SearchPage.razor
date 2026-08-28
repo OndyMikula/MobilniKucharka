@@ -45,7 +45,10 @@
         {
             @foreach (var result in _results!)
             {
-                <div class="search-result-card" @key="result.ExternalId ?? result.Name">
+                <!-- Celá karta je teď klikatelná (stejný vzor jako RecipeCard.razor na Recepty) -
+                     klepnutí kamkoliv na kartu otevře náhled bez importu, "Importovat" zůstává
+                     samostatné tlačítko s @onclick:stopPropagation, ať nespustí i klik karty pod sebou. -->
+                <div class="search-result-card" @key="result.ExternalId ?? result.Name" @onclick="() => OnCardClicked(result)">
                     <div class="search-result-img-wrap">
                         @if (!string.IsNullOrWhiteSpace(result.ImageUrl))
                         {
@@ -58,13 +61,10 @@
                     </div>
 
                     <div class="search-result-body">
-                        <h3 class="search-result-title">@result.Name</h3>
+                        <h3 class="search-result-title">@result.DisplayName</h3>
 
                         <div class="search-result-actions">
-                            <button type="button" class="btn-text-primary" @onclick="() => OnDetailClicked(result)">
-                                @Tr("Detail")
-                            </button>
-                            <button type="button" class="btn-sm-success" @onclick="() => OnImportClicked(result)">
+                            <button type="button" class="btn-sm-success" @onclick="() => OnImportClicked(result)" @onclick:stopPropagation="true">
                                 @Tr("Importovat")
                             </button>
                         </div>
@@ -165,7 +165,7 @@
         _searchCts?.Cancel();
     }
 
-    private async Task OnDetailClicked(ExternalRecipeSearchResult result)
+    private async Task OnCardClicked(ExternalRecipeSearchResult result)
     {
         await OpenRecipeAsync(result, isImport: false);
     }
@@ -235,12 +235,12 @@
         {
             var completed = await _searchService.CompleteMealDbResultAsync(result);
             if (completed == null) return null;
-            return await App.Database.SaveExternalRecipeAsync(completed);
+            return await App.Database.SaveExternalRecipeAsync(completed, result.NameCs);
         }
 
         if (result.Source == ExternalRecipeSource.Spoonacular && int.TryParse(result.ExternalId, out int spoonacularId))
         {
-            return await _searchService.GetSpoonacularRecipeAsync(spoonacularId);
+            return await _searchService.GetSpoonacularRecipeAsync(spoonacularId, result.NameCs);
         }
 
         return null;

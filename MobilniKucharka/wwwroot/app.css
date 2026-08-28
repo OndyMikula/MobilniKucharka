@@ -498,6 +498,13 @@ html, body {
     border-radius: var(--radius-md);
     overflow: hidden;
     box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transition: transform 0.1s ease, background-color 0.1s ease;
+}
+
+.search-result-card:active {
+    transform: scale(0.99);
+    background-color: var(--color-surface-hover);
 }
 
 .search-result-img-wrap {

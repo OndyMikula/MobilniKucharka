@@ -88,30 +88,32 @@ namespace MobilniKucharka.Translation
             return result?.FirstOrDefault();
         }
 
-        public async Task<bool> TranslateRecipeNameAndStepsAsync(MobilniKucharka.Classes.Recipe.Recipe recipe, string fromLang, string toLang)
+        public async Task<bool> TranslateRecipeNameAndStepsAsync(MobilniKucharka.Classes.Recipe.Recipe recipe, string fromLang, string toLang, bool skipName = false)
         {
             bool fromCs = fromLang.Equals("cs", StringComparison.OrdinalIgnoreCase);
-
-            string sourceName = fromCs ? recipe.Name_CS : recipe.Name_EN;
             var sourceSteps = fromCs ? recipe.Steps_CS : recipe.Steps_EN;
 
-            var batch = new List<string> { sourceName };
+            var batch = new List<string>();
+            if (!skipName)
+                batch.Add(fromCs ? recipe.Name_CS : recipe.Name_EN);
             batch.AddRange(sourceSteps);
+
+            if (batch.Count == 0) return true; // jméno přeskočeno a žádné kroky k překladu - není chyba
 
             var translated = await TranslateBatchAsync(batch, toLang, fromLang);
             if (translated == null || translated.Count != batch.Count) return false;
 
-            string translatedName = translated[0];
-            var translatedSteps = translated.Skip(1).ToList();
+            int stepsStartIndex = skipName ? 0 : 1;
+            var translatedSteps = translated.Skip(stepsStartIndex).ToList();
 
             if (fromCs)
             {
-                recipe.Name_EN = translatedName;
+                if (!skipName) recipe.Name_EN = translated[0];
                 recipe.Steps_EN = translatedSteps;
             }
             else
             {
-                recipe.Name_CS = translatedName;
+                if (!skipName) recipe.Name_CS = translated[0];
                 recipe.Steps_CS = translatedSteps;
             }
 

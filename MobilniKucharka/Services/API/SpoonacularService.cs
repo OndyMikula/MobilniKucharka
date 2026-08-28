@@ -11,7 +11,7 @@ namespace MobilniKucharka.Services.Api
         private readonly SQLiteAsyncConnection _db = new(dbPath);
         private static readonly string ApiKey = Secrets.SpoonacularApiKey;
 
-        public async Task<Recipe?> GetRecipeWithCacheAsync(int spoonacularId)
+        public async Task<Recipe?> GetRecipeWithCacheAsync(int spoonacularId, string? translatedNameCs = null)
         {
             var cached = await _db.Table<Recipe>()
                                  .Where(r => r.ExternalSourceId == $"spoon_{spoonacularId}")
@@ -41,14 +41,13 @@ namespace MobilniKucharka.Services.Api
 
                 var data = JsonSerializer.Deserialize<JsonElement>(contentString);
 
-                // Zdroj je anglický - Name_CS/StepsJson_CS necháváme prázdné. RecipeDetailPage.OnAppearing
-                // (přes EnsureRecipeLanguageAsync) pak automaticky doplní češtinu při prvním zobrazení.
-                // Dřív se sem omylem plnilo Name_CS stejným textem jako Name_EN, takže se "už přeložený"
-                // recept nikdy doopravdy nepřeložil.
                 var recipe = new Recipe
                 {
                     ExternalSourceId = $"spoon_{spoonacularId}",
                     Name_EN = data.GetProperty("title").GetString() ?? "",
+                    // Stejná logika jako v BudgetPlannerService.SaveExternalRecipeAsync - pokud appka
+                    // recept už přeložila pro zobrazení v seznamu hledání, použije se to rovnou.
+                    Name_CS = translatedNameCs ?? string.Empty,
                     PrepTime = data.GetProperty("readyInMinutes").GetInt32(),
                     ImageUrl = data.GetProperty("image").GetString() ?? "",
                     SourceUrl = data.TryGetProperty("sourceUrl", out var srcProp) ? srcProp.GetString() ?? "" : "",
@@ -58,17 +57,9 @@ namespace MobilniKucharka.Services.Api
                     Fat = ExtractNutrient(data, "Fat"),
                     Sugar = ExtractNutrient(data, "Sugar"),
 
-                    // Dřív omylem StepsJson (mrtvé pole, Steps_EN by bylo prázdné) - teď StepsJson_EN.
                     StepsJson_EN = ExtractSteps(data),
-
-                    // Dřív se sem IngredientsRaw vůbec neplnilo - "extendedIngredients" z odpovědi API
-                    // se úplně ignorovalo, takže Spoonacular recepty vždy skončily bez surovin (na
-                    // rozdíl od MealDB importu, který IngredientsRaw plní správně). Viz ExtractIngredientsRaw níže.
                     IngredientsRaw = ExtractIngredientsRaw(data),
 
-                    // 0 = neznámý počet porcí (viz ServingSize konvence v CLAUDE.md - nikdy nehádat,
-                    // vždy se zeptat uživatele). Dřív se sem omylem dosazovala 1 i když "servings"
-                    // chybělo, takže recept vypadal, že appka ví, pro kolik lidí je, i když nevěděla.
                     ServingSize = data.TryGetProperty("servings", out var servingsProp) && servingsProp.GetInt32() > 0
                         ? servingsProp.GetInt32()
                         : 0,
