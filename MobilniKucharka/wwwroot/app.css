@@ -905,3 +905,48 @@ html, body {
     color: #664D03;
     text-decoration: none;
 }
+
+/* --- StarRating --- */
+.star-rating {
+    display: inline-flex;
+    gap: 2px;
+}
+
+.star-slot {
+    position: relative;
+    width: var(--star-size, 24px);
+    height: var(--star-size, 24px);
+    font-size: var(--star-size, 24px);
+    line-height: 1;
+}
+
+.star {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.star-empty {
+    color: var(--color-border);
+}
+
+.star-filled {
+    color: var(--color-star);
+}
+
+.star-hit-left,
+.star-hit-right {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    cursor: pointer;
+}
+
+.star-hit-left {
+    left: 0;
+}
+
+.star-hit-right {
+    right: 0;
+}

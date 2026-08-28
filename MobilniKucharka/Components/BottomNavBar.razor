@@ -38,6 +38,13 @@
             _ => "/"
         };
 
-        NavigationManager.NavigateTo(route);
+        // replace: true - nepřidává novou položku do WebView vlastní (JS/prohlížečové) historie
+        // při přepnutí záložky. Bez tohohle si BlazorWebView na Androidu drží historii "za sebou",
+        // a jeho VLASTNÍ vestavěné zachytávání tlačítka/gesta zpět (viz Keycode.Back handling v
+        // BlazorWebView.Android.cs, CanGoBack() -> GoBack()) tuhle historii spotřebovává dřív, než
+        // se gesto vůbec dostane k MainActivity/AppShell - proto předchozí dvě opravy neměly žádný
+        // efekt, nikdy se ke slovu nedostaly. S replace: true CanGoBack() zůstává false a gesto
+        // se konečně dostane tam, kam má.
+        NavigationManager.NavigateTo(route, replace: true);
     }
 }
