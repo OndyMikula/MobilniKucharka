@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MobilniKucharka.Classes.Legal.LicensePage"
+             Title="License"
+             BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#121212}">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="20">
+
+            <VerticalStackLayout Spacing="6">
+                <Label Text="App name, icon, and branding" FontAttributes="Bold" FontSize="17"
+                       TextColor="{AppThemeBinding Light=#111111, Dark=#FFFFFF}" />
+                <Label Text="The source code below is licensed under the Apache License, Version 2.0. This license covers the source code only - it does not grant rights to the app's name, icon, or branding (&quot;Mobilní Kuchařka&quot;), which are not covered by this license and may not be reused to imply an official or endorsed version of the app without permission."
+                       FontSize="14" LineHeight="1.3"
+                       TextColor="{AppThemeBinding Light=#333333, Dark=#CCCCCC}" />
+            </VerticalStackLayout>
+
+            <BoxView HeightRequest="1" BackgroundColor="LightGray" />
+
+            <ActivityIndicator x:Name="LoadingIndicator" IsRunning="True" Color="#2196F3" />
+
+            <!-- Plné, nezkrácené znění Apache License 2.0 - načtené za běhu z bundlovaného
+                 Resources/Raw/LICENSE_apache2.txt (viz LicensePage.xaml.cs), ne přeformulovaný souhrn. -->
+            <Label x:Name="LicenseTextLabel" FontSize="12" LineHeight="1.4"
+                   TextColor="{AppThemeBinding Light=#333333, Dark=#CCCCCC}" IsVisible="False" />
+
+            <Button Text="View this file on GitHub" Clicked="OnViewOnGitHubClicked"
+                    BackgroundColor="#2196F3" TextColor="White" CornerRadius="10" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

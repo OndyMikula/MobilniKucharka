@@ -1,7 +1,4 @@
-﻿using Microsoft.Maui.Controls;
-using Microsoft.Maui.Controls.Xaml;
-
-namespace MobilniKucharka.Translation
+﻿namespace MobilniKucharka.Translation
 {
     // XAML: Text="{loc:Tr 'Rozepsaný recept'}"
     // Stránka se při přepnutí jazyka celá znovu sestavuje (viz SettingsPage.OnLanguageChanged),

@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using MobilniKucharka.Classes.Navigation;
+using System.Collections.ObjectModel;
 
 namespace MobilniKucharka.Classes.UserData.Bookmark;
 
@@ -11,6 +12,7 @@ public partial class BookmarksPage : ContentPage
     {
         InitializeComponent();
         BookmarksCollectionView.ItemsSource = Bookmarks;
+        BottomNav.SetActiveTab(AppTab.Bookmarks);
     }
 
     protected override async void OnAppearing()
@@ -25,6 +27,12 @@ public partial class BookmarksPage : ContentPage
         Bookmarks.Clear();
         foreach (var b in bookmarks)
             Bookmarks.Add(b);
+    }
+
+    // Patička (BottomNavBar) požádala o přepnutí na jinou hlavní záložku.
+    private async void OnBottomNavTabRequested(object sender, AppTab tab)
+    {
+        await AppTabNavigation.GoToTabAsync(Navigation, tab);
     }
 
     private async void OnCategoryTapped(object sender, TappedEventArgs e)
@@ -50,8 +58,8 @@ public partial class BookmarksPage : ContentPage
         string pinLabel = (bookmark?.IsPinned ?? false) ? "Odepnout" : "Připnout";
 
         string action = isProtected
-            ? await DisplayActionSheet(categoryName, "Zrušit", null, "Upravit recepty ve složce", pinLabel)
-            : await DisplayActionSheet(categoryName, "Zrušit", null, "Upravit recepty ve složce", pinLabel, "Smazat záložku");
+            ? await DisplayActionSheetAsync(categoryName, "Zrušit", null, "Upravit recepty ve složce", pinLabel)
+            : await DisplayActionSheetAsync(categoryName, "Zrušit", null, "Upravit recepty ve složce", pinLabel, "Smazat záložku");
 
         if (action == "Upravit recepty ve složce")
         {
@@ -64,7 +72,7 @@ public partial class BookmarksPage : ContentPage
         }
         else if (action == "Smazat záložku")
         {
-            bool confirm = await DisplayAlert("Smazat záložku", $"Opravdu chceš smazat záložku \"{categoryName}\"? Recepty samotné zůstanou zachované.", "Smazat", "Zrušit");
+            bool confirm = await DisplayAlertAsync("Smazat záložku", $"Opravdu chceš smazat záložku \"{categoryName}\"? Recepty samotné zůstanou zachované.", "Smazat", "Zrušit");
             if (confirm)
             {
                 await App.Database.DeleteBookmarkAsync(categoryName);
@@ -85,7 +93,7 @@ public partial class BookmarksPage : ContentPage
         var selectionList = allRecipes.Select(r => new BookmarkedRecipeSelectionModel
         {
             RecipeId = r.Id,
-            RecipeName = r.Name_CS,
+            RecipeName = r.Name,
             IsInBookmark = idsInBookmark.Contains(r.Id)
         }).ToList();
 
@@ -113,7 +121,7 @@ public partial class BookmarksPage : ContentPage
 
     private async void OnPageOptionsClicked(object sender, TappedEventArgs e)
     {
-        string action = await DisplayActionSheet("Možnosti", "Zrušit", null, "Upravit pořadí záložek");
+        string action = await DisplayActionSheetAsync("Možnosti", "Zrušit", null, "Upravit pořadí záložek");
         if (action == "Upravit pořadí záložek")
             await OpenReorderOverlayAsync();
     }

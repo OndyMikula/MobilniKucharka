@@ -12,6 +12,7 @@ namespace MobilniKucharka.Services
         {
             if (_isTranslationCacheReady) return;
             await _db.CreateTableAsync<RecipeTranslationCache>();
+            await _db.CreateTableAsync<SearchQueryTranslationCache>();
             _isTranslationCacheReady = true;
         }
 
@@ -51,11 +52,48 @@ namespace MobilniKucharka.Services
             }
         }
 
+        // Cache pro překlad vyhledávacích dotazů - viz SearchQueryTranslationCache.cs. Nezávislé
+        // na konkrétním receptu, takže žije mimo RecipeId-scoped metody výše.
+        public async Task<string?> GetSearchQueryTranslationAsync(string originalText)
+        {
+            await EnsureTranslationCacheReadyAsync();
+
+            var entry = await _db.Table<SearchQueryTranslationCache>()
+                .Where(c => c.OriginalText == originalText)
+                .FirstOrDefaultAsync();
+
+            return entry?.TranslatedText;
+        }
+
+        public async Task SaveSearchQueryTranslationAsync(string originalText, string translatedText)
+        {
+            await EnsureTranslationCacheReadyAsync();
+
+            var existing = await _db.Table<SearchQueryTranslationCache>()
+                .Where(c => c.OriginalText == originalText)
+                .FirstOrDefaultAsync();
+
+            if (existing != null)
+            {
+                existing.TranslatedText = translatedText;
+                await _db.UpdateAsync(existing);
+            }
+            else
+            {
+                await _db.InsertAsync(new SearchQueryTranslationCache
+                {
+                    OriginalText = originalText,
+                    TranslatedText = translatedText
+                });
+            }
+        }
+
         // Přeloží recept z jednoho jazyka do druhého a rovnou uloží.
-        // Name_CS/EN a Steps_CS/EN se přeloží vždy přes DeepL (mají vlastní sloupce, žádná cache netřeba).
-        // DescriptionText/IngredientsRaw (jednojazyčná pole) nejdřív zkontrolují cache - pokud tam cílový
-        // jazyk už je z předchozího překladu, DeepL se pro ně vůbec nevolá.
-        public async Task<bool> TranslateAndSaveRecipeAsync(int recipeId, string fromLang, string toLang)
+        // skipName: true když Name_CS/EN už je vyplněné z jiného zdroje (viz SaveExternalRecipeAsync/
+        // GetRecipeWithCacheAsync, kam se propisuje překlad hotový už během hledání v SearchPage) -
+        // v tom případě se do dávkového DeepL volání jméno vůbec nezahrne a přeloží se jen kroky,
+        // ať se tatáž věta nepřekládá (a neplatí) podruhé.
+        public async Task<bool> TranslateAndSaveRecipeAsync(int recipeId, string fromLang, string toLang, bool skipName = false)
         {
             try
             {
@@ -72,7 +110,7 @@ namespace MobilniKucharka.Services
 
                 var translationService = new TranslationService();
 
-                bool namesStepsOk = await translationService.TranslateRecipeNameAndStepsAsync(recipe, fromLang, toLang);
+                bool namesStepsOk = await translationService.TranslateRecipeNameAndStepsAsync(recipe, fromLang, toLang, skipName);
                 if (!namesStepsOk) return false;
 
                 recipe.DescriptionText = await GetOrTranslateFieldAsync(translationService, recipeId, "DescriptionText", recipe.DescriptionText, fromLang, toLang);
@@ -123,17 +161,21 @@ namespace MobilniKucharka.Services
             var currentSteps = currentLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
             var otherSteps = otherLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
 
+            bool nameOk = !string.IsNullOrWhiteSpace(currentName);
+
             // "Hotovo" znamená: jméno je vyplněné A (zdrojový jazyk nemá žádné kroky, NEBO cílový jazyk
             // kroky taky má). Dřív se kontrolovalo jen jméno, takže recept s vyplněným jménem ale prázdnými
             // kroky (např. z dřív přerušeného překladu) navždy vypadal jako hotový a nikdy se nedokončil.
             bool stepsOk = otherSteps.Count == 0 || currentSteps.Count > 0;
-            if (!string.IsNullOrWhiteSpace(currentName) && stepsOk)
+            if (nameOk && stepsOk)
                 return recipe;
 
             if (string.IsNullOrWhiteSpace(otherName))
                 return recipe; // není z čeho překládat
 
-            bool success = await TranslateAndSaveRecipeAsync(recipeId, fromLang: otherLang, toLang: currentLang);
+            // Jméno může už být hotové (recept uložený rovnou s Name_CS z RecipeSearchService, viz
+            // TranslateResultNamesForDisplayAsync), zatímco kroky ještě ne - pak přeložíme jen kroky.
+            bool success = await TranslateAndSaveRecipeAsync(recipeId, fromLang: otherLang, toLang: currentLang, skipName: nameOk);
             if (!success) return recipe;
 
             return await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();

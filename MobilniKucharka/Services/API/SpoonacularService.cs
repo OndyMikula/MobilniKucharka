@@ -1,7 +1,5 @@
-﻿using MobilniKucharka.Classes;
-using MobilniKucharka.Classes.Recipe;
+﻿using MobilniKucharka.Classes.Recipe;
 using SQLite;
-using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace MobilniKucharka.Services.Api
@@ -13,7 +11,7 @@ namespace MobilniKucharka.Services.Api
         private readonly SQLiteAsyncConnection _db = new(dbPath);
         private static readonly string ApiKey = Secrets.SpoonacularApiKey;
 
-        public async Task<Recipe?> GetRecipeWithCacheAsync(int spoonacularId)
+        public async Task<Recipe?> GetRecipeWithCacheAsync(int spoonacularId, string? translatedNameCs = null)
         {
             var cached = await _db.Table<Recipe>()
                                  .Where(r => r.ExternalSourceId == $"spoon_{spoonacularId}")
@@ -43,14 +41,13 @@ namespace MobilniKucharka.Services.Api
 
                 var data = JsonSerializer.Deserialize<JsonElement>(contentString);
 
-                // Zdroj je anglický - Name_CS/StepsJson_CS necháváme prázdné. RecipeDetailPage.OnAppearing
-                // (přes EnsureRecipeLanguageAsync) pak automaticky doplní češtinu při prvním zobrazení.
-                // Dřív se sem omylem plnilo Name_CS stejným textem jako Name_EN, takže se "už přeložený"
-                // recept nikdy doopravdy nepřeložil.
                 var recipe = new Recipe
                 {
                     ExternalSourceId = $"spoon_{spoonacularId}",
                     Name_EN = data.GetProperty("title").GetString() ?? "",
+                    // Stejná logika jako v BudgetPlannerService.SaveExternalRecipeAsync - pokud appka
+                    // recept už přeložila pro zobrazení v seznamu hledání, použije se to rovnou.
+                    Name_CS = translatedNameCs ?? string.Empty,
                     PrepTime = data.GetProperty("readyInMinutes").GetInt32(),
                     ImageUrl = data.GetProperty("image").GetString() ?? "",
                     SourceUrl = data.TryGetProperty("sourceUrl", out var srcProp) ? srcProp.GetString() ?? "" : "",
@@ -60,11 +57,12 @@ namespace MobilniKucharka.Services.Api
                     Fat = ExtractNutrient(data, "Fat"),
                     Sugar = ExtractNutrient(data, "Sugar"),
 
-                    // Dřív omylem StepsJson (mrtvé pole, Steps_EN by bylo prázdné) - teď StepsJson_EN.
                     StepsJson_EN = ExtractSteps(data),
+                    IngredientsRaw = ExtractIngredientsRaw(data),
+
                     ServingSize = data.TryGetProperty("servings", out var servingsProp) && servingsProp.GetInt32() > 0
                         ? servingsProp.GetInt32()
-                        : 1,
+                        : 0,
                     EquipmentJson = "[]",
                     DietaryFlagsJson = ExtractDiets(data)
                 };
@@ -79,6 +77,50 @@ namespace MobilniKucharka.Services.Api
             catch (Exception)
             {
                 return null;
+            }
+        }
+
+        // Hledání receptů podle textového dotazu (dotaz už bývá anglicky - viz RecipeSearchService,
+        // který ho před voláním přeloží). Vrací jen lehká data (id/název/obrázek) - plné detaily se
+        // dotáhnou (a rovnou uloží do DB, viz GetRecipeWithCacheAsync) až po výběru receptu.
+        public async Task<List<ExternalRecipeSearchResult>> SearchRecipesAsync(string query, string? diet, CancellationToken cancellationToken)
+        {
+            string dietParam = string.IsNullOrWhiteSpace(diet) ? "" : $"&diet={Uri.EscapeDataString(diet)}";
+            string url = $"https://api.spoonacular.com/recipes/complexSearch?apiKey={ApiKey}&query={Uri.EscapeDataString(query)}&number=10{dietParam}";
+
+            try
+            {
+                var response = await _httpClient.GetAsync(url, cancellationToken);
+                if (!response.IsSuccessStatusCode) return [];
+
+                var contentString = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (string.IsNullOrWhiteSpace(contentString) || !contentString.TrimStart().StartsWith('{'))
+                    return [];
+
+                var root = JsonSerializer.Deserialize<JsonElement>(contentString);
+                if (!root.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
+                    return [];
+
+                var list = new List<ExternalRecipeSearchResult>();
+                foreach (var item in results.EnumerateArray())
+                {
+                    list.Add(new ExternalRecipeSearchResult
+                    {
+                        Source = ExternalRecipeSource.Spoonacular,
+                        ExternalId = item.TryGetProperty("id", out var idProp) ? idProp.GetInt32().ToString() : "",
+                        Name = item.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? "" : "",
+                        ImageUrl = item.TryGetProperty("image", out var imgProp) ? imgProp.GetString() ?? "" : ""
+                    });
+                }
+                return list;
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // ať volající (RecipeSearchService/SearchPage) pozná rozdíl mezi timeoutem a "nic se nenašlo"
+            }
+            catch
+            {
+                return [];
             }
         }
 
@@ -114,6 +156,69 @@ namespace MobilniKucharka.Services.Api
             }
             catch { }
             return JsonSerializer.Serialize(stepsList);
+        }
+
+        // Sestaví IngredientsRaw ve stejném formátu "Název|Množství", jaký používá MealDB import
+        // i ruční tvorba receptu (viz CreateRecipePage.TriggerAutoSaveAsync) - tedy jméno a
+        // množství oddělené "|", jedna surovina na řádek. Množství bereme z "measures.metric" (ne
+        // "measures.us"), aby jednotky (g/ml/kg/l) odpovídaly tomu, co appka jinde umí parsovat
+        // (viz NutritionEstimationService.ConvertToProductUnit/DetectUnitFamily).
+        private static string ExtractIngredientsRaw(JsonElement root)
+        {
+            var lines = new List<string>();
+            try
+            {
+                if (!root.TryGetProperty("extendedIngredients", out var ingredients) || ingredients.ValueKind != JsonValueKind.Array)
+                    return string.Empty;
+
+                foreach (var ing in ingredients.EnumerateArray())
+                {
+                    string name = ing.TryGetProperty("nameClean", out var nameCleanProp) && !string.IsNullOrWhiteSpace(nameCleanProp.GetString())
+                        ? nameCleanProp.GetString()!
+                        : ing.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "" : "";
+
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+
+                    double amount = 0;
+                    string unit = "";
+
+                    if (ing.TryGetProperty("measures", out var measures) && measures.TryGetProperty("metric", out var metric))
+                    {
+                        amount = metric.TryGetProperty("amount", out var amtProp) ? amtProp.GetDouble() : 0;
+                        unit = metric.TryGetProperty("unitShort", out var unitProp) ? unitProp.GetString() ?? "" : "";
+                    }
+
+                    // Fallback na top-level "amount"/"unit", kdyby "measures.metric" chybělo.
+                    if (amount <= 0 && ing.TryGetProperty("amount", out var fallbackAmountProp))
+                    {
+                        amount = fallbackAmountProp.GetDouble();
+                        unit = ing.TryGetProperty("unit", out var fallbackUnitProp) ? fallbackUnitProp.GetString() ?? "" : unit;
+                    }
+
+                    string normalizedUnit = NormalizeMetricUnit(unit);
+                    string amountText = amount > 0 ? $"{amount:0.##} {normalizedUnit}".Trim() : "";
+
+                    lines.Add(string.IsNullOrWhiteSpace(amountText) ? name : $"{name}|{amountText}");
+                }
+            }
+            catch { }
+            return string.Join("\n", lines);
+        }
+
+        // Sjednotí Spoonacularovy metrické jednotky na tvar, který appka jinde rozpoznává
+        // (g/kg/ml/l). Prázdná jednotka (kusové suroviny jako "1 vejce") se bere jako "ks".
+        private static string NormalizeMetricUnit(string unit)
+        {
+            string normalized = unit.Trim().ToLowerInvariant();
+            return normalized switch
+            {
+                "g" or "grams" or "gram" => "g",
+                "kg" or "kilograms" or "kilogram" => "kg",
+                "ml" or "milliliters" or "milliliter" => "ml",
+                "l" or "liters" or "liter" => "l",
+                "" => "ks",
+                _ => normalized // neznámá jednotka (např. "clove") - necháme tak, ať je surovina aspoň vidět
+            };
         }
 
         private static string ExtractDiets(JsonElement root)

@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Maui;
+using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
 
 namespace MobilniKucharka
@@ -17,8 +17,12 @@ namespace MobilniKucharka
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
+            builder.Services.AddMauiBlazorWebView();
+            builder.Services.AddSingleton<Services.IDialogService, Services.DialogService>();
+
 #if DEBUG
             builder.Logging.AddDebug();
+            builder.Services.AddBlazorWebViewDeveloperTools();
 #endif
 
             return builder.Build();

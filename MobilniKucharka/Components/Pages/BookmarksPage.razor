@@ -1,0 +1,327 @@
+@page "/bookmarks"
+@namespace MobilniKucharka.Components.Pages
+@implements IDisposable
+@inject IDialogService DialogService
+
+<div class="hub-page">
+    <!-- Header -->
+    <div class="hub-header">
+        <h1 class="hub-title">@Tr("Záložky")</h1>
+        <button type="button" class="icon-btn" title="@Tr("Možnosti")" @onclick="OnPageOptionsClicked">⋮</button>
+    </div>
+
+    <!-- Bookmark Grid -->
+    <div class="bookmarks-grid">
+        @if (_isLoading)
+        {
+            <div class="skeleton-folder"></div>
+            <div class="skeleton-folder"></div>
+            <div class="skeleton-folder"></div>
+            <div class="skeleton-folder"></div>
+        }
+        else if (_bookmarks == null || _bookmarks.Count == 0)
+        {
+            <div class="empty-state">
+                <span class="empty-icon">📁</span>
+                <p>@Tr("Zatím nemáš žádné záložky.")</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var bookmark in _bookmarks)
+            {
+                <div class="bookmark-card"
+                     style="@GetCardStyle(bookmark)"
+                     @onclick="() => OnCategoryClicked(bookmark.Name)">
+
+                    @if (bookmark.UseImageAsBackground)
+                    {
+                        <img src="@ImageHelper.ResolveImageSrc(bookmark.BackgroundImage)"
+                             alt="@bookmark.Name"
+                             class="bookmark-card-bg-img"
+                             loading="lazy" />
+                    }
+                    else
+                    {
+                        <div class="bookmark-card-icon">@bookmark.Icon</div>
+                    }
+
+                    @if (bookmark.IsPinned)
+                    {
+                        <div class="bookmark-pin-badge">📌</div>
+                    }
+
+                    <button type="button"
+                            class="bookmark-options-btn"
+                            @onclick:stopPropagation="true"
+                            @onclick="() => OnBookmarkOptionsClicked(bookmark)">
+                        ⋮
+                    </button>
+
+                    <div class="bookmark-card-title-bar">
+                        <span class="bookmark-card-name">@TranslateCategoryName(bookmark.Name)</span>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <!-- Create Bookmark Button -->
+    <button type="button" class="btn-action btn-primary" @onclick="OpenCreateBookmark">
+        @Tr("Vytvořit záložku")
+    </button>
+
+    <!-- Overlay: Upravit recepty ve složce -->
+    @if (_showEditRecipesOverlay)
+    {
+        <div class="modal-overlay" @onclick="CloseEditRecipesOverlay">
+            <div class="modal-card modal-large" @onclick:stopPropagation="true">
+                <h2 class="modal-title">@string.Format(Tr("Upravit recepty: {0}"), TranslateCategoryName(_editingCategoryName))</h2>
+
+                <div class="modal-content-scroll">
+                    @if (_recipeSelectionList == null || _recipeSelectionList.Count == 0)
+                    {
+                        <p class="empty-text">@Tr("Zatím nemáš žádné recepty.")</p>
+                    }
+                    else
+                    {
+                        @foreach (var item in _recipeSelectionList)
+                        {
+                            <label class="modal-checkbox-row">
+                                <input type="checkbox"
+                                       checked="@item.IsInBookmark"
+                                       @onchange="(e) => OnRecipeCheckedChange(item, e)" />
+                                <span class="modal-checkbox-label">@item.RecipeName</span>
+                            </label>
+                        }
+                    }
+                </div>
+
+                <button type="button" class="btn-action btn-primary modal-action-btn" @onclick="CloseEditRecipesOverlay">
+                    @Tr("Hotovo")
+                </button>
+            </div>
+        </div>
+    }
+
+    <!-- Overlay: Upravit pořadí záložek -->
+    @if (_showReorderOverlay)
+    {
+        <div class="modal-overlay" @onclick="CloseReorderOverlay">
+            <div class="modal-card modal-large" @onclick:stopPropagation="true">
+                <h2 class="modal-title">@Tr("Upravit pořadí záložek")</h2>
+
+                <div class="modal-content-scroll">
+                    @for (int i = 0; i < _reorderItems.Count; i++)
+                    {
+                        int index = i;
+                        var item = _reorderItems[i];
+                        <div class="reorder-row">
+                            <span class="reorder-handle">⠿</span>
+                            <span class="reorder-name">@TranslateCategoryName(item.Name)</span>
+                            <div class="reorder-buttons">
+                                <button type="button" class="btn-reorder" disabled="@(index == 0)" @onclick="() => MoveReorderItemUp(index)">▲</button>
+                                <button type="button" class="btn-reorder" disabled="@(index == _reorderItems.Count - 1)" @onclick="() => MoveReorderItemDown(index)">▼</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <button type="button" class="btn-action btn-primary modal-action-btn" @onclick="SaveReorderAsync">
+                    @Tr("Uložit pořadí")
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Bookmark>? _bookmarks;
+    private bool _isLoading = true;
+    private bool _showEditRecipesOverlay = false;
+    private bool _showReorderOverlay = false;
+    private string _editingCategoryName = string.Empty;
+    private List<BookmarkedRecipeSelectionModel> _recipeSelectionList = [];
+    private List<BookmarkReorderItem> _reorderItems = [];
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    private static string TranslateCategoryName(string name)
+    {
+        return name switch
+        {
+            "Oblíbené" => Tr("Oblíbené"),
+            "Vytvořené recepty" => Tr("Vytvořené recepty"),
+            "Vyhledané recepty" => Tr("Vyhledané recepty"),
+            "Koncepty" => Tr("Koncepty"),
+            _ => name
+        };
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        BlazorShellPage.ShellAppeared += OnShellAppeared;
+        await LoadBookmarksAsync();
+    }
+
+    private async void OnShellAppeared()
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadBookmarksAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadBookmarksAsync()
+    {
+        _bookmarks = await App.Database.GetAllBookmarksAsync();
+        _isLoading = false;
+    }
+
+    private static string GetCardStyle(Bookmark b)
+    {
+        if (b.UseImageAsBackground)
+            return "background-color: #2196F3;";
+        return $"background-color: {b.BackgroundColor};";
+    }
+
+    private void OnCategoryClicked(string categoryName)
+    {
+        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+        nav?.PushAsync(new BookmarkCategoryPage(categoryName));
+    }
+
+    private void OpenCreateBookmark()
+    {
+        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+        nav?.PushAsync(new CreateBookmarkPage());
+    }
+
+    private async Task OnBookmarkOptionsClicked(Bookmark bookmark)
+    {
+        bool isProtected = bookmark.Name is "Oblíbené" or "Koncepty";
+        string pinLabel = bookmark.IsPinned ? Tr("Odepnout") : Tr("Připnout");
+
+        string? action = isProtected
+            ? await DialogService.ShowActionSheetAsync(TranslateCategoryName(bookmark.Name), Tr("Zrušit"), null, Tr("Upravit recepty ve složce"), pinLabel)
+            : await DialogService.ShowActionSheetAsync(TranslateCategoryName(bookmark.Name), Tr("Zrušit"), null, Tr("Upravit recepty ve složce"), pinLabel, Tr("Smazat záložku"));
+
+        if (action == Tr("Upravit recepty ve složce"))
+        {
+            await OpenEditRecipesOverlayAsync(bookmark.Name);
+        }
+        else if (action == pinLabel)
+        {
+            await App.Database.TogglePinAsync(bookmark.Name);
+            await LoadBookmarksAsync();
+        }
+        else if (action == Tr("Smazat záložku"))
+        {
+            bool confirm = await DialogService.ShowConfirmAsync(
+                Tr("Smazat záložku"),
+                string.Format(Tr("Opravdu chceš smazat záložku \"{0}\"? Recepty samotné zůstanou zachované."), TranslateCategoryName(bookmark.Name)),
+                Tr("Smazat"),
+                Tr("Zrušit"));
+
+            if (confirm)
+            {
+                await App.Database.DeleteBookmarkAsync(bookmark.Name);
+                await LoadBookmarksAsync();
+            }
+        }
+    }
+
+    private async Task OnPageOptionsClicked()
+    {
+        string? action = await DialogService.ShowActionSheetAsync(Tr("Možnosti"), Tr("Zrušit"), null, Tr("Upravit pořadí záložek"));
+        if (action == Tr("Upravit pořadí záložek"))
+        {
+            OpenReorderOverlay();
+        }
+    }
+
+    private async Task OpenEditRecipesOverlayAsync(string categoryName)
+    {
+        _editingCategoryName = categoryName;
+
+        var allRecipes = await App.Database.GetAllRecipesAsync();
+        var recipesInBookmark = await App.Database.GetRecipesByCategoryAsync(categoryName);
+        var idsInBookmark = recipesInBookmark.Select(r => r.Id).ToHashSet();
+
+        _recipeSelectionList = allRecipes.Select(r => new BookmarkedRecipeSelectionModel
+        {
+            RecipeId = r.Id,
+            RecipeName = r.Name,
+            IsInBookmark = idsInBookmark.Contains(r.Id)
+        }).ToList();
+
+        _showEditRecipesOverlay = true;
+    }
+
+    private async Task OnRecipeCheckedChange(BookmarkedRecipeSelectionModel model, ChangeEventArgs e)
+    {
+        bool isChecked = e.Value is bool b && b;
+        model.IsInBookmark = isChecked;
+
+        if (isChecked)
+            await App.Database.AddRecipeToCategoryAsync(model.RecipeId, _editingCategoryName);
+        else
+            await App.Database.RemoveRecipeFromCategoryAsync(model.RecipeId, _editingCategoryName);
+    }
+
+    private void CloseEditRecipesOverlay()
+    {
+        _showEditRecipesOverlay = false;
+    }
+
+    private void OpenReorderOverlay()
+    {
+        if (_bookmarks == null) return;
+
+        _reorderItems = _bookmarks.Select(b => new BookmarkReorderItem
+        {
+            Name = b.Name,
+            IsPinned = b.IsPinned
+        }).ToList();
+
+        _showReorderOverlay = true;
+    }
+
+    private void MoveReorderItemUp(int index)
+    {
+        if (index > 0 && index < _reorderItems.Count)
+        {
+            var item = _reorderItems[index];
+            _reorderItems.RemoveAt(index);
+            _reorderItems.Insert(index - 1, item);
+        }
+    }
+
+    private void MoveReorderItemDown(int index)
+    {
+        if (index >= 0 && index < _reorderItems.Count - 1)
+        {
+            var item = _reorderItems[index];
+            _reorderItems.RemoveAt(index);
+            _reorderItems.Insert(index + 1, item);
+        }
+    }
+
+    private async Task SaveReorderAsync()
+    {
+        await App.Database.UpdateBookmarkOrderAsync([.. _reorderItems.Select(i => i.Name)]);
+        _showReorderOverlay = false;
+        await LoadBookmarksAsync();
+    }
+
+    private void CloseReorderOverlay()
+    {
+        _showReorderOverlay = false;
+    }
+
+    public void Dispose()
+    {
+        BlazorShellPage.ShellAppeared -= OnShellAppeared;
+    }
+}

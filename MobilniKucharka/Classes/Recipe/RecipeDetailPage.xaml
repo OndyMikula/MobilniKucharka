@@ -48,13 +48,20 @@
 
                     <VerticalStackLayout VerticalOptions="End" Margin="20" Spacing="5">
                         <Label x:Name="RecipeNameLabel" FontSize="24" FontAttributes="Bold" TextColor="White" />
-                        <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
-                            <HorizontalStackLayout Spacing="2" VerticalOptions="Center">
-                                <HorizontalStackLayout x:Name="HeroStarsHost" Spacing="2" VerticalOptions="Center" />
-                                <Label x:Name="HeroRatingNumberLabel" TextColor="White" FontSize="16" FontAttributes="Bold" VerticalOptions="Center" Margin="5,0,0,0"/>
+                        <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                            <HorizontalStackLayout Grid.Column="0" Spacing="10" VerticalOptions="Center">
+                                <HorizontalStackLayout Spacing="2" VerticalOptions="Center">
+                                    <HorizontalStackLayout x:Name="HeroStarsHost" Spacing="2" VerticalOptions="Center" />
+                                    <Label x:Name="HeroRatingNumberLabel" TextColor="White" FontSize="16" FontAttributes="Bold" VerticalOptions="Center" Margin="5,0,0,0"/>
+                                </HorizontalStackLayout>
+                                <Label x:Name="PrepTimeLabel" TextColor="White" FontSize="14" VerticalOptions="Center" IsVisible="False"/>
                             </HorizontalStackLayout>
-                            <Label x:Name="PrepTimeLabel" TextColor="White" FontSize="14" VerticalOptions="Center" IsVisible="False"/>
-                        </HorizontalStackLayout>
+
+                            <Button Grid.Column="1" x:Name="ImportButton" Text="{loc:Tr 'Importovat'}" Clicked="OnImportClicked"
+                                    BackgroundColor="#4CAF50" TextColor="White" FontSize="12" FontAttributes="Bold"
+                                    Padding="10,4" CornerRadius="12" HeightRequest="28"
+                                    VerticalOptions="Center" IsVisible="False"/>
+                        </Grid>
                     </VerticalStackLayout>
                 </Grid>
 
@@ -105,7 +112,11 @@
                         <Grid ColumnDefinitions="Auto, Auto, *, Auto">
                             <Label Grid.Column="0" Text="🛒" FontSize="20"/>
                             <Label Grid.Column="1" Text="{loc:Tr 'Ingredience'}" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" Margin="10,0,0,0"/>
-                            <Label Grid.Column="2" x:Name="PeopleCountBadge" TextColor="Gray" FontSize="14" VerticalOptions="Center" Margin="10,0,0,0"/>
+                            <Label Grid.Column="2" x:Name="PeopleCountBadge" TextColor="Gray" FontSize="14" VerticalOptions="Center" Margin="10,0,0,0">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnPeopleCountBadgeTapped" />
+                                </Label.GestureRecognizers>
+                            </Label>
                             <Label Grid.Column="3" Text="📋" FontSize="18" VerticalOptions="Center">
                                 <Label.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnCopyIngredientsClicked" />

@@ -1,0 +1,309 @@
+@page "/"
+@page "/recipes"
+@namespace MobilniKucharka.Components.Pages
+@implements IDisposable
+@inject IDialogService DialogService
+
+<div class="hub-page">
+    <!-- Header -->
+    <div class="hub-header">
+        <h1 class="hub-title">@Tr("Dnešní menu")</h1>
+        <button type="button" class="icon-btn" title="@Tr("Nastavení")" @onclick="OpenSettings">⚙️</button>
+    </div>
+
+    <!-- Settings Summary Banner -->
+    <div class="settings-banner">
+        <div class="settings-banner-info">
+            <span class="settings-banner-title">@Tr("Tvoje nastavení:")</span>
+            <span class="settings-banner-desc">@SettingsSummaryText</span>
+        </div>
+        <button type="button" class="btn-sm-trans" @onclick="OpenOnboarding">@Tr("Změnit")</button>
+    </div>
+
+    <!-- Local Search Bar -->
+    <div class="search-bar-row">
+        <input type="text"
+               class="search-input"
+               placeholder="@Tr("Hledat mezi uloženými recepty...")"
+               @bind="_searchText"
+               @bind:event="oninput"
+               @bind:after="OnSearchChanged" />
+
+        <button type="button" class="btn-search-icon" @onclick="PerformSearchAsync">🔍</button>
+
+        <label class="pref-checkbox-label">
+            <input type="checkbox" @bind="_filterByPreferences" @bind:after="PerformSearchAsync" />
+            <span>@Tr("Dle preferencí")</span>
+        </label>
+    </div>
+
+    <!-- Developer mode tools -->
+    @if (_isDeveloperMode)
+    {
+        <div class="dev-tools-row">
+            <button type="button" class="btn-dev" @onclick="OnResetDatabaseClicked">@Tr("🔄 Resetovat testovací databázi")</button>
+            <button type="button" class="btn-dev" @onclick="OnRepairStepsClicked">@Tr("🔧 Opravit formátování kroků")</button>
+        </div>
+    }
+
+    <!-- Recipe Cards List -->
+    <div class="recipe-cards-container">
+        @if (_isLoading)
+        {
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+        }
+        else if (_recipes == null || _recipes.Count == 0)
+        {
+            <div class="empty-state">
+                <span class="empty-icon">🍲</span>
+                <p>@Tr("Žádné recepty nevyhovují filtru.")</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var recipeWithCost in _recipes)
+            {
+                <RecipeCard @key="recipeWithCost.Recipe.Id" Item="recipeWithCost" />
+            }
+        }
+    </div>
+
+    <!-- Bottom Action Buttons -->
+    <div class="action-buttons-grid">
+        <button type="button" class="btn-action btn-primary" @onclick="OnSurpriseMeClicked" disabled="@_isGeneratingSurprise">
+            @if (_isGeneratingSurprise)
+            {
+                <span>⏳ @Tr("Hledám...")</span>
+            }
+            else
+            {
+                <span>@Tr("Překvap mě!")</span>
+            }
+        </button>
+        <button type="button" class="btn-action btn-success" @onclick="OpenCreateRecipe">
+            @Tr("Vytvořit recept")
+        </button>
+    </div>
+</div>
+
+@code {
+    private List<RecipeWithCost>? _recipes;
+    private bool _isLoading = true;
+    private bool _isGeneratingSurprise = false;
+    private string _searchText = string.Empty;
+    private bool _filterByPreferences = false;
+    private bool _isDeveloperMode = false;
+    private string SettingsSummaryText = string.Empty;
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    protected override async Task OnInitializedAsync()
+    {
+        BlazorShellPage.ShellAppeared += OnShellAppeared;
+        await LoadPageDataAsync();
+        _ = CheckForUpdatesAsync();
+        CheckPendingImport();
+    }
+
+    private async void OnShellAppeared()
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadPageDataAsync();
+            CheckPendingImport();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadPageDataAsync()
+    {
+        _isDeveloperMode = Preferences.Default.Get("IsDeveloperMode", false);
+        UpdateSummaryText();
+
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            _recipes = await App.Database.GetPlanAsync();
+        }
+        else
+        {
+            _recipes = await App.Database.SearchRecipesAsync(_searchText.Trim(), _filterByPreferences);
+        }
+
+        _isLoading = false;
+    }
+
+    private void UpdateSummaryText()
+    {
+        int people = Preferences.Default.Get("PeopleCount", 2);
+        double budget = Preferences.Default.Get("WeeklyBudget", 2000.0);
+        string template = Tr("{0} osoby | Rozpočet: {1} Kč/týden");
+        SettingsSummaryText = string.Format(template, people, budget);
+    }
+
+    private async Task OnSearchChanged()
+    {
+        await PerformSearchAsync();
+    }
+
+    private async Task PerformSearchAsync()
+    {
+        string text = _searchText?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _recipes = await App.Database.GetPlanAsync();
+        }
+        else
+        {
+            _recipes = await App.Database.SearchRecipesAsync(text, _filterByPreferences);
+        }
+    }
+
+    private async Task OnSurpriseMeClicked()
+    {
+        if (_isGeneratingSurprise) return;
+        _isGeneratingSurprise = true;
+
+        try
+        {
+            var userDiets = ParseUserDiets();
+            var mealDbService = new TheMealDbService();
+            var found = await mealDbService.GetRandomRecipeMatchingDietAsync(userDiets);
+
+            if (found == null)
+            {
+                await DialogService.ShowAlertAsync(Tr("Chyba"), Tr("Nepodařilo se najít žádný recept. Zkontroluj internetové připojení."), "OK");
+                return;
+            }
+
+            var savedRecipe = await App.Database.SaveExternalRecipeAsync(found);
+
+            if (savedRecipe.ServingSize <= 0)
+            {
+                string? result = await DialogService.ShowPromptAsync(
+                    Tr("Pro kolik lidí by měl recept být?"),
+                    Tr("Zadej, pro kolik lidí chceš recept uvařit."),
+                    "OK", initialValue: string.Empty, keyboard: Keyboard.Numeric);
+
+                if (int.TryParse(result, out var parsed) && parsed > 0)
+                {
+                    await App.Database.UpdateRecipeServingSizeAsync(savedRecipe.Id, parsed);
+                    savedRecipe.ServingSize = parsed;
+                }
+            }
+
+            var recipeWithCost = new RecipeWithCost
+            {
+                Recipe = savedRecipe,
+                CalculatedCost = 0,
+                IsWithinBudget = true
+            };
+
+            var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+            if (nav != null)
+            {
+                await nav.PushAsync(new Classes.Recipe.RecipeDetailPage(recipeWithCost));
+            }
+        }
+        finally
+        {
+            _isGeneratingSurprise = false;
+        }
+    }
+
+    private static List<string> ParseUserDiets()
+    {
+        string raw = Preferences.Default.Get("UserDiets", "");
+        return string.IsNullOrWhiteSpace(raw)
+            ? []
+            : [.. raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+    }
+
+    private void OpenSettings()
+    {
+        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+        nav?.PushAsync(new SettingsPage());
+    }
+
+    private void OpenOnboarding()
+    {
+        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+        nav?.PushAsync(new OnboardingPage());
+    }
+
+    private void OpenCreateRecipe()
+    {
+        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+        nav?.PushAsync(new Classes.Recipe.CreateRecipePage());
+    }
+
+    private async Task OnResetDatabaseClicked()
+    {
+        bool confirm = await DialogService.ShowConfirmAsync(Tr("Reset databáze"), Tr("Tohle smaže VŠECHNY recepty a záložky a nahradí je testovacími daty. Pokračovat?"), Tr("Ano"), Tr("Zrušit"));
+        if (!confirm) return;
+
+        await App.Database.ResetDatabaseAsync();
+        await LoadPageDataAsync();
+        await DialogService.ShowAlertAsync(Tr("Hotovo"), Tr("Databáze byla resetována na testovací data."), "OK");
+    }
+
+    private async Task OnRepairStepsClicked()
+    {
+        int fixedCount = await App.Database.RepairAllRecipeStepsAsync();
+        await DialogService.ShowAlertAsync(Tr("Hotovo"), string.Format(Tr("Opraveno receptů: {0}"), fixedCount), "OK");
+    }
+
+    private void CheckPendingImport()
+    {
+        if (!string.IsNullOrWhiteSpace(App.PendingImportGuid))
+        {
+            string guid = App.PendingImportGuid;
+            App.PendingImportGuid = null;
+            _ = HandlePendingImportAsync(guid);
+        }
+    }
+
+    private async Task HandlePendingImportAsync(string guid)
+    {
+        var recipe = await RecipeLinkShareService.ImportFromLinkAsync(guid);
+        if (recipe != null)
+        {
+            int newId = await App.Database.ImportSharedRecipeAsync(recipe);
+            await App.Database.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
+            await DialogService.ShowAlertAsync(Tr("Recept naimportován"), string.Format(Tr("\"{0}\" byl přidán do tvých receptů."), recipe.Name), "OK");
+            await LoadPageDataAsync();
+        }
+        else
+        {
+            await DialogService.ShowAlertAsync(Tr("Odkaz neplatný"), Tr("Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit)."), "OK");
+        }
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        var updateService = new UpdateCheckService();
+        var info = await updateService.CheckForUpdateAsync();
+
+        if (info != null && info.IsUpdateAvailable)
+        {
+            bool download = await DialogService.ShowConfirmAsync(
+                Tr("Nová verze je k dispozici"),
+                string.Format(Tr("Je dostupná nová verze aplikace ({0}). Chceš ji nainstalovat? Všechny recepty, záložky a nastavení zůstanou zachovány."), info.LatestVersion),
+                Tr("Instalovat"),
+                Tr("Pokračovat bez instalace"));
+
+            if (download)
+            {
+                string urlToOpen = !string.IsNullOrWhiteSpace(info.ApkDownloadUrl) ? info.ApkDownloadUrl : info.ReleaseUrl;
+                if (!string.IsNullOrWhiteSpace(urlToOpen))
+                    await Launcher.Default.OpenAsync(urlToOpen);
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        BlazorShellPage.ShellAppeared -= OnShellAppeared;
+    }
+}

@@ -1,0 +1,20 @@
+@namespace MobilniKucharka.Components
+
+<Router AppAssembly="@typeof(MauiProgram).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1,h2" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div class="empty-state">
+                <span class="empty-icon">🔍</span>
+                <p>@Tr("Stránka nenalezena.")</p>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>
+
+@code {
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+}

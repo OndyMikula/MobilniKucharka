@@ -1,4 +1,5 @@
-﻿#nullable disable
+#nullable disable
+using MobilniKucharka.Classes.Navigation;
 using MobilniKucharka.Classes.Recipe;
 using MobilniKucharka.Classes.Recipe.Sharing;
 using MobilniKucharka.Classes.UserData;
@@ -16,6 +17,7 @@ namespace MobilniKucharka
         {
             InitializeComponent();
             _budgetService = App.Database;
+            BottomNav.SetActiveTab(AppTab.Recipes);
         }
 
         private static string Tr(string csText) => MobilniKucharka.Translation.UiTranslator.Tr(csText);
@@ -28,6 +30,7 @@ namespace MobilniKucharka
             UpdateSummaryUI();
             ResetDatabaseButton.IsVisible = Preferences.Default.Get("IsDeveloperMode", false);
             RepairStepsButton.IsVisible = Preferences.Default.Get("IsDeveloperMode", false);
+            BlazorNavTestButton.IsVisible = Preferences.Default.Get("IsDeveloperMode", false);
             _ = CheckForUpdatesAsync();
 
             // Levný "nudge" pro překreslení - žádné čekání, žádný přepočet layoutu.
@@ -49,7 +52,7 @@ namespace MobilniKucharka
 
             if (info != null && info.IsUpdateAvailable)
             {
-                bool download = await DisplayAlert(
+                bool download = await DisplayAlertAsync(
                     Tr("Nová verze je k dispozici"),
                     string.Format(Tr("Je dostupná nová verze aplikace ({0}). Chceš ji nainstalovat? Všechny recepty, záložky a nastavení zůstanou zachovány."), info.LatestVersion),
                     Tr("Instalovat"),
@@ -81,7 +84,7 @@ namespace MobilniKucharka
 
             if (found == null)
             {
-                await DisplayAlert(Tr("Chyba"), Tr("Nepodařilo se najít žádný recept. Zkontroluj internetové připojení."), "OK");
+                await DisplayAlertAsync(Tr("Chyba"), Tr("Nepodařilo se najít žádný recept. Zkontroluj internetové připojení."), "OK");
                 return;
             }
 
@@ -165,17 +168,31 @@ namespace MobilniKucharka
             await Navigation.PushAsync(new SettingsPage());
         }
 
+        // Patička (BottomNavBar) požádala o přepnutí na jinou hlavní záložku - skutečnou navigaci
+        // (pop-to-root + případný push) řeší sdílený AppTabNavigation, ne tahle stránka přímo.
+        private async void OnBottomNavTabRequested(object _, AppTab tab)
+        {
+            await AppTabNavigation.GoToTabAsync(Navigation, tab);
+        }
+
         private async void OnBookmarksClicked(object sender, EventArgs e)
         {
             await Navigation.PushAsync(new BookmarksPage());
         }
 
+        // Vyhledávací řádek nahoře na stránce - hledá POUZE mezi lokálně uloženými recepty
+        // (včetně receptů naimportovaných z internetu přes SearchPage), ne na internetu.
         private async void OnSearchTextChanged(object sender, TextChangedEventArgs e)
         {
             await PerformSearchAsync();
         }
 
         private async void OnFilterByPreferencesChanged(object sender, CheckedChangedEventArgs e)
+        {
+            await PerformSearchAsync();
+        }
+
+        private async void OnLocalSearchButtonClicked(object sender, EventArgs e)
         {
             await PerformSearchAsync();
         }
@@ -194,25 +211,20 @@ namespace MobilniKucharka
             RecipesCollectionView.ItemsSource = results;
         }
 
-        private async void OnSearchButtonClicked(object sender, EventArgs e)
-        {
-            await PerformSearchAsync();
-        }
-
         private async void OnResetDatabaseClicked(object sender, EventArgs e)
         {
-            bool confirm = await DisplayAlert(Tr("Reset databáze"), Tr("Tohle smaže VŠECHNY recepty a záložky a nahradí je testovacími daty. Pokračovat?"), Tr("Ano"), Tr("Zrušit"));
+            bool confirm = await DisplayAlertAsync(Tr("Reset databáze"), Tr("Tohle smaže VŠECHNY recepty a záložky a nahradí je testovacími daty. Pokračovat?"), Tr("Ano"), Tr("Zrušit"));
             if (!confirm) return;
 
             await _budgetService.ResetDatabaseAsync();
             await LoadRecipesDataAsync();
-            await DisplayAlert(Tr("Hotovo"), Tr("Databáze byla resetována na testovací data."), "OK");
+            await DisplayAlertAsync(Tr("Hotovo"), Tr("Databáze byla resetována na testovací data."), "OK");
         }
 
         private async void OnRepairStepsClicked(object sender, EventArgs e)
         {
             int fixedCount = await _budgetService.RepairAllRecipeStepsAsync();
-            await DisplayAlert(Tr("Hotovo"), string.Format(Tr("Opraveno receptů: {0}"), fixedCount), "OK");
+            await DisplayAlertAsync(Tr("Hotovo"), string.Format(Tr("Opraveno receptů: {0}"), fixedCount), "OK");
         }
 
         private async Task HandlePendingImportAsync(string guid) //link-sharing
@@ -222,13 +234,18 @@ namespace MobilniKucharka
             {
                 int newId = await _budgetService.ImportSharedRecipeAsync(recipe);
                 await _budgetService.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
-                await DisplayAlert(Tr("Recept naimportován"), string.Format(Tr("\"{0}\" byl přidán do tvých receptů."), recipe.Name), "OK");
+                await DisplayAlertAsync(Tr("Recept naimportován"), string.Format(Tr("\"{0}\" byl přidán do tvých receptů."), recipe.Name), "OK");
                 await LoadRecipesDataAsync();
             }
             else
             {
-                await DisplayAlert(Tr("Odkaz neplatný"), Tr("Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit)."), "OK");
+                await DisplayAlertAsync(Tr("Odkaz neplatný"), Tr("Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit)."), "OK");
             }
+        }
+
+        private async void OnBlazorNavTestClicked(object sender, EventArgs e)
+        {
+            await Navigation.PushAsync(new Classes.Navigation.BlazorShellPage());
         }
     }
 }

@@ -1,11 +1,10 @@
-using SQLite;
 using MobilniKucharka.Classes;
-using System.Text.Json;
 using MobilniKucharka.Classes.Recipe;
 using MobilniKucharka.Classes.UserData.Bookmark;
 using MobilniKucharka.Services.Api;
-using MobilniKucharka.Classes.Recipe.Sharing;
+using SQLite;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace MobilniKucharka.Services
@@ -42,6 +41,14 @@ namespace MobilniKucharka.Services
                 if (bookmarkCount == 0)
                 {
                     await SeedBookmarksAsync();
+                }
+                else
+                {
+                    // Doplňková migrace pro appky, které už měly záložky nasazené z dřívějška -
+                    // seed výše se spustí jen na úplně prázdné tabulce, takže existující instalace
+                    // (včetně vývojového zařízení) by jinak "Vyhledané recepty" nikdy nedostaly,
+                    // aniž by se jim smazala data.
+                    await EnsureSearchedRecipesBookmarkExistsAsync();
                 }
 
                 _isInitialized = true;
@@ -134,11 +141,24 @@ namespace MobilniKucharka.Services
             {
                 new() { Name = "Oblíbené", BackgroundColor = "#FFE0E0", Icon = "❤️" },
                 new() { Name = "Vytvořené recepty", BackgroundColor = "#E3F2FD", Icon = "👨‍🍳" },
+                new() { Name = "Vyhledané recepty", BackgroundColor = "#E8F5E9", Icon = "🔍" },
                 new() { Name = "Koncepty", BackgroundColor = "#F5F5F5", Icon = "📝" }
             };
 
             foreach (var b in defaultBookmarks)
                 await _db.InsertAsync(b);
+        }
+
+        // Doplní "Vyhledané recepty" u appek, které tuhle záložku ještě nemají (viz komentář u
+        // volání v EnsureInitializedAsync výše). Bezpečné volat opakovaně - jakmile záložka jednou
+        // existuje, další volání jen zkontroluje a nic nedělá.
+        private async Task EnsureSearchedRecipesBookmarkExistsAsync()
+        {
+            var existing = await _db.Table<Bookmark>().Where(b => b.Name == "Vyhledané recepty").FirstOrDefaultAsync();
+            if (existing == null)
+            {
+                await _db.InsertAsync(new Bookmark { Name = "Vyhledané recepty", BackgroundColor = "#E8F5E9", Icon = "🔍" });
+            }
         }
 
         private async Task<List<LocalProduct>> GetProductsCachedAsync()
@@ -171,7 +191,7 @@ namespace MobilniKucharka.Services
             {
                 await EnsureInitializedAsync();
 
-                var recipes = (await _db.Table<Recipe>().ToListAsync()).Where(r => !r.IsDraft).ToList();
+                var recipes = (await _db.Table<Recipe>().ToListAsync()).Where(r => !r.IsDraft && !r.IsSearchTemp).ToList();
                 var allProducts = await GetProductsCachedAsync();
                 var allIngredients = await GetIngredientsCachedAsync();
                 var allAliases = await GetAliasesCachedAsync();
@@ -192,11 +212,16 @@ namespace MobilniKucharka.Services
                     if (userEquipment.Count != 0 && !recipe.Equipment.All(e => userEquipment.Contains(e)))
                         continue;
 
-                    var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(recipe, peopleCount, allProducts, allIngredients, allAliases);
+                    // Doplní jméno (a kroky) do aktuálního jazyka appky, pokud ještě chybí - díky cache uvnitř
+                    // EnsureRecipeLanguageAsync se DeepL zavolá jen jednou za (recept, jazyk) navždy; další
+                    // zobrazení seznamu je pak jen levná kontrola v DB, ne nové volání API.
+                    var displayRecipe = await EnsureRecipeLanguageAsync(recipe.Id) ?? recipe;
+
+                    var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(displayRecipe, peopleCount, allProducts, allIngredients, allAliases);
 
                     results.Add(new RecipeWithCost
                     {
-                        Recipe = recipe,
+                        Recipe = displayRecipe,
                         CalculatedCost = cost,
                         AllIngredientsPriced = allPriced,
                         AnyIngredientsPriced = anyPriced,
@@ -205,8 +230,8 @@ namespace MobilniKucharka.Services
                 }
 
                 return [.. results
-            .OrderBy(r => r.AllIngredientsPriced ? 0 : (r.AnyIngredientsPriced ? 1 : 2))
-            .ThenBy(r => r.CalculatedCost)];
+                    .OrderBy(r => r.AllIngredientsPriced ? 0 : (r.AnyIngredientsPriced ? 1 : 2))
+                    .ThenBy(r => r.CalculatedCost)];
             }
             catch (Exception ex)
             {
@@ -221,7 +246,7 @@ namespace MobilniKucharka.Services
             {
                 await EnsureInitializedAsync();
 
-                var allRecipes = (await _db.Table<Recipe>().ToListAsync()).Where(r => !r.IsDraft).ToList();
+                var allRecipes = (await _db.Table<Recipe>().ToListAsync()).Where(r => !r.IsDraft && !r.IsSearchTemp).ToList();
 
                 var matches = string.IsNullOrWhiteSpace(searchText)
                     ? allRecipes
@@ -248,18 +273,24 @@ namespace MobilniKucharka.Services
                 var allIngredients = await GetIngredientsCachedAsync();
                 var allAliases = await GetAliasesCachedAsync();
 
-                var results = matches.Select(r =>
+                var results = new List<RecipeWithCost>();
+                foreach (var match in matches)
                 {
-                    var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(r, peopleCount, allProducts, allIngredients, allAliases);
-                    return new RecipeWithCost
+                    // Stejná logika jako v GetPlanAsync - doplní překlad jména/kroků, pokud ještě chybí
+                    // (např. čerstvě naimportovaný recept ze SearchPage), s cache proti opakovaným DeepL voláním.
+                    var displayRecipe = await EnsureRecipeLanguageAsync(match.Id) ?? match;
+
+                    var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(displayRecipe, peopleCount, allProducts, allIngredients, allAliases);
+
+                    results.Add(new RecipeWithCost
                     {
-                        Recipe = r,
+                        Recipe = displayRecipe,
                         CalculatedCost = cost,
                         AllIngredientsPriced = allPriced,
                         AnyIngredientsPriced = anyPriced,
                         IsWithinBudget = allPriced && cost <= maxDailyBudget
-                    };
-                }).ToList();
+                    });
+                }
 
                 return [.. results.OrderBy(r => r.Recipe.Name_CS)];
             }
@@ -284,8 +315,21 @@ namespace MobilniKucharka.Services
 
                 var recipeIds = links.Select(l => l.RecipeId).ToHashSet();
                 var allRecipes = await _db.Table<Recipe>().ToListAsync();
+                var matchedRecipes = allRecipes.Where(r => recipeIds.Contains(r.Id)).ToList();
 
-                return [.. allRecipes.Where(r => recipeIds.Contains(r.Id))];
+                // Stejný "translate-on-read" vzor jako GetPlanAsync/SearchRecipesAsync - recept
+                // naimportovaný jen v jednom jazyce (např. přes SearchPage, který ukládá jen Name_EN)
+                // se tu doplní do aktuálního jazyka appky, pokud ještě nebyl zobrazen přes
+                // RecipeDetailPage. Díky tomu se i "Vytvořené recepty" (kam Import odkládá recepty)
+                // zobrazují správně přeložené. Cache uvnitř EnsureRecipeLanguageAsync zajistí, že se
+                // DeepL nezavolá znovu, pokud už překlad existuje.
+                var displayRecipes = new List<Recipe>();
+                foreach (var recipe in matchedRecipes)
+                {
+                    displayRecipes.Add(await EnsureRecipeLanguageAsync(recipe.Id) ?? recipe);
+                }
+
+                return displayRecipes;
             }
             catch (Exception ex)
             {
@@ -634,7 +678,7 @@ namespace MobilniKucharka.Services
 
             return anyManualOrder
                 ? [.. bookmarks.OrderByDescending(b => b.IsPinned).ThenBy(b => b.SortOrder)]
-                : [.. bookmarks.OrderByDescending(b => b.IsPinned).ThenByDescending(b => b.LastEditedUtc)];
+                : [.. bookmarks.OrderByDescending(b => b.IsPinned).ThenBy(b => b.Id)];
         }
 
         public async Task TogglePinAsync(string categoryName)
@@ -686,10 +730,11 @@ namespace MobilniKucharka.Services
         public async Task<List<Recipe>> GetAllRecipesAsync()
         {
             await EnsureInitializedAsync();
-            return await _db.Table<Recipe>().ToListAsync();
+            var recipes = await _db.Table<Recipe>().ToListAsync();
+            return [.. recipes.Where(r => !r.IsSearchTemp)];
         }
 
-        public async Task<Recipe> SaveExternalRecipeAsync(MealDbRecipe mealDbRecipe)
+        public async Task<Recipe> SaveExternalRecipeAsync(MealDbRecipe mealDbRecipe, string? translatedNameCs = null)
         {
             await EnsureInitializedAsync();
             string externalId = $"mealdb_{mealDbRecipe.ExternalId}";
@@ -698,9 +743,12 @@ namespace MobilniKucharka.Services
             var recipe = new Recipe
             {
                 Name_EN = mealDbRecipe.Name,
-                // Name_CS necháváme prázdné - zdroj je anglický, EnsureRecipeLanguageAsync doplní češtinu
-                // při prvním zobrazení (viz RecipeDetailPage.OnAppearing). Dřív se sem plnilo Name_CS
-                // stejným textem jako Name_EN, takže "už přeložený" recept se nikdy doopravdy nepřeložil.
+                // Pokud appka recept už jednou přeložila pro zobrazení v seznamu výsledků hledání
+                // (viz RecipeSearchService.TranslateResultNamesForDisplayAsync), použijeme ten
+                // překlad rovnou - ať se za tutéž větu neplatí DeepL kvóta podruhé jen proto, že
+                // recept mezitím "přešel" ze seznamu do uloženého receptu. Bez něj zůstane prázdné
+                // a doplní ho EnsureRecipeLanguageAsync při prvním zobrazení, stejně jako dřív.
+                Name_CS = translatedNameCs ?? string.Empty,
                 ExternalSourceId = externalId,
                 ImageUrl = mealDbRecipe.ImageUrl,
                 Category = "Objevené recepty",
@@ -710,7 +758,8 @@ namespace MobilniKucharka.Services
                 Sugar = mealDbRecipe.Sugar,
                 IsNutritionEstimated = mealDbRecipe.IsNutritionEstimated,
                 StepsJson_EN = JsonSerializer.Serialize(SplitInstructions(mealDbRecipe.Instructions)),
-                // StepsJson_CS necháváme prázdné ze stejného důvodu jako Name_CS výše.
+                // StepsJson_CS necháváme prázdné ze stejného důvodu jako dřív - hledání nikdy
+                // nepřekládá kroky, jen zobrazované názvy v seznamu.
                 EquipmentJson = "[]",
                 DietaryFlagsJson = JsonSerializer.Serialize(GuessDietFlags(mealDbRecipe.Category)),
                 IngredientsRaw = string.Join("\n", mealDbRecipe.Ingredients.Select(i => $"{i.Name}|{i.Measure}")),

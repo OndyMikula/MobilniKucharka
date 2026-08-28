@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:services="clr-namespace:MobilniKucharka.Services"
              xmlns:loc="clr-namespace:MobilniKucharka.Translation"
+             xmlns:navigation="clr-namespace:MobilniKucharka.Classes.Navigation"
              x:Class="MobilniKucharka.MainPage"
              Shell.NavBarIsVisible="False"
              NavigationPage.HasNavigationBar="False"
@@ -22,7 +23,7 @@
                     FontSize="24" Clicked="OnSettingsToolbarClicked" Padding="0" VerticalOptions="Center"/>
         </Grid>
 
-        <Grid Grid.Row="1" RowDefinitions="Auto, Auto, Auto, Auto, *">
+        <Grid Grid.Row="1" RowDefinitions="Auto, Auto, Auto, Auto, Auto, *">
             <Border Grid.Row="0" Margin="15,5,15,5" Padding="12,8" StrokeShape="RoundRectangle 10" Stroke="Transparent" BackgroundColor="#2196F3">
                 <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
                     <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
@@ -37,13 +38,13 @@
 
             <Grid Grid.Row="1" ColumnDefinitions="*, Auto, Auto" Margin="15,0,15,5" ColumnSpacing="8">
                 <Entry Grid.Column="0" x:Name="SearchEntry" 
-                       Placeholder="{loc:Tr 'Hledat recept podle názvu...'}" 
+                       Placeholder="{loc:Tr 'Hledat mezi uloženými recepty...'}" 
                        TextChanged="OnSearchTextChanged" 
-                       Completed="OnSearchButtonClicked"
+                       Completed="OnLocalSearchButtonClicked"
                        VerticalOptions="Center" />
                 <Button Grid.Column="1" Text="🔍" FontSize="18" 
                         WidthRequest="44" HeightRequest="44" Padding="0" CornerRadius="22"
-                        BackgroundColor="#2196F3" TextColor="White" Clicked="OnSearchButtonClicked" />
+                        BackgroundColor="#2196F3" TextColor="White" Clicked="OnLocalSearchButtonClicked" />
                 <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" HorizontalOptions="Center" Spacing="0">
                     <CheckBox x:Name="FilterByPreferencesCheckBox" 
                               CheckedChanged="OnFilterByPreferencesChanged" 
@@ -61,7 +62,12 @@
                     HorizontalOptions="Center" Padding="0" HeightRequest="24" Margin="0,0,0,5"
                     IsVisible="False"/>
 
-            <CollectionView x:Name="RecipesCollectionView" Grid.Row="4">
+            <Button Grid.Row="4" x:Name="BlazorNavTestButton" Text="🧪 Otestovat Blazor navigaci" Clicked="OnBlazorNavTestClicked"
+                    FontSize="11" TextColor="Gray" BackgroundColor="Transparent" 
+                    HorizontalOptions="Center" Padding="0" HeightRequest="24" Margin="0,0,0,5"
+                    IsVisible="False"/>
+
+            <CollectionView x:Name="RecipesCollectionView" Grid.Row="5">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="services:RecipeWithCost">
                         <Border Margin="15,5,15,10" Padding="0" StrokeShape="RoundRectangle 12" Stroke="LightGray" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
@@ -101,10 +107,7 @@
                     BackgroundColor="#4CAF50" TextColor="White" FontAttributes="Bold" HeightRequest="50" CornerRadius="10"/>
         </Grid>
 
-        <Grid Grid.Row="3" ColumnDefinitions="*, *" Padding="10,10,10,20" BackgroundColor="{AppThemeBinding Light=#E0E0E0, Dark=#1F1F1F}">
-            <Button Grid.Column="0" Text="{loc:Tr 'Recepty'}" BackgroundColor="#2196F3" TextColor="White" FontAttributes="Bold" CornerRadius="10" Margin="5"/>
-            <Button Grid.Column="1" Text="{loc:Tr 'Záložky'}" Clicked="OnBookmarksClicked" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light=Black, Dark=White}" FontAttributes="Bold" CornerRadius="10" Margin="5"/>
-        </Grid>
+        <navigation:BottomNavBar Grid.Row="3" x:Name="BottomNav" TabRequested="OnBottomNavTabRequested" />
 
     </Grid>
 </ContentPage>

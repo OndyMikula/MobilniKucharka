@@ -1,5 +1,4 @@
 ﻿using System.Globalization;
-using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace MobilniKucharka.Services.Api
@@ -32,7 +31,7 @@ namespace MobilniKucharka.Services.Api
                 var contentString = await response.Content.ReadAsStringAsync();
 
                 // 2. Zkontrolujeme, jestli to vůbec vypadá jako JSON (JSON vždy začíná { nebo [ )
-                if (string.IsNullOrWhiteSpace(contentString) || (!contentString.StartsWith('{')  && !contentString.StartsWith('[')))
+                if (string.IsNullOrWhiteSpace(contentString) || (!contentString.StartsWith('{') && !contentString.StartsWith('[')))
                 {
                     return null; // Zabalíme to dřív, než to stihne spadnout
                 }

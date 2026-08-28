@@ -1,7 +1,6 @@
-﻿using System.Text;
+﻿using MobilniKucharka.Services;
+using System.Text;
 using System.Text.Json;
-using MobilniKucharka.Classes.Recipe;
-using MobilniKucharka.Services;
 
 namespace MobilniKucharka.Classes.Recipe.Sharing
 {
