@@ -205,7 +205,7 @@
 
             if (isImport)
             {
-                await App.Database.AddRecipeToCategoryAsync(savedRecipe.Id, "Vytvořené recepty");
+                await App.Database.AddRecipeToCategoryAsync(savedRecipe.Id, "Vyhledané recepty");
             }
 
             var recipeWithCost = new RecipeWithCost

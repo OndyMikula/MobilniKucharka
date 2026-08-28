@@ -42,6 +42,14 @@ namespace MobilniKucharka.Services
                 {
                     await SeedBookmarksAsync();
                 }
+                else
+                {
+                    // Doplňková migrace pro appky, které už měly záložky nasazené z dřívějška -
+                    // seed výše se spustí jen na úplně prázdné tabulce, takže existující instalace
+                    // (včetně vývojového zařízení) by jinak "Vyhledané recepty" nikdy nedostaly,
+                    // aniž by se jim smazala data.
+                    await EnsureSearchedRecipesBookmarkExistsAsync();
+                }
 
                 _isInitialized = true;
             }
@@ -133,11 +141,24 @@ namespace MobilniKucharka.Services
             {
                 new() { Name = "Oblíbené", BackgroundColor = "#FFE0E0", Icon = "❤️" },
                 new() { Name = "Vytvořené recepty", BackgroundColor = "#E3F2FD", Icon = "👨‍🍳" },
+                new() { Name = "Vyhledané recepty", BackgroundColor = "#E8F5E9", Icon = "🔍" },
                 new() { Name = "Koncepty", BackgroundColor = "#F5F5F5", Icon = "📝" }
             };
 
             foreach (var b in defaultBookmarks)
                 await _db.InsertAsync(b);
+        }
+
+        // Doplní "Vyhledané recepty" u appek, které tuhle záložku ještě nemají (viz komentář u
+        // volání v EnsureInitializedAsync výše). Bezpečné volat opakovaně - jakmile záložka jednou
+        // existuje, další volání jen zkontroluje a nic nedělá.
+        private async Task EnsureSearchedRecipesBookmarkExistsAsync()
+        {
+            var existing = await _db.Table<Bookmark>().Where(b => b.Name == "Vyhledané recepty").FirstOrDefaultAsync();
+            if (existing == null)
+            {
+                await _db.InsertAsync(new Bookmark { Name = "Vyhledané recepty", BackgroundColor = "#E8F5E9", Icon = "🔍" });
+            }
         }
 
         private async Task<List<LocalProduct>> GetProductsCachedAsync()

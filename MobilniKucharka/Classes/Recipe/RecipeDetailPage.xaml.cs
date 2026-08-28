@@ -62,6 +62,7 @@ public partial class RecipeDetailPage : ContentPage
         await App.Database.MarkRecipeSearchTempAsync(_recipeWithCost.Recipe.Id, isTemp: false);
         _recipeWithCost.Recipe.IsSearchTemp = false;
         _hasPromotedFromTemp = true;
+        ImportButton.IsVisible = false; // recept právě přestal být dočasný - tlačítko Importovat už nedává smysl
     }
 
     private void PopulateFromCurrentRecipe()
@@ -71,6 +72,11 @@ public partial class RecipeDetailPage : ContentPage
         HeroRatingNumberLabel.Text = _recipeWithCost.Recipe.Rating.ToString("F1");
         StarRatingHelper.Render(HeroStarsHost, _recipeWithCost.Recipe.Rating);
         SetupUserRatingWidget();
+
+        // Tlačítko "Importovat" v hero přehledu - viditelné jen dokud je recept dočasný (zobrazený
+        // přes SearchPage "Detail", ale zatím nenaimportovaný). Jakmile se recept "promuje" (viz
+        // PromoteFromSearchTempAsync) jakoukoli jinou interakcí, tlačítko se odtamtud samo skryje.
+        ImportButton.IsVisible = _recipeWithCost.Recipe.IsSearchTemp;
 
         int servings = Math.Max(_recipeWithCost.Recipe.ServingSize, 1);
         ProteinLabel.Text = FormatNutritionPerServing(_recipeWithCost.Recipe.Protein, servings);
@@ -584,5 +590,14 @@ public partial class RecipeDetailPage : ContentPage
             _displayPeopleCount = parsed;
             LoadIngredientsAndSteps();
         }
+    }
+
+    // Tlačítko "Importovat" přímo v hero přehledu (vedle hvězdiček) - dělá totéž, co "Importovat"
+    // v seznamu výsledků hledání (SearchPage), jen o krok později: zruší dočasný příznak (viz
+    // PromoteFromSearchTempAsync, samo skryje tlačítko) a přidá recept do "Vytvořené recepty".
+    private async void OnImportClicked(object sender, EventArgs e)
+    {
+        await PromoteFromSearchTempAsync();
+        await App.Database.AddRecipeToCategoryAsync(_recipeWithCost.Recipe.Id, "Vyhledané recepty");
     }
 }
