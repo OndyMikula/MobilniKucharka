@@ -4,7 +4,7 @@ namespace MobilniKucharka.Services
 {
     public static class ImageHelper
     {
-        private static readonly Dictionary<string, string> Base64Cache = new();
+        private static readonly Dictionary<string, string> Base64Cache = [];
         private const int MaxCacheEntries = 50;
 
         public static string ResolveImageSrc(string? pathOrUrl)
