@@ -1,4 +1,6 @@
-﻿namespace MobilniKucharka.Classes.UserData.Bookmark;
+﻿using MobilniKucharka.Services;
+
+namespace MobilniKucharka.Classes.UserData.Bookmark;
 
 public partial class CreateBookmarkPage : ContentPage
 {
@@ -8,9 +10,6 @@ public partial class CreateBookmarkPage : ContentPage
     private readonly string _originalCategoryName = string.Empty;
     private readonly bool _isProtectedBookmark = false;
 
-    // Musí odpovídat BudgetPlannerService.ProtectedBookmarkNames - kdyby appka na jedné straně
-    // dovolila přejmenovat pole, ale DB metoda to potichu zablokovala, uživatel by viděl "uloženo"
-    // a přitom se nic nezměnilo. Zákaz proto vynucujeme na obou místech stejně.
     private static readonly string[] ProtectedBookmarkNames = ["Oblíbené", "Vytvořené recepty", "Vyhledané recepty", "Koncepty"];
 
     private static string Tr(string csText) => MobilniKucharka.Translation.UiTranslator.Tr(csText);
@@ -20,9 +19,6 @@ public partial class CreateBookmarkPage : ContentPage
         InitializeComponent();
     }
 
-    // Editační režim - otevřeno z BookmarksPage.razor přes "Upravit záložku". Název jde přejmenovat
-    // jen u nechráněných (uživatelem vytvořených) záložek - viz ProtectedBookmarkNames a
-    // BudgetPlannerService.UpdateBookmarkAsync, kde je stejné pravidlo vynucené i na straně DB.
     public CreateBookmarkPage(string categoryName) : this()
     {
         _isEditingExisting = true;
@@ -63,16 +59,16 @@ public partial class CreateBookmarkPage : ContentPage
             var result = results.FirstOrDefault();
             if (result != null)
             {
-                // Stejný vzor jako CreateRecipePage.OnSelectImageLocal - MediaPicker vrací FullPath
-                // do dočasného umístění, které nepřežije aktualizaci appky ani mazání cache systémem.
-                // Musíme soubor zkopírovat do trvalého FileSystem.AppDataDirectory, jinak obrázek
-                // po update zmizí a zobrazí se výchozí modrá barva (BackgroundColor) místo něj.
-                string localFileName = $"{Guid.NewGuid()}_{result.FileName}";
+                // Obrázek se rovnou zmenší přes ImageResizeService (viz tam) - fotka z fotoaparátu
+                // ve full rozlišení by se v Blazor <img> (BookmarksPage.razor) zobrazovala jako
+                // base64 data: URI, kde Android WebView u příliš velkých obrázků obrázek občas
+                // vůbec nevykreslí, potichu, bez chyby. Výstup je vždy JPEG bez ohledu na vstupní
+                // formát, proto přípona vždy ".jpg", ne původní result.FileName.
+                string localFileName = $"{Guid.NewGuid()}.jpg";
                 string localFilePath = Path.Combine(FileSystem.AppDataDirectory, localFileName);
 
                 using Stream sourceStream = await result.OpenReadAsync();
-                using FileStream localFileStream = File.OpenWrite(localFilePath);
-                await sourceStream.CopyToAsync(localFileStream);
+                await ImageResizeService.SaveResizedAsync(sourceStream, localFilePath);
 
                 _selectedImagePath = localFilePath;
                 _imageWasRemoved = false;
@@ -97,8 +93,6 @@ public partial class CreateBookmarkPage : ContentPage
         }
     }
 
-    // Vrátí záložku na výchozí jednobarevné pozadí - hlavně pro obnovu záložek zasažených starým
-    // bugem (obrázek zmizel po aktualizaci appky), kdy jediná cesta ven byla obrázek znovu vybrat.
     private void OnRemoveImageClicked(object sender, EventArgs e)
     {
         _selectedImagePath = string.Empty;

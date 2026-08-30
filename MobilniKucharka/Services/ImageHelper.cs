@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace MobilniKucharka.Services
 {
     public static class ImageHelper
@@ -39,7 +41,7 @@ namespace MobilniKucharka.Services
                     };
 
                     string dataUri = $"data:{mimeType};base64,{Convert.ToBase64String(bytes)}";
-                    
+
                     if (Base64Cache.Count >= MaxCacheEntries)
                     {
                         Base64Cache.Clear();
@@ -47,10 +49,19 @@ namespace MobilniKucharka.Services
                     Base64Cache[pathOrUrl] = dataUri;
                     return dataUri;
                 }
+                else
+                {
+                    // Cesta uložená v DB neexistuje na disku - dřív se to řešilo úplně potichu, což
+                    // znemožňovalo dohledat, proč se karta v Blazoru zobrazuje s výchozí barvou
+                    // místo fotky. Teď to jde aspoň vidět v Debug Output/adb logu.
+                    Debug.WriteLine($"[ImageHelper] Soubor neexistuje: {pathOrUrl}");
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                // Silently fallback if file cannot be read
+                // Skutečná výjimka při čtení (uzamčený soubor, chybějící oprávnění...) - dřív úplně
+                // tichý catch, teď aspoň vidět, co přesně selhalo a u kterého souboru.
+                Debug.WriteLine($"[ImageHelper] Nepodařilo se načíst '{pathOrUrl}': {ex.Message}");
             }
 
             return pathOrUrl;

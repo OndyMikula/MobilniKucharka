@@ -282,12 +282,15 @@ namespace MobilniKucharka.Classes.Recipe
                 var result = results.FirstOrDefault();
                 if (result != null)
                 {
-                    string localFileName = $"{Guid.NewGuid()}_{result.FileName}";
+                    // Stejný důvod jako u záložek (CreateBookmarkPage.OnPickImageClicked) - fotka z
+                    // fotoaparátu ve full rozlišení by se v Blazor <img> (RecipeCard.razor) zobrazovala
+                    // jako base64 data: URI, kde WebView u příliš velkých obrázků obrázek občas vůbec
+                    // nevykreslí. Výstup ImageResizeService je vždy JPEG, proto přípona vždy ".jpg".
+                    string localFileName = $"{Guid.NewGuid()}.jpg";
                     string localFilePath = Path.Combine(FileSystem.AppDataDirectory, localFileName);
 
                     using Stream sourceStream = await result.OpenReadAsync();
-                    using FileStream localFileStream = File.OpenWrite(localFilePath);
-                    await sourceStream.CopyToAsync(localFileStream);
+                    await ImageResizeService.SaveResizedAsync(sourceStream, localFilePath);
 
                     _savedImagePath = localFilePath;
                     RecipeImagePreview.Source = ImageSource.FromFile(localFilePath);
