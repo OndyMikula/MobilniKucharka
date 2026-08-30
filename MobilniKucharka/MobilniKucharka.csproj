@@ -27,7 +27,7 @@
 
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.5.9.3</ApplicationDisplayVersion> <!-- Co vidí user (1.5.9.3), "- beta" pro oznaceni beta verze -->
-		<ApplicationVersion>12</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(12) -->
+		<ApplicationVersion>13</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(13) -->
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
 
