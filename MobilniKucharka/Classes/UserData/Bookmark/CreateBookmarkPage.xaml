@@ -12,12 +12,18 @@
 
         <ScrollView Grid.Row="0" VerticalScrollBarVisibility="Never">
             <VerticalStackLayout Spacing="25" Margin="0,15,0,0">
-                <Label Text="{loc:Tr 'Nová složka'}" FontSize="26" FontAttributes="Bold" HorizontalOptions="Center" />
+                <Label x:Name="HeaderLabel" Text="{loc:Tr 'Nová složka'}" FontSize="26" FontAttributes="Bold" HorizontalOptions="Center" />
 
                 <!-- Vstup pro název -->
                 <VerticalStackLayout Spacing="8">
                     <Label Text="{loc:Tr 'Název záložky'}" FontAttributes="Bold" FontSize="14" TextColor="Gray" />
                     <Entry x:Name="BookmarkNameEntry" Placeholder="{loc:Tr 'Např. Rychlé večeře...'}" MaxLength="30" ClearButtonVisibility="WhileEditing" />
+                </VerticalStackLayout>
+
+                <!-- POPIS ZÁLOŽKY (volitelný) -->
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="{loc:Tr 'Popis (volitelný)'}" FontAttributes="Bold" FontSize="14" TextColor="Gray" />
+                    <Editor x:Name="DescriptionEditor" Placeholder="{loc:Tr 'Krátký popis záložky...'}" AutoSize="TextChanges" MaxLength="200" />
                 </VerticalStackLayout>
 
                 <!-- Výběr obrázku -->
@@ -39,12 +45,17 @@
                             <Image x:Name="BookmarkImagePreview" Aspect="AspectFill" IsVisible="False" />
                         </Grid>
                     </Border>
+
+                    <!-- Zobrazeno jen když je vybraný/uložený obrázek - umožní vrátit se k výchozí
+                         barvě, hlavně pro obnovu záložek zasažených starým bugem s mizejícím obrázkem. -->
+                    <Button x:Name="RemoveImageButton" Text="{loc:Tr 'Odebrat obrázek'}" Clicked="OnRemoveImageClicked"
+                            IsVisible="False" BackgroundColor="Transparent" TextColor="#F44336" FontSize="13" />
                 </VerticalStackLayout>
             </VerticalStackLayout>
         </ScrollView>
 
         <!-- Tlačítko Uložit -->
-        <Button Grid.Row="1" 
+        <Button Grid.Row="1" x:Name="SaveButton"
                 Text="{loc:Tr 'Uložit složku'}" 
                 Clicked="OnSaveClicked"
                 HeightRequest="55"

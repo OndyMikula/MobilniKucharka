@@ -11,11 +11,19 @@ public partial class BookmarkCategoryPage : ContentPage
 
     public ObservableCollection<RecipeWithCost> Recipes { get; set; } = [];
 
+    private static string Tr(string csText) => MobilniKucharka.Translation.UiTranslator.Tr(csText);
+
     public BookmarkCategoryPage(string categoryName)
     {
         InitializeComponent();
         _categoryName = categoryName;
-        Title = _categoryName;
+
+        // Tr() zvládne i výchozí čtyři záložky rovnou - jejich přesné české názvy jsou zároveň
+        // klíči v ui_translations_en.json ("Oblíbené", "Vytvořené recepty"...), takže žádný
+        // samostatný překladový switch (jako TranslateCategoryName v BookmarksPage.razor) tu není
+        // potřeba. U vlastních (nepřeložených) záložek Tr() beze změny vrátí originální název.
+        Title = Tr(_categoryName);
+        CategoryNameLabel.Text = Tr(_categoryName);
 
         RecipesCollectionView.ItemsSource = Recipes;
     }
@@ -23,7 +31,29 @@ public partial class BookmarkCategoryPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        await LoadBookmarkHeaderAsync();
         await LoadRecipesSafeAsync();
+    }
+
+    // Popis záložky (Bookmark.Description) je volitelný - řádek se zobrazí jen když je vyplněný,
+    // ať prázdné záložky nemají pod názvem zbytečnou mezeru. Načítá se znovu při každém OnAppearing,
+    // aby se hned projevila případná úprava přes CreateBookmarkPage(categoryName) v editačním režimu.
+    private async Task LoadBookmarkHeaderAsync()
+    {
+        var bookmark = await App.Database.GetBookmarkByNameAsync(_categoryName);
+        if (bookmark == null) return;
+
+        CategoryNameLabel.Text = Tr(bookmark.Name);
+
+        if (!string.IsNullOrWhiteSpace(bookmark.Description))
+        {
+            CategoryDescriptionLabel.Text = bookmark.Description;
+            CategoryDescriptionLabel.IsVisible = true;
+        }
+        else
+        {
+            CategoryDescriptionLabel.IsVisible = false;
+        }
     }
 
     private async Task LoadRecipesSafeAsync()

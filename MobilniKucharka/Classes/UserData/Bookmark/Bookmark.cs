@@ -8,6 +8,7 @@ namespace MobilniKucharka.Classes.UserData.Bookmark
         public int Id { get; set; }
 
         public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
 
         // Buď barva v HEX formátu (např. #2196F3), nebo cesta k obrázku na pozadí
         public string BackgroundColor { get; set; } = "#2196F3";

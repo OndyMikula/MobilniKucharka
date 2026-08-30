@@ -202,14 +202,19 @@
     {
         bool isProtected = bookmark.Name is "Oblíbené" or "Koncepty";
         string pinLabel = bookmark.IsPinned ? Tr("Odepnout") : Tr("Připnout");
+        string editBookmarkLabel = Tr("Upravit záložku");
 
         string? action = isProtected
-            ? await DialogService.ShowActionSheetAsync(TranslateCategoryName(bookmark.Name), Tr("Zrušit"), null, Tr("Upravit recepty ve složce"), pinLabel)
-            : await DialogService.ShowActionSheetAsync(TranslateCategoryName(bookmark.Name), Tr("Zrušit"), null, Tr("Upravit recepty ve složce"), pinLabel, Tr("Smazat záložku"));
+            ? await DialogService.ShowActionSheetAsync(TranslateCategoryName(bookmark.Name), Tr("Zrušit"), null, Tr("Upravit recepty ve složce"), editBookmarkLabel, pinLabel)
+            : await DialogService.ShowActionSheetAsync(TranslateCategoryName(bookmark.Name), Tr("Zrušit"), null, Tr("Upravit recepty ve složce"), editBookmarkLabel, pinLabel, Tr("Smazat záložku"));
 
         if (action == Tr("Upravit recepty ve složce"))
         {
             await OpenEditRecipesOverlayAsync(bookmark.Name);
+        }
+        else if (action == editBookmarkLabel)
+        {
+            OpenEditBookmark(bookmark.Name);
         }
         else if (action == pinLabel)
         {
@@ -230,6 +235,12 @@
                 await LoadBookmarksAsync();
             }
         }
+    }
+
+    private void OpenEditBookmark(string categoryName)
+    {
+        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+        nav?.PushAsync(new CreateBookmarkPage(categoryName));
     }
 
     private async Task OnPageOptionsClicked()

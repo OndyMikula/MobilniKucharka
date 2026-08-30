@@ -633,6 +633,9 @@ html, body {
     justify-content: center;
     font-size: 40px;
     z-index: 1;
+    /* Necháváme prostor nad title-barem, který je teď position: absolute (viz níže) a tedy
+       mimo flex tok - bez tohohle by se velká ikona vizuálně překrývala se jménem záložky dole. */
+    padding-bottom: 34px;
 }
 
 .bookmark-pin-badge {
@@ -670,7 +673,15 @@ html, body {
 }
 
 .bookmark-card-title-bar {
-    position: relative;
+    /* Dřív obyčejný flex item - u záložek s vlastním obrázkem (.bookmark-card-bg-img je
+       position: absolute, tedy MIMO flex tok) tak zůstal jediným flex itemem v kontejneru,
+       a justify-content: space-between ho posadilo nahoru misto dolů. Ukotvením na position:
+       absolute; bottom: 0 se chová stejně bez ohledu na to, jestli je pod ním obrázek nebo
+       ikona - jméno je teď vždy dole, pro obě varianty záložek. */
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 1;
     background: rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(2px);
