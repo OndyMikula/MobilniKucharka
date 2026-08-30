@@ -2,6 +2,7 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 
 <div class="page-shell">
     <main class="page-content">
@@ -18,6 +19,40 @@
     {
         UpdateActiveTabFromUri(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+
+        // SystemInsets (viz Classes/Navigation/SystemInsets.cs) se aktualizuje z nativní strany
+        // (MainActivity na Androidu) při každé změně inzetu systémové navigační lišty. Reagujeme
+        // přepočtením CSS proměnné --system-nav-inset (viz app.css, .nav-bar-inset-spacer), takže
+        // appčin vlastní spodní nav bar vždy sahá přesně k hornímu okraji systémové lišty.
+        SystemInsets.BottomChanged += OnSystemInsetChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // První nastavení hned po načtení WebView - kdyby MainActivity nahlásila inzet ještě
+            // předtím, než tahle komponenta vůbec existovala (běžný běh při startu appky).
+            await ApplySystemInsetAsync();
+        }
+    }
+
+    private async void OnSystemInsetChanged()
+    {
+        await InvokeAsync(ApplySystemInsetAsync);
+    }
+
+    private async Task ApplySystemInsetAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("setSystemNavInset", SystemInsets.BottomDp);
+        }
+        catch
+        {
+            // WebView nemusí být hned po prvním renderu plně připravený na JS interop - další
+            // skutečná změna inzetu (OnSystemInsetChanged) se stejně pokusí znovu.
+        }
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
@@ -58,5 +93,6 @@
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
+        SystemInsets.BottomChanged -= OnSystemInsetChanged;
     }
 }

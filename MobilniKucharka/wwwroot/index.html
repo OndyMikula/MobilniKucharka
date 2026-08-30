@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿﻿
+<!DOCTYPE html>
 <html lang="cs">
 <head>
     <meta charset="utf-8" />
@@ -16,6 +17,15 @@
         <a class="dismiss">🗙</a>
     </div>
 
+    <script>
+        // Jediná JS funkce v appce - nastaví CSS proměnnou --system-nav-inset na kořenovém
+        // elementu, kterou app.css čte v .nav-bar-inset-spacer. Volá se z MainLayout.razor
+        // (C#/Blazor strana) přes IJSRuntime, hodnota (px) přichází z nativní vrstvy - viz
+        // SystemInsets.cs a Platforms/Android/MainActivity.cs.
+        window.setSystemNavInset = function (px) {
+            document.documentElement.style.setProperty('--system-nav-inset', px + 'px');
+        };
+    </script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
 </body>
 </html>

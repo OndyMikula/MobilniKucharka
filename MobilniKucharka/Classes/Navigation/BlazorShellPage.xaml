@@ -13,7 +13,21 @@
                 <RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
             </BlazorWebView.RootComponents>
         </BlazorWebView>
+        <?xml version="1.0" encoding="utf-8" ?>
+        <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:components="clr-namespace:MobilniKucharka.Components"
+             x:Class="MobilniKucharka.Classes.Navigation.BlazorShellPage"
+             Shell.NavBarIsVisible="False"
+             NavigationPage.HasNavigationBar="False">
 
+            <BlazorWebView x:Name="BlazorWebViewControl" HostPage="wwwroot/index.html">
+                <BlazorWebView.RootComponents>
+                    <RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
+                </BlazorWebView.RootComponents>
+            </BlazorWebView>
+
+        </ContentPage>
         <!-- Vyplní přesně tolik prostoru, kolik zabírá systémová navigační lišta (viz
              MainActivity.SystemBottomInsetChanged), stejnou barvou jako appčin vlastní spodní
              nav bar (BottomNavBar.razor / -color-nav-bg v app.css) - appka tak nikdy neleží pod

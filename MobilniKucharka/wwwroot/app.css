@@ -108,14 +108,27 @@ html, body {
 
 /* Bottom Navigation Bar */
 .nav-bar {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--color-nav-bg);
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.nav-bar-content {
     position: relative;
     display: flex;
     align-items: stretch;
     height: 68px;
     padding: 8px 8px 10px 8px;
-    background-color: var(--color-nav-bg);
+}
+
+.nav-bar-inset-spacer {
+    /* Nastavuje MainLayout.razor za běhu přes window.setSystemNavInset() (viz index.html), podle
+       skutečné výšky systémové navigační lišty nahlášené z nativní vrstvy (SystemInsets.cs,
+       MainActivity.cs). 0px na zařízeních/OS verzích, kde k překryvu vůbec nedochází. */
+    height: var(--system-nav-inset, 0px);
     flex-shrink: 0;
-    z-index: 10;
 }
 
 .nav-pill {
