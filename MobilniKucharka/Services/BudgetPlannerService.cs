@@ -639,14 +639,19 @@ namespace MobilniKucharka.Services
             }
         }
 
-        public async Task InsertNewCategoryAsync(string category, string imagePath)
+        // Výchozí čtyři záložky - jejich Name je použitý jako doslovný srovnávací klíč napříč kódem
+        // (AddRecipeToCategoryAsync, GetRecipesByCategoryAsync, BookmarksPage.razor.TranslateCategoryName...),
+        // takže se nikdy nesmí přejmenovat. Obrázek/popis u nich ale klidně editovatelné jsou.
+        private static readonly string[] ProtectedBookmarkNames = ["Oblíbené", "Vytvořené recepty", "Vyhledané recepty", "Koncepty"];
+
+        public async Task InsertNewCategoryAsync(string category, string imagePath, string description = "")
         {
             await EnsureInitializedAsync();
 
             var existing = await _db.Table<Bookmark>().Where(b => b.Name == category).FirstOrDefaultAsync();
             if (existing != null) return;
 
-            var bookmark = new Bookmark { Name = category };
+            var bookmark = new Bookmark { Name = category, Description = description?.Trim() ?? string.Empty };
 
             if (!string.IsNullOrWhiteSpace(imagePath) && File.Exists(imagePath))
                 bookmark.BackgroundImage = imagePath;
@@ -654,6 +659,62 @@ namespace MobilniKucharka.Services
                 bookmark.BackgroundColor = "#2196F3";
 
             await _db.InsertAsync(bookmark);
+        }
+
+        public async Task<Bookmark?> GetBookmarkByNameAsync(string categoryName)
+        {
+            await EnsureInitializedAsync();
+            return await _db.Table<Bookmark>().Where(b => b.Name == categoryName).FirstOrDefaultAsync();
+        }
+
+        // Upraví existující záložku - obrázek, popis, a (jen u nechráněných záložek) i název.
+        // removeImage: true vrátí záložku na výchozí jednobarevné pozadí - hlavně pro obnovu záložek
+        // zasažených starým bugem, kdy uživatelem vybraný obrázek zmizel po aktualizaci appky (viz
+        // CreateBookmarkPage.OnPickImageClicked, který teď kopíruje soubor do AppDataDirectory natrvalo).
+        // Přejmenování u výchozích čtyř záložek je zakázané (viz ProtectedBookmarkNames); pokud se název
+        // u nechráněné záložky změní, přepíšou se i všechny navázané RecipeBookmark záznamy, aby recepty
+        // v ní zůstaly zachované pod novým názvem. Kolize s existujícím názvem přejmenování potichu zruší,
+        // ať se dvě různé záložky nesloučí pod jeden název.
+        public async Task UpdateBookmarkAsync(string originalName, string newName, string? imagePath, bool removeImage, string description)
+        {
+            await EnsureInitializedAsync();
+
+            var bookmark = await _db.Table<Bookmark>().Where(b => b.Name == originalName).FirstOrDefaultAsync();
+            if (bookmark == null) return;
+
+            bool isProtected = ProtectedBookmarkNames.Contains(originalName);
+            string trimmedNewName = newName.Trim();
+
+            if (!isProtected && !string.IsNullOrWhiteSpace(trimmedNewName) && trimmedNewName != originalName)
+            {
+                var nameCollision = await _db.Table<Bookmark>().Where(b => b.Name == trimmedNewName).FirstOrDefaultAsync();
+                if (nameCollision == null)
+                {
+                    bookmark.Name = trimmedNewName;
+
+                    var links = await _db.Table<RecipeBookmark>().Where(rb => rb.CategoryName == originalName).ToListAsync();
+                    foreach (var link in links)
+                    {
+                        link.CategoryName = trimmedNewName;
+                        await _db.UpdateAsync(link);
+                    }
+                }
+            }
+
+            if (removeImage)
+            {
+                bookmark.BackgroundImage = string.Empty;
+                bookmark.BackgroundColor = "#2196F3";
+            }
+            else if (!string.IsNullOrWhiteSpace(imagePath) && File.Exists(imagePath))
+            {
+                bookmark.BackgroundImage = imagePath;
+            }
+
+            bookmark.Description = description?.Trim() ?? string.Empty;
+            bookmark.LastEditedUtc = DateTime.UtcNow;
+
+            await _db.UpdateAsync(bookmark);
         }
 
         public async Task DeleteBookmarkAsync(string categoryName)

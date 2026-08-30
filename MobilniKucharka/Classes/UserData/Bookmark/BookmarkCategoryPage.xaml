@@ -10,8 +10,18 @@
         <loc:TrTemplateConverter x:Key="TrTemplateConverter" />
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="*">
-        <CollectionView x:Name="RecipesCollectionView" Grid.Row="0">
+    <Grid RowDefinitions="Auto, *">
+
+        <!-- HLAVIČKA ZÁLOŽKY: název + volitelný popis (Bookmark.Description) - zobrazeno navíc
+             k nav-bar Title, protože Title samotný nemá prostor pro víceřádkový popis. -->
+        <VerticalStackLayout Grid.Row="0" Padding="20,15,20,10" Spacing="4">
+            <Label x:Name="CategoryNameLabel" FontSize="22" FontAttributes="Bold"
+                   TextColor="{AppThemeBinding Light=#111111, Dark=#FFFFFF}" />
+            <Label x:Name="CategoryDescriptionLabel" FontSize="13" IsVisible="False"
+                   TextColor="{AppThemeBinding Light=#666666, Dark=#AAAAAA}" />
+        </VerticalStackLayout>
+
+        <CollectionView Grid.Row="1" x:Name="RecipesCollectionView">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="services:RecipeWithCost">
                     <Border Margin="15,5,15,10" Padding="0" StrokeShape="RoundRectangle 12" Stroke="LightGray" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
