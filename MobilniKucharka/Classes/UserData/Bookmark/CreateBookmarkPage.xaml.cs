@@ -17,8 +17,20 @@ public partial class CreateBookmarkPage : ContentPage
             var result = results.FirstOrDefault();
             if (result != null)
             {
-                _selectedImagePath = result.FullPath;
-                BookmarkImagePreview.Source = ImageSource.FromFile(_selectedImagePath);
+                // Stejný vzor jako CreateRecipePage.OnSelectImageLocal - MediaPicker vrací FullPath
+                // do dočasného umístění (obvykle FileSystem.CacheDirectory), které nepřežije
+                // aktualizaci appky ani běžné mazání cache systémem. Musíme soubor zkopírovat do
+                // trvalého FileSystem.AppDataDirectory, jinak po update obrázek zmizí a zobrazí se
+                // výchozí modrá barva (BackgroundColor) misto něj.
+                string localFileName = $"{Guid.NewGuid()}_{result.FileName}";
+                string localFilePath = Path.Combine(FileSystem.AppDataDirectory, localFileName);
+
+                using Stream sourceStream = await result.OpenReadAsync();
+                using FileStream localFileStream = File.OpenWrite(localFilePath);
+                await sourceStream.CopyToAsync(localFileStream);
+
+                _selectedImagePath = localFilePath;
+                BookmarkImagePreview.Source = ImageSource.FromFile(localFilePath);
 
                 BookmarkImagePreview.IsVisible = true;
                 DefaultStateLayout.IsVisible = false;
