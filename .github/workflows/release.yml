@@ -66,7 +66,7 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Install MAUI Android workload
         if: steps.check.outputs.exists == 'false'
@@ -115,7 +115,7 @@ jobs:
         shell: pwsh
         run: |
           $apkFile = Get-ChildItem -Path "MobilniKucharka/bin/Release/net10.0-android" -Filter "*Signed.apk" -Recurse | Select-Object -First 1
-          $newName = "MobilniKucharka-v${{ steps.version.outputs.safe_tag }}.apk"
+          $newName = "MobilniKucharka-v${{ steps.version.outputs.version }}.apk"
           $newPath = Join-Path $apkFile.DirectoryName $newName
           Copy-Item $apkFile.FullName $newPath -Force
           Write-Host "Přejmenováno na: $newPath"
