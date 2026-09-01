@@ -26,8 +26,8 @@
 		<ApplicationId>com.ondymikula.mobilnikucharka</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.5.9.3</ApplicationDisplayVersion> <!-- Co vidí user (1.5.9.3), "- beta" pro oznaceni beta verze -->
-		<ApplicationVersion>13</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(13) -->
+		<ApplicationDisplayVersion>1.6</ApplicationDisplayVersion> <!-- Co vidí user (1.6), "- beta" pro oznaceni beta verze -->
+		<ApplicationVersion>14</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(14) -->
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
 
@@ -86,22 +86,7 @@
 	  <MauiXaml Update="Classes\Legal\LicensePage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
-	  <MauiXaml Update="Classes\Navigation\BlazorNavBarTestPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Classes\Navigation\BottomNavBar.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Classes\Recipe\CreateRecipePage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Classes\Recipe\SearchPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
 	  <MauiXaml Update="Classes\UserData\Bookmark\BookmarkCategoryPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Classes\UserData\Bookmark\BookmarksPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	  <MauiXaml Update="Classes\UserData\Bookmark\CreateBookmarkPage.xaml">
@@ -114,9 +99,6 @@
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	  <MauiXaml Update="Classes\Navigation\BlazorShellPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Classes\Recipe\RecipeDetailPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	</ItemGroup>

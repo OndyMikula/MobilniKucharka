@@ -55,18 +55,7 @@
         }
         else
         {
-            var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-            if (nav != null)
-            {
-                if (Item.Recipe.IsDraft)
-                {
-                    await nav.PushAsync(new Classes.Recipe.CreateRecipePage(Item.Recipe.Id));
-                }
-                else
-                {
-                    await nav.PushAsync(new Classes.Recipe.RecipeDetailPage(Item));
-                }
-            }
+            NavigationManager.NavigateTo(Item.Recipe.IsDraft ? $"/recipe/{Item.Recipe.Id}/edit" : $"/recipe/{Item.Recipe.Id}");
         }
     }
 }

@@ -18,12 +18,14 @@
     </div>
 
     <script>
-        // Jediná JS funkce v appce - nastaví CSS proměnnou --system-nav-inset na kořenovém
-        // elementu, kterou app.css čte v .nav-bar-inset-spacer. Volá se z MainLayout.razor
-        // (C#/Blazor strana) přes IJSRuntime, hodnota (px) přichází z nativní vrstvy - viz
-        // SystemInsets.cs a Platforms/Android/MainActivity.cs.
         window.setSystemNavInset = function (px) {
             document.documentElement.style.setProperty('--system-nav-inset', px + 'px');
+        };
+
+        // Volané z RecipeDetailPage.razor - vrátí uživatele o jeden krok zpět ve vlastní historii
+        // Blazor Routeru (běžný browser history.back()), ne v nativním MAUI zásobníku stránek.
+        window.mkNavigateBack = function () {
+            history.back();
         };
     </script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>

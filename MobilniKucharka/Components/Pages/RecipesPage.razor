@@ -3,6 +3,7 @@
 @namespace MobilniKucharka.Components.Pages
 @implements IDisposable
 @inject IDialogService DialogService
+@inject NavigationManager NavigationManager
 
 <div class="hub-page">
     <!-- Header -->
@@ -193,18 +194,7 @@
                 }
             }
 
-            var recipeWithCost = new RecipeWithCost
-            {
-                Recipe = savedRecipe,
-                CalculatedCost = 0,
-                IsWithinBudget = true
-            };
-
-            var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-            if (nav != null)
-            {
-                await nav.PushAsync(new Classes.Recipe.RecipeDetailPage(recipeWithCost));
-            }
+            NavigationManager.NavigateTo($"/recipe/{savedRecipe.Id}");
         }
         finally
         {
@@ -234,8 +224,7 @@
 
     private void OpenCreateRecipe()
     {
-        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-        nav?.PushAsync(new Classes.Recipe.CreateRecipePage());
+        NavigationManager.NavigateTo("/recipe/create");
     }
 
     private async Task OnResetDatabaseClicked()

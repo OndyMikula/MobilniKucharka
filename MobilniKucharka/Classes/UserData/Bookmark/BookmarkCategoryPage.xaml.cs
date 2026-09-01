@@ -92,14 +92,12 @@ public partial class BookmarkCategoryPage : ContentPage
     {
         if (e.Parameter is RecipeWithCost selectedRecipe)
         {
-            if (selectedRecipe.Recipe.IsDraft)
-            {
-                await Navigation.PushAsync(new CreateRecipePage(selectedRecipe.Recipe.Id));
-            }
-            else
-            {
-                await Navigation.PushAsync(new RecipeDetailPage(selectedRecipe));
-            }
+            string route = selectedRecipe.Recipe.IsDraft
+                ? $"/recipe/{selectedRecipe.Recipe.Id}/edit"
+                : $"/recipe/{selectedRecipe.Recipe.Id}";
+
+            App.PendingRecipeRoute = route;
+            await Navigation.PopToRootAsync();
         }
     }
 }

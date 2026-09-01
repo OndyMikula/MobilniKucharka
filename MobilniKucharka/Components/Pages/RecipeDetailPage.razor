@@ -1,0 +1,774 @@
+﻿@page "/recipe/{Id:int}"
+@namespace MobilniKucharka.Components.Pages
+@implements IDisposable
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@using System.Text.RegularExpressions
+
+<div class="recipe-detail-page">
+    @if (_isLoading)
+    {
+        <div class="skeleton-card" style="height: 250px; border-radius: 0;"></div>
+        <div class="hub-page">
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+        </div>
+    }
+    else if (_recipe == null)
+    {
+        <div class="empty-state">
+            <span class="empty-icon">🍲</span>
+            <p>@Tr("Tento recept se nepodařilo najít.")</p>
+        </div>
+    }
+    else
+    {
+        <div class="recipe-detail-hero">
+            @if (!string.IsNullOrWhiteSpace(_recipe.ImageUrl))
+            {
+                <img src="@ImageHelper.ResolveImageSrc(_recipe.ImageUrl)" alt="@_recipe.Name" class="recipe-detail-hero-img" />
+            }
+            else
+            {
+                <div class="recipe-detail-hero-placeholder">🍲</div>
+            }
+
+            <div class="recipe-detail-hero-gradient"></div>
+
+            <button type="button" class="hero-circle-btn back" @onclick="OnBackClickedAsync">←</button>
+            <button type="button" class="hero-circle-btn favorite @(_isFavorite ? "favorited" : "")" @onclick="OnFavoriteToggledAsync">
+                @(_isFavorite ? "♥" : "♡")
+            </button>
+            <button type="button" class="hero-circle-btn options" @onclick="OnOptionsMenuClickedAsync">⋮</button>
+
+            <div class="recipe-detail-hero-info">
+                <h1 class="recipe-detail-title">@_recipe.Name</h1>
+                <div class="recipe-detail-meta-row">
+                    <div class="recipe-detail-meta-left">
+                        <!-- EmptyColor="#FFFFFF" - hero je vždy tmavý (fotka + gradient) bez ohledu na
+                             světlý/tmavý motiv appky, výchozí var(--color-border) by tam u nehodnoceného
+                             receptu (0.0) splývala s pozadím - viz StarRating.razor. -->
+                        <StarRating Rating="_recipe.Rating" SizePx="18" EmptyColor="#FFFFFF" />
+                        <span class="recipe-detail-rating-number">@_recipe.Rating.ToString("F1")</span>
+                        @if (_recipe.HasPrepTime)
+                        {
+                            <span>⏱ @_recipe.PrepTime min</span>
+                        }
+                    </div>
+                    @if (_recipe.IsSearchTemp)
+                    {
+                        <button type="button" class="btn-import-inline" @onclick="OnImportClickedAsync">@Tr("Importovat")</button>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="recipe-detail-body">
+
+            <!-- NUTRICNI HODNOTY -->
+            <div class="detail-section">
+                <div class="nutrition-grid">
+                    <div class="nutrition-card" style="background-color: var(--color-primary-bg);">
+                        <span class="nutrition-card-label" style="color: #1565C0;">@Tr("Bílkoviny")</span>
+                        <span class="nutrition-card-value" style="color: #1565C0;">@FormatNutritionPerServing(_recipe.Protein, Math.Max(_recipe.ServingSize, 1))</span>
+                    </div>
+                    <div class="nutrition-card" style="background-color: var(--color-warning-bg);">
+                        <span class="nutrition-card-label" style="color: #EF6C00;">@Tr("Sacharidy")</span>
+                        <span class="nutrition-card-value" style="color: #EF6C00;">@FormatNutritionPerServing(_recipe.Carbs, Math.Max(_recipe.ServingSize, 1))</span>
+                    </div>
+                    <div class="nutrition-card" style="background-color: var(--color-success-bg);">
+                        <span class="nutrition-card-label" style="color: #2E7D32;">@Tr("Tuky")</span>
+                        <span class="nutrition-card-value" style="color: #2E7D32;">@FormatNutritionPerServing(_recipe.Fat, Math.Max(_recipe.ServingSize, 1))</span>
+                    </div>
+                    <div class="nutrition-card" style="background-color: var(--color-danger-bg);">
+                        <span class="nutrition-card-label" style="color: #C62828;">@Tr("Cukry")</span>
+                        <span class="nutrition-card-value" style="color: #C62828;">@FormatNutritionPerServing(_recipe.Sugar, Math.Max(_recipe.ServingSize, 1))</span>
+                    </div>
+                </div>
+                @if (_recipe.IsNutritionEstimated)
+                {
+                    <div class="nutrition-estimate-label">@Tr("Odhad")</div>
+                }
+            </div>
+
+            <!-- POPIS -->
+            @if (!string.IsNullOrWhiteSpace(_recipe.DescriptionText))
+            {
+                <div class="detail-section">
+                    <div class="detail-section-header">
+                        <span>📝</span>
+                        <h2 class="detail-section-title">@Tr("Popis receptu")</h2>
+                    </div>
+                    <p style="white-space: pre-wrap; margin: 0;">@_recipe.DescriptionText</p>
+                </div>
+            }
+
+            <!-- INGREDIENCE -->
+            <div class="detail-section">
+                <div class="detail-section-header">
+                    <span>🛒</span>
+                    <h2 class="detail-section-title">@Tr("Ingredience")</h2>
+                    <button type="button" class="detail-section-badge" @onclick="OnPeopleCountBadgeTappedAsync">@_peopleCountBadgeText</button>
+                    <span class="detail-section-spacer"></span>
+                    <button type="button" class="detail-section-icon-btn" @onclick="OnCopyIngredientsClickedAsync">📋</button>
+                </div>
+
+                <div class="detail-card">
+                    @foreach (var ingredient in _ingredients)
+                    {
+                        <div class="ingredient-row" @onclick="() => OnIngredientTappedAsync(ingredient)">
+                            <span class="ingredient-name">@ingredient.Name</span>
+                            <span class="ingredient-amount">@ingredient.AmountText</span>
+                            <span class="ingredient-cost">@ingredient.CostText</span>
+                        </div>
+                    }
+                </div>
+                <div class="price-source-note">@Tr("Průměrné ceny (ČSÚ) — klepnutím na surovinu můžeš zadat vlastní cenu")</div>
+                <div class="total-price-label">@_totalPriceText</div>
+            </div>
+
+            <!-- POTREBNE POMUCKY -->
+            @if (_recipe.Equipment.Count > 0)
+            {
+                <div class="detail-section">
+                    <div class="detail-section-header">
+                        <span>🧰</span>
+                        <h2 class="detail-section-title">@Tr("Potřebné pomůcky")</h2>
+                    </div>
+                    <div class="equipment-chips-row">
+                        @foreach (var tag in _recipe.Equipment)
+                        {
+                            <span class="equipment-chip">@tag</span>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- POSTUP -->
+            <div class="detail-section">
+                <div class="detail-section-header">
+                    <span>🍳</span>
+                    <h2 class="detail-section-title">@Tr("Postup přípravy")</h2>
+                    <span class="detail-section-spacer"></span>
+                    <button type="button" class="detail-section-icon-btn" @onclick="OnCopyStepsClickedAsync">📋</button>
+                </div>
+
+                <div class="detail-card">
+                    @foreach (var step in _steps)
+                    {
+                        <div class="step-row">
+                            <span>👉</span>
+                            <span class="step-text">@step.StepText</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- ZDROJ -->
+            @if (!string.IsNullOrWhiteSpace(_recipe.SourceUrl))
+            {
+                <button type="button" class="recipe-source-link" @onclick="OnSourceLinkClickedAsync">🔗 @Tr("Zobrazit původní recept")</button>
+            }
+            else if (string.IsNullOrWhiteSpace(_recipe.ExternalSourceId))
+            {
+                <p class="recipe-source-link" style="text-decoration: none; cursor: default;">@Tr("Recept vytvořen uživatelem")</p>
+            }
+
+            <!-- HODNOCENI -->
+            <div class="recipe-detail-rating-section">
+                <span class="recipe-detail-rating-title">@Tr("Tvoje hodnocení receptu")</span>
+                <StarRating Rating="_recipe.Rating" Interactive="true" SizePx="32" RatingChanged="OnUserRatingChangedAsync" />
+
+                <!-- Posuvník jako druhý způsob hodnocení vedle klepání na hvězdy - step 0.5 zachovává
+                     stejnou přesnost na půl hvězdy. @oninput mění _recipe.Rating hned (živý posun
+                     hvězd při tažení), skutečný zápis do DB (OnUserRatingChangedAsync, sdílené s
+                     klepáním na hvězdy výše) proběhne až @onchange (puštění posuvníku) - ať appka
+                     nezapisuje do SQLite při každém pixelu tažení. Hodnota vždy s InvariantCulture -
+                     HTML range input vždy očekává/vrací desetinnou tečku bez ohledu na jazyk appky,
+                     zatímco SettingsPage.OnLanguageChanged umí nastavit CurrentCulture na "cs", kde
+                     by běžný ToString()/Parse použil čárku a rozbil hodnotu. -->
+                <input type="range" class="rating-slider" min="0" max="5" step="0.5"
+                       value="@_recipe.Rating.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                       @oninput="OnRatingSliderInput"
+                       @onchange="OnRatingSliderChangeAsync" />
+            </div>
+        </div>
+    }
+</div>
+
+<!-- OVERLAY: PRIDAT DO ZALOZKY -->
+@if (_showBookmarkOverlay)
+{
+    <div class="modal-overlay" @onclick="CloseBookmarkOverlayAsync">
+        <div class="modal-card modal-large" @onclick:stopPropagation="true">
+            <h2 class="modal-title">@Tr("Přidat do záložky")</h2>
+            <div class="modal-content-scroll">
+                @foreach (var item in _bookmarkSelection)
+                {
+                    <label class="modal-checkbox-row">
+                        <input type="checkbox" checked="@item.IsRecipeInCategory" @onchange="(e) => OnBookmarkCheckedChangeAsync(item, e)" />
+                        <span class="modal-checkbox-label">@item.CategoryName</span>
+                    </label>
+                }
+            </div>
+            <button type="button" class="btn-action btn-primary modal-action-btn" @onclick="CloseBookmarkOverlayAsync">@Tr("Hotovo")</button>
+        </div>
+    </div>
+}
+
+<!-- OVERLAY: SMAZAT RECEPT -->
+@if (_showDeleteOverlay)
+{
+    <div class="modal-overlay" @onclick="OnCancelDeleteClicked">
+        <div class="modal-card" @onclick:stopPropagation="true">
+            <h2 class="modal-title">@Tr("Smazat recept?")</h2>
+            <p style="text-align:center; color: var(--color-text-muted); margin: 0;">@Tr("Tato akce je nevratná.")</p>
+            <div style="display:flex; gap:10px;">
+                <button type="button" class="btn-action" style="background-color:#9E9E9E; flex:1;" @onclick="OnCancelDeleteClicked">@Tr("Zrušit")</button>
+                <button type="button" class="btn-action" style="background-color:var(--color-danger); flex:1;" @onclick="OnConfirmDeleteClickedAsync">@Tr("Smazat")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Recipe? _recipe;
+    private bool _isLoading = true;
+    private bool _hasPromotedFromTemp = false;
+    private int _displayPeopleCount = Preferences.Default.Get("PeopleCount", 2);
+    private bool _isFavorite;
+    private List<DisplayIngredient> _ingredients = [];
+    private List<DisplayStep> _steps = [];
+    private string _totalPriceText = string.Empty;
+    private string _peopleCountBadgeText = string.Empty;
+    private bool _showBookmarkOverlay;
+    private List<BookmarkSelectionModel> _bookmarkSelection = [];
+    private bool _showDeleteOverlay;
+    private bool _isDeveloperMode;
+
+    private static readonly Regex AmountScaleNumberRegex = new(@"^(\d+(?:[.,]\d+)?)", RegexOptions.Compiled);
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    protected override void OnInitialized()
+    {
+        _isDeveloperMode = Preferences.Default.Get("IsDeveloperMode", false);
+        Classes.Navigation.BlazorShellPage.ShellAppeared += OnShellAppeared;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_recipe != null && _recipe.Id == Id) return;
+
+        _hasPromotedFromTemp = false;
+        _isLoading = true;
+        await LoadRecipeDataAsync();
+        _isLoading = false;
+    }
+
+    private async void OnShellAppeared()
+    {
+        if (_recipe == null) return;
+
+        await InvokeAsync(async () =>
+        {
+            await LoadRecipeDataAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadRecipeDataAsync()
+    {
+        var updated = await App.Database.EnsureRecipeLanguageAsync(Id);
+        if (updated == null) return;
+
+        _recipe = updated;
+        await InitializeFavoriteStateAsync();
+        await LoadIngredientsAndStepsAsync();
+    }
+
+    private async Task PromoteFromSearchTempAsync()
+    {
+        if (_recipe == null || _hasPromotedFromTemp || !_recipe.IsSearchTemp) return;
+
+        await App.Database.MarkRecipeSearchTempAsync(_recipe.Id, isTemp: false);
+        _recipe.IsSearchTemp = false;
+        _hasPromotedFromTemp = true;
+    }
+
+    private static string FormatNutritionPerServing(double total, int servings) =>
+        $"{Math.Round(total / Math.Max(servings, 1), 1):0.#}g";
+
+    private async Task InitializeFavoriteStateAsync()
+    {
+        if (_recipe == null) return;
+        var categories = await App.Database.GetCategoriesForRecipeAsync(_recipe.Id);
+        _isFavorite = categories.Contains("Oblíbené");
+    }
+
+    private async Task LoadIngredientsAndStepsAsync()
+    {
+        if (_recipe == null) return;
+
+        var recipe = _recipe;
+        int peopleCount = _displayPeopleCount;
+
+        var ingredients = await App.Database.GetIngredientsForRecipeAsync(recipe.Id, peopleCount);
+
+        int effectiveServingSize = recipe.ServingSize > 0 ? recipe.ServingSize : 0;
+        double scaleFactor = effectiveServingSize > 0 ? peopleCount / (double)effectiveServingSize : 1.0;
+
+        if (ingredients.Count == 0 && !string.IsNullOrWhiteSpace(recipe.IngredientsRaw))
+        {
+            var rawLines = recipe.IngredientsRaw.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            ingredients = [];
+
+            foreach (var line in rawLines)
+            {
+                var parts = line.Split('|');
+                string name = parts.ElementAtOrDefault(0)?.Trim() ?? "";
+                string amount = parts.ElementAtOrDefault(1)?.Trim() ?? "";
+
+                if (string.IsNullOrWhiteSpace(name)) continue;
+
+                string detectedUnit = NutritionEstimationService.DetectUnitFamily(amount);
+                var product = await App.Database.GetOrCreateLocalProductByNameAsync(name, detectedUnit);
+                double pieceWeight = product.TypicalUnitWeightGrams > 0 ? product.TypicalUnitWeightGrams : 60;
+                double? parsedAmount = NutritionEstimationService.ConvertToProductUnit(amount, product.Unit, pieceWeight);
+                double? scaledAmount = parsedAmount != null ? parsedAmount.Value * scaleFactor : null;
+
+                string costText;
+                double costValue = 0;
+                if (scaledAmount == null)
+                {
+                    costText = "";
+                }
+                else
+                {
+                    costValue = Math.Round(scaledAmount.Value * product.EffectivePrice, 0);
+                    costText = costValue > 0 ? $"{costValue:N0} Kč" : "? Kč";
+                }
+
+                string displayAmount = amount;
+                if (!string.IsNullOrWhiteSpace(amount) && scaleFactor != 1.0)
+                {
+                    var numMatch = AmountScaleNumberRegex.Match(amount);
+                    if (numMatch.Success)
+                    {
+                        double originalNum = double.Parse(numMatch.Value.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture);
+                        double scaledNum = originalNum * scaleFactor;
+                        string restOfText = amount[numMatch.Length..];
+                        displayAmount = $"{scaledNum:0.#}{restOfText}";
+                    }
+                }
+
+                ingredients.Add(new DisplayIngredient
+                {
+                    ProductId = product.Id,
+                    RawAmount = scaledAmount ?? 0,
+                    CostValue = costValue,
+                    Name = name,
+                    AmountText = displayAmount,
+                    CostText = costText
+                });
+            }
+        }
+
+        _ingredients = ingredients;
+
+        string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
+        var rawSteps = currentLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
+        _steps = rawSteps.Select((stepText, index) => new DisplayStep { StepNumber = index + 1, StepText = stepText }).ToList();
+
+        var (totalCost, allPriced) = await App.Database.GetRecipeCostDetailsAsync(recipe.Id, peopleCount);
+        _totalPriceText = allPriced && totalCost > 0
+            ? string.Format(Tr("Celkem za jídlo: {0:N0} Kč"), totalCost)
+            : Tr("Cena nákupu není k dispozici");
+
+        _peopleCountBadgeText = effectiveServingSize > 0
+            ? $"({UiTranslator.TrPeopleCount(_displayPeopleCount)}) ✏️"
+            : $"✏️ {Tr("Nastavit počet porcí")}";
+    }
+
+    private async Task OnIngredientTappedAsync(DisplayIngredient ingredient)
+    {
+        if (ingredient.ProductId <= 0)
+        {
+            await DialogService.ShowAlertAsync("Chyba", "Tuto surovinu se nepodařilo přiřadit k produktu. Zkus recept znovu otevřít.", "OK");
+            return;
+        }
+
+        string? action = await DialogService.ShowActionSheetAsync(ingredient.Name, "Zrušit", null,
+            "Zadat vlastní cenu", "Propojit s existující surovinou", "Změnit jednotku");
+
+        if (string.IsNullOrEmpty(action) || action == "Zrušit") return;
+
+        await PromoteFromSearchTempAsync();
+
+        if (action == "Zadat vlastní cenu")
+        {
+            if (ingredient.RawAmount <= 0)
+            {
+                string? manualResult = await DialogService.ShowPromptAsync(
+                    "Vlastní cena suroviny",
+                    $"Množství pro \"{ingredient.Name}\" nejde rozeznat, zadej rovnou cenu za jednotku (Kč), nebo nech prázdné pro průměrnou cenu.",
+                    "Uložit", "Zrušit", keyboard: Keyboard.Numeric);
+
+                if (manualResult == null) return;
+
+                if (string.IsNullOrWhiteSpace(manualResult))
+                    await App.Database.ClearManualPriceAsync(ingredient.ProductId);
+                else if (double.TryParse(manualResult.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture, out var unitPrice))
+                    await App.Database.SetManualPriceAsync(ingredient.ProductId, unitPrice);
+
+                await LoadIngredientsAndStepsAsync();
+                return;
+            }
+
+            string? result = await DialogService.ShowPromptAsync(
+                "Vlastní cena suroviny",
+                $"Kolik jsi celkem zaplatil/a za {ingredient.AmountText} suroviny \"{ingredient.Name}\"? (Kč)\nCena se přepočítá na jednotku a použije se i v ostatních receptech s jiným množstvím.",
+                "Uložit", "Zrušit", keyboard: Keyboard.Numeric);
+
+            if (result == null) return;
+
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                await App.Database.ClearManualPriceAsync(ingredient.ProductId);
+            }
+            else if (double.TryParse(result.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture, out var totalPrice))
+            {
+                double pricePerUnit = totalPrice / ingredient.RawAmount;
+                await App.Database.SetManualPriceAsync(ingredient.ProductId, pricePerUnit);
+            }
+            else
+            {
+                await DialogService.ShowAlertAsync("Neplatná hodnota", $"\"{result}\" se nepodařilo rozpoznat jako číslo. Zkus to znovu, jen s číslicemi (např. 25 nebo 25.50).", "OK");
+                return;
+            }
+
+            await LoadIngredientsAndStepsAsync();
+        }
+        else if (action == "Propojit s existující surovinou")
+        {
+            var allProducts = await App.Database.GetAllLocalProductsAsync();
+            string[] names = [.. allProducts.Select(p => p.Name_CS)];
+
+            string? chosen = await DialogService.ShowActionSheetAsync("Propojit s...", "Zrušit", null, names);
+            var match = allProducts.FirstOrDefault(p => p.Name_CS == chosen);
+
+            if (match != null)
+            {
+                await App.Database.LinkIngredientNameToProductAsync(ingredient.Name, match.Id);
+                await LoadIngredientsAndStepsAsync();
+            }
+        }
+        else if (action == "Změnit jednotku")
+        {
+            string[] unitOptions = ["g", "ml", "ks"];
+            string? chosenUnit = await DialogService.ShowActionSheetAsync("Vyber jednotku", "Zrušit", null, unitOptions);
+
+            if (chosenUnit != null && unitOptions.Contains(chosenUnit))
+            {
+                await App.Database.SetProductUnitAsync(ingredient.ProductId, chosenUnit);
+                await LoadIngredientsAndStepsAsync();
+            }
+        }
+    }
+
+    private async Task OnFavoriteToggledAsync()
+    {
+        if (_recipe == null) return;
+        await PromoteFromSearchTempAsync();
+
+        if (_isFavorite)
+        {
+            await App.Database.RemoveRecipeFromCategoryAsync(_recipe.Id, "Oblíbené");
+            _isFavorite = false;
+        }
+        else
+        {
+            await App.Database.AddRecipeToCategoryAsync(_recipe.Id, "Oblíbené");
+            _isFavorite = true;
+        }
+    }
+
+    private async Task OpenBookmarksOverlayAsync()
+    {
+        if (_recipe == null) return;
+
+        var allCategories = await App.Database.GetDistinctCategoriesAsync();
+        var currentRecipeCategories = await App.Database.GetCategoriesForRecipeAsync(_recipe.Id);
+
+        _bookmarkSelection = allCategories.Select(cat => new BookmarkSelectionModel
+        {
+            CategoryName = cat,
+            IsRecipeInCategory = currentRecipeCategories.Contains(cat)
+        }).ToList();
+
+        _showBookmarkOverlay = true;
+    }
+
+    private async Task OnBookmarkCheckedChangeAsync(BookmarkSelectionModel model, ChangeEventArgs e)
+    {
+        if (_recipe == null) return;
+        bool isChecked = e.Value is bool b && b;
+        model.IsRecipeInCategory = isChecked;
+
+        await PromoteFromSearchTempAsync();
+
+        if (isChecked)
+            await App.Database.AddRecipeToCategoryAsync(_recipe.Id, model.CategoryName);
+        else
+            await App.Database.RemoveRecipeFromCategoryAsync(_recipe.Id, model.CategoryName);
+    }
+
+    private async Task CloseBookmarkOverlayAsync()
+    {
+        _showBookmarkOverlay = false;
+        await InitializeFavoriteStateAsync();
+    }
+
+    private async Task OnOptionsMenuClickedAsync()
+    {
+        if (_recipe == null) return;
+
+        string[] options = _isDeveloperMode
+            ? [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Smazat recept"), "🔧 " + Tr("Zobrazit syrová data kroků")]
+            : [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Smazat recept")];
+
+        string? action = await DialogService.ShowActionSheetAsync(Tr("Možnosti receptu"), Tr("Zrušit"), null, options);
+
+        if (action == Tr("Sdílet recept"))
+            await ShareRecipeAsync();
+        else if (action == Tr("Sdílet přes odkaz"))
+            await ShareRecipeViaLinkAsync();
+        else if (action == Tr("Přidat do záložky"))
+            await OpenBookmarksOverlayAsync();
+        else if (action == Tr("Upravit recept"))
+            await OnEditRecipeClickedAsync();
+        else if (action == Tr("Smazat recept"))
+            _showDeleteOverlay = true;
+        else if (action == "🔧 " + Tr("Zobrazit syrová data kroků"))
+            await ShowRawStepsDiagnosticAsync();
+    }
+
+    private async Task OnEditRecipeClickedAsync()
+    {
+        if (_recipe == null) return;
+        await PromoteFromSearchTempAsync();
+        NavigationManager.NavigateTo($"/recipe/{_recipe.Id}/edit");
+    }
+
+    private async Task ShareRecipeAsync()
+    {
+        if (_recipe == null) return;
+        await PromoteFromSearchTempAsync();
+
+        try
+        {
+            string filePath = await RecipeShareService.ExportRecipeAsync(_recipe);
+
+            await Share.Default.RequestAsync(new ShareFileRequest
+            {
+                Title = $"{Tr("Sdílet recept")}: {_recipe.Name}",
+                File = new ShareFile(filePath)
+            });
+        }
+        catch (Exception ex)
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), $"{Tr("Sdílení se nepodařilo")}: {ex.Message}", "OK");
+        }
+    }
+
+    private async Task ShareRecipeViaLinkAsync()
+    {
+        if (_recipe == null) return;
+        await PromoteFromSearchTempAsync();
+
+        string? link = await RecipeLinkShareService.ShareViaLinkAsync(_recipe);
+
+        if (link == null)
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), Tr("Odkaz se nepodařilo vytvořit. Zkontroluj internetové připojení."), "OK");
+            return;
+        }
+
+        string bodyTemplate = Tr("Podívej se na tento recept ({0}) v Mobilní Kuchařce: {1}\n(Odkaz je platný 24 hodin nebo dokud ho neotevřeš.)");
+
+        await Share.Default.RequestAsync(new ShareTextRequest
+        {
+            Title = $"{Tr("Recept")}: {_recipe.Name}",
+            Text = string.Format(bodyTemplate, _recipe.Name, link)
+        });
+    }
+
+    private async Task ShowRawStepsDiagnosticAsync()
+    {
+        if (_recipe == null) return;
+
+        var sb = new System.Text.StringBuilder();
+        var steps = _recipe.Steps_CS;
+
+        for (int i = 0; i < steps.Count; i++)
+        {
+            sb.AppendLine($"[{i}] \"{steps[i]}\"");
+            foreach (char c in steps[i])
+            {
+                if (!char.IsLetterOrDigit(c) && c != ' ' && !char.IsPunctuation(c))
+                    sb.AppendLine($"    neobvyklý znak: U+{(int)c:X4}");
+            }
+        }
+
+        await DialogService.ShowAlertAsync("Syrová data kroků", sb.Length > 0 ? sb.ToString() : "Žádné kroky.", "OK");
+    }
+
+    private void OnCancelDeleteClicked() => _showDeleteOverlay = false;
+
+    private async Task OnConfirmDeleteClickedAsync()
+    {
+        if (_recipe == null) return;
+        _showDeleteOverlay = false;
+        await App.Database.DeleteRecipeAsync(_recipe.Id);
+        NavigationManager.NavigateTo("/recipes");
+    }
+
+    private async Task OnUserRatingChangedAsync(double newRating)
+    {
+        if (_recipe == null) return;
+        await PromoteFromSearchTempAsync();
+
+        _recipe.Rating = newRating;
+        await App.Database.UpdateRecipeRatingAsync(_recipe.Id, newRating);
+    }
+
+    // Živá aktualizace při TAŽENÍ posuvníku - jen mění lokální stav (hvězdy nad posuvníkem se
+    // překreslí okamžitě), žádný zápis do DB. Zápis proběhne až při puštění, viz
+    // OnRatingSliderChangeAsync níže - stejný vzor jako u @bind:event="oninput" jinde v appce
+    // (RecipesPage.razor vyhledávací pole), jen bez formálního @bind, protože potřebujeme
+    // InvariantCulture parsing (viz komentář u <input type="range"> výše).
+    private void OnRatingSliderInput(ChangeEventArgs e)
+    {
+        if (_recipe == null) return;
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double newRating))
+        {
+            _recipe.Rating = Math.Round(newRating * 2) / 2;
+        }
+    }
+
+    // Skutečný zápis do DB při PUŠTĚNÍ posuvníku - sdílí stejnou metodu (OnUserRatingChangedAsync)
+    // jako klepnutí na hvězdy, takže obě cesty hodnocení mají identické chování (promote ze
+    // search-temp, DB update).
+    private async Task OnRatingSliderChangeAsync(ChangeEventArgs e)
+    {
+        if (_recipe == null) return;
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double newRating))
+        {
+            double rounded = Math.Round(newRating * 2) / 2;
+            await OnUserRatingChangedAsync(rounded);
+        }
+    }
+
+    private async Task OnCopyIngredientsClickedAsync()
+    {
+        if (_ingredients.Count == 0)
+        {
+            await DialogService.ShowAlertAsync(Tr("Kopírování"), Tr("Není co zkopírovat."), "OK");
+            return;
+        }
+
+        await PromoteFromSearchTempAsync();
+
+        string text = string.Join("\n", _ingredients.Select(i => $"{i.AmountText} {i.Name}"));
+        await Clipboard.Default.SetTextAsync(text);
+        await DialogService.ShowAlertAsync(Tr("Zkopírováno"), Tr("Suroviny byly zkopírovány do schránky."), "OK");
+    }
+
+    private async Task OnCopyStepsClickedAsync()
+    {
+        if (_recipe == null) return;
+
+        string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
+        var steps = currentLang == "cs" ? _recipe.Steps_CS : _recipe.Steps_EN;
+
+        if (steps.Count == 0)
+        {
+            await DialogService.ShowAlertAsync(Tr("Kopírování"), Tr("Není co zkopírovat."), "OK");
+            return;
+        }
+
+        await PromoteFromSearchTempAsync();
+
+        string text = string.Join("\n\n", steps.Select((s, i) => $"{i + 1}. {s}"));
+        await Clipboard.Default.SetTextAsync(text);
+        await DialogService.ShowAlertAsync(Tr("Zkopírováno"), Tr("Postup přípravy byl zkopírován do schránky."), "OK");
+    }
+
+    private async Task OnPeopleCountBadgeTappedAsync()
+    {
+        if (_recipe == null) return;
+        var recipe = _recipe;
+
+        if (recipe.ServingSize <= 0)
+        {
+            string? baseResult = await DialogService.ShowPromptAsync(
+                Tr("Pro kolik lidí je tento recept napsaný?"),
+                Tr("Recept neuvádí počet porcí. Zadej, pro kolik lidí jsou napsané suroviny."),
+                "OK", initialValue: string.Empty, keyboard: Keyboard.Numeric);
+
+            if (int.TryParse(baseResult, out var baseParsed) && baseParsed > 0)
+            {
+                await PromoteFromSearchTempAsync();
+
+                await App.Database.UpdateRecipeServingSizeAsync(recipe.Id, baseParsed);
+                recipe.ServingSize = baseParsed;
+                await LoadIngredientsAndStepsAsync();
+            }
+            return;
+        }
+
+        string? result = await DialogService.ShowPromptAsync(
+            Tr("Zobrazit recept pro kolik lidí?"),
+            Tr("Množství surovin se přepočítá jen pro tohle zobrazení, tvoje výchozí nastavení domácnosti se nezmění."),
+            "OK", initialValue: _displayPeopleCount.ToString(), keyboard: Keyboard.Numeric);
+
+        if (int.TryParse(result, out var parsed) && parsed > 0)
+        {
+            _displayPeopleCount = parsed;
+            await LoadIngredientsAndStepsAsync();
+        }
+    }
+
+    private async Task OnImportClickedAsync()
+    {
+        if (_recipe == null) return;
+        await PromoteFromSearchTempAsync();
+        await App.Database.AddRecipeToCategoryAsync(_recipe.Id, "Vyhledané recepty");
+    }
+
+    private async Task OnSourceLinkClickedAsync()
+    {
+        if (_recipe == null || string.IsNullOrWhiteSpace(_recipe.SourceUrl)) return;
+        await Launcher.Default.OpenAsync(_recipe.SourceUrl);
+    }
+
+    private async Task OnBackClickedAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("mkNavigateBack");
+        }
+        catch
+        {
+            NavigationManager.NavigateTo("/recipes");
+        }
+    }
+
+    public void Dispose()
+    {
+        Classes.Navigation.BlazorShellPage.ShellAppeared -= OnShellAppeared;
+    }
+}

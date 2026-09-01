@@ -7,7 +7,7 @@
         double fillAmount = GetFillAmount(starIndex);
 
         <span class="star-slot">
-            <span class="star star-empty">★</span>
+            <span class="star star-empty" style="@EmptyColorStyle">★</span>
             <span class="star star-filled" style="clip-path: inset(0 @(100 - fillAmount)% 0 0);">★</span>
 
             @if (Interactive)
@@ -23,11 +23,13 @@
     [Parameter] public double Rating { get; set; }
     [Parameter] public bool Interactive { get; set; } = false;
     [Parameter] public int SizePx { get; set; } = 24;
+
+    [Parameter] public string? EmptyColor { get; set; }
+
     [Parameter] public EventCallback<double> RatingChanged { get; set; }
 
-    // Přímý přepis StarRatingHelper.BuildStarVisual/BuildHalfStar (XAML verze) - stejné
-    // prahové hodnoty (>= 0.25 pro půlku, >= 0.75 zaokrouhlí nahoru na celou), jen vrací
-    // procento vyplnění místo skládání Label/Grid vizuálu ručně.
+    private string EmptyColorStyle => string.IsNullOrWhiteSpace(EmptyColor) ? string.Empty : $"color: {EmptyColor};";
+
     private double GetFillAmount(int index)
     {
         int fullStars = (int)Math.Floor(Rating);

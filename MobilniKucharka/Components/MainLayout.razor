@@ -20,21 +20,32 @@
         UpdateActiveTabFromUri(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
 
-        // SystemInsets (viz Classes/Navigation/SystemInsets.cs) se aktualizuje z nativní strany
-        // (MainActivity na Androidu) při každé změně inzetu systémové navigační lišty. Reagujeme
-        // přepočtením CSS proměnné --system-nav-inset (viz app.css, .nav-bar-inset-spacer), takže
-        // appčin vlastní spodní nav bar vždy sahá přesně k hornímu okraji systémové lišty.
         SystemInsets.BottomChanged += OnSystemInsetChanged;
+
+        // MainLayout existuje po celou dobu běhu appky bez ohledu na aktuální hub route
+        // (/recipes, /search, /bookmarks) - proto je to jediné bezpečné místo pro reakci na
+        // požadavek "naviguj na tuhle route", který přijde od ještě nativní stránky (viz
+        // App.PendingRecipeRoute a BookmarkCategoryPage.xaml.cs). Kdyby tohle sedělo jen na
+        // RecipesPage, nezafungovalo by to, kdyby byla zrovna zobrazená /search nebo /bookmarks.
+        Classes.Navigation.BlazorShellPage.ShellAppeared += OnPendingRouteCheck;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // První nastavení hned po načtení WebView - kdyby MainActivity nahlásila inzet ještě
-            // předtím, než tahle komponenta vůbec existovala (běžný běh při startu appky).
             await ApplySystemInsetAsync();
         }
+    }
+
+    private void OnPendingRouteCheck()
+    {
+        if (string.IsNullOrWhiteSpace(App.PendingRecipeRoute)) return;
+
+        string route = App.PendingRecipeRoute;
+        App.PendingRecipeRoute = null;
+
+        NavigationManager.NavigateTo(route);
     }
 
     private async void OnSystemInsetChanged()
@@ -83,6 +94,8 @@
         {
             _activeTab = AppTab.Bookmarks;
         }
+        // "recipe/..." route (detail/úprava) záměrně nemění _activeTab - spodní lišta zůstává na
+        // naposledy aktivní záložce, takže se uživatel po opuštění detailu vrátí přesně tam, odkud přišel.
     }
 
     private void OnTabChanged(AppTab tab)
@@ -94,5 +107,6 @@
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
         SystemInsets.BottomChanged -= OnSystemInsetChanged;
+        Classes.Navigation.BlazorShellPage.ShellAppeared -= OnPendingRouteCheck;
     }
 }
