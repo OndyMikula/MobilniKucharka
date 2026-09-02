@@ -473,7 +473,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 18px;
-    overflow-x: hidden;
+    flex-shrink: 0;
 }
 
 .form-group {
@@ -715,6 +715,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 25px;
+    flex-shrink: 0;
 }
 
 .nutrition-grid {
