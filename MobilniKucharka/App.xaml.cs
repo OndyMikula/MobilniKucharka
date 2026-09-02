@@ -6,11 +6,9 @@ namespace MobilniKucharka;
 public partial class App : Application
 {
     private static BudgetPlannerService? _database;
-    public static string? PendingImportGuid { get; set; }
 
-    // Most pro "ještě nativní stránka chce navigovat na Blazor recipe route" (viz
-    // BookmarkCategoryPage.xaml.cs a MainLayout.razor) - stejný vzor jako PendingImportGuid výše.
-    public static string? PendingRecipeRoute { get; set; }
+    public static string? PendingImportGuid { get; set; }
+    public static string? PendingBlazorRoute { get; set; }
 
     public static BudgetPlannerService Database
     {

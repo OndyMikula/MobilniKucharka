@@ -22,11 +22,6 @@
 
         SystemInsets.BottomChanged += OnSystemInsetChanged;
 
-        // MainLayout existuje po celou dobu běhu appky bez ohledu na aktuální hub route
-        // (/recipes, /search, /bookmarks) - proto je to jediné bezpečné místo pro reakci na
-        // požadavek "naviguj na tuhle route", který přijde od ještě nativní stránky (viz
-        // App.PendingRecipeRoute a BookmarkCategoryPage.xaml.cs). Kdyby tohle sedělo jen na
-        // RecipesPage, nezafungovalo by to, kdyby byla zrovna zobrazená /search nebo /bookmarks.
         Classes.Navigation.BlazorShellPage.ShellAppeared += OnPendingRouteCheck;
     }
 
@@ -40,10 +35,10 @@
 
     private void OnPendingRouteCheck()
     {
-        if (string.IsNullOrWhiteSpace(App.PendingRecipeRoute)) return;
+        if (string.IsNullOrWhiteSpace(App.PendingBlazorRoute)) return;
 
-        string route = App.PendingRecipeRoute;
-        App.PendingRecipeRoute = null;
+        string route = App.PendingBlazorRoute;
+        App.PendingBlazorRoute = null;
 
         NavigationManager.NavigateTo(route);
     }
@@ -61,8 +56,6 @@
         }
         catch
         {
-            // WebView nemusí být hned po prvním renderu plně připravený na JS interop - další
-            // skutečná změna inzetu (OnSystemInsetChanged) se stejně pokusí znovu.
         }
     }
 
@@ -94,8 +87,6 @@
         {
             _activeTab = AppTab.Bookmarks;
         }
-        // "recipe/..." route (detail/úprava) záměrně nemění _activeTab - spodní lišta zůstává na
-        // naposledy aktivní záložce, takže se uživatel po opuštění detailu vrátí přesně tam, odkud přišel.
     }
 
     private void OnTabChanged(AppTab tab)

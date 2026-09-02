@@ -1,0 +1,118 @@
+﻿@page "/bookmark-category"
+@namespace MobilniKucharka.Components.Pages
+@implements IDisposable
+@inject IDialogService DialogService
+
+<div class="hub-page">
+    <div class="hub-header">
+        <div style="display:flex; flex-direction:column; gap:2px;">
+            <h1 class="hub-title" style="font-size:22px;">@_displayName</h1>
+            @if (!string.IsNullOrWhiteSpace(_description))
+            {
+                <span style="font-size:13px; color:var(--color-text-secondary); font-weight:normal;">@_description</span>
+            }
+        </div>
+    </div>
+
+    <div class="recipe-cards-container">
+        @if (_isLoading)
+        {
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+        }
+        else if (_recipes.Count == 0)
+        {
+            <div class="empty-state">
+                <span class="empty-icon">🍲</span>
+                <p>@Tr("V této záložce nejsou žádné recepty.")</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var recipeWithCost in _recipes)
+            {
+                <RecipeCard @key="recipeWithCost.Recipe.Id" Item="recipeWithCost" />
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "name")] public string? Name { get; set; }
+
+    private List<RecipeWithCost> _recipes = [];
+    private bool _isLoading = true;
+    private string _displayName = string.Empty;
+    private string _description = string.Empty;
+    private string? _loadedForName;
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Classes.Navigation.BlazorShellPage.ShellAppeared += OnShellAppeared;
+        await LoadAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedForName == Name) return;
+        await LoadAsync();
+    }
+
+    private async void OnShellAppeared()
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Name)) return;
+
+        _isLoading = true;
+        _loadedForName = Name;
+        _displayName = Tr(Name);
+
+        var bookmark = await App.Database.GetBookmarkByNameAsync(Name);
+        _description = bookmark?.Description ?? string.Empty;
+
+        try
+        {
+            var rawRecipes = await App.Database.GetRecipesByCategoryAsync(Name);
+
+            int peopleCount = Preferences.Default.Get("PeopleCount", 2);
+            double maxDailyBudget = Preferences.Default.Get("WeeklyBudget", 2000.0) / 7.0;
+
+            var results = new List<RecipeWithCost>();
+            foreach (var r in rawRecipes)
+            {
+                double cost = await App.Database.CalculateRecipeCostAsync(r.Id, peopleCount);
+
+                results.Add(new RecipeWithCost
+                {
+                    Recipe = r,
+                    CalculatedCost = cost,
+                    IsWithinBudget = cost <= maxDailyBudget
+                });
+            }
+
+            _recipes = results;
+        }
+        catch (Exception ex)
+        {
+            await DialogService.ShowAlertAsync("Chyba načítání", $"Recepty se nepodařilo načíst.\nDetail: {ex.Message}", "OK");
+            _recipes = [];
+        }
+
+        _isLoading = false;
+    }
+
+    public void Dispose()
+    {
+        Classes.Navigation.BlazorShellPage.ShellAppeared -= OnShellAppeared;
+    }
+}
