@@ -1,0 +1,167 @@
+﻿@page "/bug-report"
+@namespace MobilniKucharka.Components.Pages
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<div class="create-recipe-page">
+    <div class="create-recipe-header">
+        <button type="button" class="icon-btn" @onclick="NavigateBackAsync">←</button>
+    </div>
+
+    <div class="create-recipe-body">
+        <h1 class="hub-title" style="font-size:22px; margin:0 0 4px 0;">@Tr("Nahlásit chybu")</h1>
+        <p style="margin:0; color:var(--color-text-secondary); font-size:13px;">
+            @Tr("Popiš, co se stalo: ")
+        </p>
+
+        <div class="form-group">
+            <label class="form-label">@Tr("Popis chyby")</label>
+            <textarea class="form-textarea" style="min-height:110px;" placeholder="@Tr("Popiš problém co nejpřesněji...")"
+                      value="@_description" disabled="@_isSending"
+                      @oninput="(e) => _description = e.Value?.ToString() ?? string.Empty"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">@Tr("Jak chybu zopakovat (nepovinné)")</label>
+            <textarea class="form-textarea" placeholder="@Tr("Co jsi dělal/a předtím, než se chyba objevila?")"
+                      value="@_reproSteps" disabled="@_isSending"
+                      @oninput="(e) => _reproSteps = e.Value?.ToString() ?? string.Empty"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">@Tr("Automaticky přiložené informace")</label>
+            <div class="detail-card" style="font-size:13px; color:var(--color-text-secondary);">
+                <div>@Tr("Jazyk aplikace"): @_languageName</div>
+                <div>@string.Format(Tr("Verze {0}"), _appVersion)</div>
+            </div>
+        </div>
+
+        <button type="button" class="btn-action btn-success" style="height:55px; margin-top:6px;" @onclick="OnSendInAppAsync" disabled="@_isSending">
+            @if (_isSending)
+            {
+                <span>⏳ @Tr("Odesílám...")</span>
+            }
+            else
+            {
+                <span>@Tr("Odeslat")</span>
+            }
+        </button>
+
+        <button type="button" class="recipe-source-link" @onclick="OnSendByEmailAsync" disabled="@_isSending">
+            @Tr("Nebo odeslat e-mailem")
+        </button>
+    </div>
+</div>
+
+@code {
+    private const string DeveloperEmail = "devzoufaly@gmail.com";
+
+    private string _description = string.Empty;
+    private string _reproSteps = string.Empty;
+    private string _appVersion = string.Empty;
+    private string _languageName = string.Empty;
+    private bool _isSending = false;
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    protected override void OnInitialized()
+    {
+        _appVersion = AppInfo.Current.VersionString;
+        _languageName = Preferences.Default.Get("AppLanguageName", "Čeština");
+    }
+
+    // Markdown zvýraznění (**tučně**) - GitHub Discussion komentáře ho vykreslí normálně, na
+    // rozdíl od e-mailu (RecipeLinkShareService.ShareViaLinkAsync/OnSendByEmailAsync níže ho
+    // pošlou jako obyčejný text - drobná kosmetická nekonzistence mezi oběma kanály, ne chyba).
+    private string BuildReportText()
+    {
+        string languageCode = Preferences.Default.Get("AppLanguageCode", "cs");
+        string descriptionPart = string.IsNullOrWhiteSpace(_description) ? "(nevyplněno)" : _description;
+        string reproPart = string.IsNullOrWhiteSpace(_reproSteps) ? "(nevyplněno)" : _reproSteps;
+
+        return $"**Nahlášení chyby z aplikace**\n\n" +
+               $"**Verze aplikace:** {_appVersion}\n" +
+               $"**Jazyk aplikace:** {_languageName} ({languageCode})\n\n" +
+               $"**Popis chyby:**\n{descriptionPart}\n\n" +
+               $"**Jak problém zopakovat:**\n{reproPart}";
+    }
+
+    private async Task<bool> ValidateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_description))
+        {
+            await DialogService.ShowAlertAsync(Tr("Upozornění"), Tr("Zadej prosím popis chyby."), "OK");
+            return false;
+        }
+        return true;
+    }
+
+    // Hlavní cesta - report se pošle rovnou z aplikace jako komentář do GitHub Discussion #56 přes
+    // GraphQL API (viz GitHubDiscussionService), bez nutnosti opustit appku nebo mít GitHub účet.
+    private async Task OnSendInAppAsync()
+    {
+        if (!await ValidateAsync()) return;
+
+        _isSending = true;
+        try
+        {
+            var service = new GitHubDiscussionService();
+            bool success = await service.PostBugReportAsync(BuildReportText());
+
+            if (success)
+            {
+                await DialogService.ShowAlertAsync(Tr("Odesláno"), Tr("Díky! Hlášení bylo úspěšně odesláno."), "OK");
+                await NavigateBackAsync();
+            }
+            else
+            {
+                await DialogService.ShowAlertAsync(
+                    Tr("Odeslání se nepodařilo"),
+                    Tr("Zkontroluj internetové připojení a zkus to znovu, nebo použij odeslání e-mailem níže."),
+                    "OK");
+            }
+        }
+        finally
+        {
+            _isSending = false;
+        }
+    }
+
+    // Záložní cesta - stejný obsah, jen jinak doručený. Užitečné, pokud selže síť nebo appka
+    // běží se starým, už otočeným tokenem (appka sama nemůže token obnovit bez nové verze).
+    private async Task OnSendByEmailAsync()
+    {
+        if (!await ValidateAsync()) return;
+
+        try
+        {
+            await Email.Default.ComposeAsync(new EmailMessage
+            {
+                Subject = $"Nahlášení chyby - Mobilní Kuchařka {_appVersion}",
+                Body = BuildReportText(),
+                To = [DeveloperEmail]
+            });
+        }
+        catch (FeatureNotSupportedException)
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), Tr("Na tomto zařízení není nastavená žádná e-mailová aplikace."), "OK");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), ex.Message, "OK");
+        }
+    }
+
+    private async Task NavigateBackAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("mkNavigateBack");
+        }
+        catch
+        {
+            NavigationManager.NavigateTo("/recipes");
+        }
+    }
+}

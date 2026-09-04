@@ -389,6 +389,15 @@ public partial class SettingsPage : ContentPage
         await DisplayAlertAsync(Tr("Hotovo"), Tr("Byl jsi odhlášen z beta programu."), "OK");
     }
 
+    // Nahlásit chybu je Blazor route (/bug-report) - SettingsPage je zatím pořád nativní (Fáze 3
+    // zatím nedokončená), takže se používá stejný most jako dřív u BookmarkCategoryPage
+    // (App.PendingBlazorRoute + PopToRootAsync na BlazorShellPage, viz MainLayout.razor).
+    private async void OnReportBugClicked(object sender, EventArgs e)
+    {
+        App.PendingBlazorRoute = "/bug-report";
+        await Navigation.PopToRootAsync();
+    }
+
     private static void RestartApp()
     {
         App.ResetDatabase();

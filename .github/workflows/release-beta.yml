@@ -87,6 +87,7 @@ jobs:
                   public const string NutritionixApiKey = "TVUJ_NUTRITIONIX_API_KEY";
                   public const string GitHubShareToken = "${{ secrets.SHARE_TOKEN }}";
                   public const string DeepLApiKey = "${{ secrets.DEEPL_API_KEY }}";
+                  public const string GitHubDiscussionToken = "${{ secrets.DISCUSSION_TOKEN }}";
               }
           }
           "@

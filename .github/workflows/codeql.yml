@@ -31,16 +31,11 @@ jobs:
       - name: Install MAUI workload
         run: dotnet workload install maui-android
 
-      # Secrets.cs je v .gitignore a nikdy se necommituje - release.yml/release-beta.yml ho
-      # generují za běhu ze skutečných repo secrets (viz CLAUDE.md, sekce "Build & release").
-      # CodeQL kód jen staticky analyzuje, nikdy nespouští, takže si vystačí s neškodnými
-      # placeholder hodnotami - žádný důvod vystavovat skutečné API klíče scanovacímu jobu,
-      # který je nikdy nepoužije k reálnému volání.
       - name: Generate placeholder Secrets.cs (for compilation only, not real keys)
         shell: pwsh
         run: |
           $secretsPath = "MobilniKucharka/Services/Secrets.cs"
-          @"
+                    @"
           namespace MobilniKucharka.Services
           {
               public static class Secrets
@@ -50,6 +45,7 @@ jobs:
                   public const string NutritionixApiKey = "placeholder";
                   public const string GitHubShareToken = "placeholder";
                   public const string DeepLApiKey = "placeholder:fx";
+                  public const string GitHubDiscussionToken = "placeholder";
               }
           }
           "@ | Set-Content -Path $secretsPath -Encoding utf8

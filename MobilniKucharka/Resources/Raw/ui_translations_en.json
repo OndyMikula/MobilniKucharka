@@ -204,5 +204,30 @@
   "Zrušit": "Cancel",
   "📷 Vybrat z galerie": "📷 Choose from gallery",
   "🔄 Resetovat testovací databázi": "🔄 Reset test database",
-  "🔧 Opravit formátování kroků": "🔧 Fix step formatting"
+  "🔧 Opravit formátování kroků": "🔧 Fix step formatting",
+
+  "Nahlásit chybu": "Report a bug",
+  "Pošli hlášení o chybě přímo vývojáři - stačí popsat, co se stalo.": "Send a bug report straight to the developer - just describe what happened.",
+  "Popiš, co se stalo: ": "Describe what happened: ",
+  "Čím přesnější popis, tím rychleji se to podaří opravit.": "The more precise, the faster it can get fixed.",
+  "Popis chyby": "Bug description",
+  "Popiš problém co nejpřesněji...": "Describe the problem as precisely as possible...",
+  "Jak chybu zopakovat (nepovinné)": "How to reproduce the bug (optional)",
+  "Co jsi dělal/a předtím, než se chyba objevila?": "What were you doing right before the bug appeared?",
+  "Automaticky přiložené informace": "Automatically attached information",
+  "Zadej prosím popis chyby.": "Please enter a bug description.",
+  "Na tomto zařízení není nastavená žádná e-mailová aplikace.": "No email app is set up on this device.",
+  "Report byl zkopírován do schránky. Otevírám GitHub diskuzi, kam ho můžeš vložit.": "The report has been copied to your clipboard. Opening the GitHub discussion where you can paste it.",
+  "Práva": "Permissions",
+  "Tato funkce není na vašem zařízení podporována.": "This feature isn't supported on this device.",
+  "Aplikace nemá oprávnění přistupovat k fotkám.": "The app doesn't have permission to access photos.",
+  "Nepodařilo se uložit složku": "Couldn't save the folder",
+
+  "Odesílám...": "Sending...",
+  "Odeslat": "Send",
+  "Nebo odeslat e-mailem": "Or send by email",
+  "Odesláno": "Sent",
+  "Díky! Hlášení bylo úspěšně odesláno.": "Thanks! Your report was sent successfully.",
+  "Odeslání se nepodařilo": "Sending failed",
+  "Zkontroluj internetové připojení a zkus to znovu, nebo použij odeslání e-mailem níže.": "Check your internet connection and try again, or use the email option below."
 }
