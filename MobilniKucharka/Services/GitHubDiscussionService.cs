@@ -1,11 +1,15 @@
-﻿using System.Text;
+﻿using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 
 namespace MobilniKucharka.Services
 {
-    // Pošle hlášení chyby jako komentář do existující GitHub Discussion (#56,
-    // OndyMikula/MobilniKucharka) přes GraphQL API. Token (Secrets.GitHubDiscussionToken) je
-    // fine-grained PAT omezený jen na tenhle repozitář
+    public enum DiscussionPostResult
+    {
+        Success,
+        NotConfigured,
+        NetworkOrApiFailure
+    }
 
     public class GitHubDiscussionService
     {
@@ -15,30 +19,40 @@ namespace MobilniKucharka.Services
         private const int DiscussionNumber = 56;
         private const string GraphQlUrl = "https://api.github.com/graphql";
 
-        public async Task<bool> PostBugReportAsync(string body)
+        // Vrací rozlišený výsledek místo prostého bool - "token není nastavený" (lokální build bez
+        // reálného Secrets.cs, nebo appka postavená před přidáním téhle funkce) je úplně jiná
+        // situace než "GitHub API/síť selhaly", ale dřív obě vracely stejné false a appka to pak
+        // uživateli ukazovala jako "zkontroluj internetové připojení", i když o připojení vůbec
+        // nešlo. Debug.WriteLine na každém kroku - stejný vzor jako ImageHelper.ResolveImageSrc -
+        // ať se příště dá skutečná příčina dohledat přes adb log/VS Debug Output, ne odhadovat.
+        public async Task<DiscussionPostResult> PostBugReportAsync(string body)
         {
+            if (string.IsNullOrWhiteSpace(Secrets.GitHubDiscussionToken) ||
+                Secrets.GitHubDiscussionToken.Contains("paste_your", StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.WriteLine("[GitHubDiscussionService] GitHubDiscussionToken není nastavený (placeholder nebo prázdný) - lokální Secrets.cs nejspíš neobsahuje reálný token.");
+                return DiscussionPostResult.NotConfigured;
+            }
+
             try
             {
-                if (string.IsNullOrWhiteSpace(Secrets.GitHubDiscussionToken) ||
-                    Secrets.GitHubDiscussionToken.Contains("paste_your", StringComparison.OrdinalIgnoreCase))
+                string? discussionId = await GetDiscussionIdAsync();
+                if (string.IsNullOrWhiteSpace(discussionId))
                 {
-                    return false;
+                    Debug.WriteLine("[GitHubDiscussionService] Nepodařilo se získat ID diskuze - viz předchozí log řádek s detailem chyby.");
+                    return DiscussionPostResult.NetworkOrApiFailure;
                 }
 
-                string? discussionId = await GetDiscussionIdAsync();
-                if (string.IsNullOrWhiteSpace(discussionId)) return false;
-
-                return await AddDiscussionCommentAsync(discussionId, body);
+                bool success = await AddDiscussionCommentAsync(discussionId, body);
+                return success ? DiscussionPostResult.Success : DiscussionPostResult.NetworkOrApiFailure;
             }
-            catch
+            catch (Exception ex)
             {
-                return false;
+                Debug.WriteLine($"[GitHubDiscussionService] Výjimka při odesílání: {ex.Message}");
+                return DiscussionPostResult.NetworkOrApiFailure;
             }
         }
 
-        // Discussion #56 už existuje (založená ručně na GitHubu) - appka si jen jednou za request
-        // dotáhne její interní GraphQL "node id" (jiné číslo než viditelné číslo #56 v URL),
-        // které mutace addDiscussionComment níže vyžaduje jako vstup.
         private async Task<string?> GetDiscussionIdAsync()
         {
             var payload = new
@@ -53,12 +67,17 @@ namespace MobilniKucharka.Services
             try
             {
                 var root = JsonSerializer.Deserialize<JsonElement>(responseJson);
-                if (root.TryGetProperty("errors", out _)) return null;
+                if (root.TryGetProperty("errors", out var errors))
+                {
+                    Debug.WriteLine($"[GitHubDiscussionService] GraphQL chyba (getDiscussionId): {errors}");
+                    return null;
+                }
 
                 return root.GetProperty("data").GetProperty("repository").GetProperty("discussion").GetProperty("id").GetString();
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.WriteLine($"[GitHubDiscussionService] Nepodařilo se rozparsovat odpověď (getDiscussionId): {ex.Message}\nOdpověď: {responseJson}");
                 return null;
             }
         }
@@ -77,12 +96,17 @@ namespace MobilniKucharka.Services
             try
             {
                 var root = JsonSerializer.Deserialize<JsonElement>(responseJson);
-                if (root.TryGetProperty("errors", out _)) return false;
+                if (root.TryGetProperty("errors", out var errors))
+                {
+                    Debug.WriteLine($"[GitHubDiscussionService] GraphQL chyba (addDiscussionComment): {errors}");
+                    return false;
+                }
 
                 return root.GetProperty("data").GetProperty("addDiscussionComment").GetProperty("comment").TryGetProperty("id", out _);
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.WriteLine($"[GitHubDiscussionService] Nepodařilo se rozparsovat odpověď (addDiscussionComment): {ex.Message}\nOdpověď: {responseJson}");
                 return false;
             }
         }
@@ -97,9 +121,15 @@ namespace MobilniKucharka.Services
             request.Headers.Add("User-Agent", "MobilniKucharka-App");
 
             var response = await _httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode) return null;
+            string responseBody = await response.Content.ReadAsStringAsync();
 
-            return await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                Debug.WriteLine($"[GitHubDiscussionService] HTTP {(int)response.StatusCode} {response.StatusCode}: {responseBody}");
+                return null;
+            }
+
+            return responseBody;
         }
     }
 }

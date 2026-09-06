@@ -107,12 +107,22 @@
         try
         {
             var service = new GitHubDiscussionService();
-            bool success = await service.PostBugReportAsync(BuildReportText());
+            var result = await service.PostBugReportAsync(BuildReportText());
 
-            if (success)
+            if (result == DiscussionPostResult.Success)
             {
                 await DialogService.ShowAlertAsync(Tr("Odesláno"), Tr("Díky! Hlášení bylo úspěšně odesláno."), "OK");
                 await NavigateBackAsync();
+            }
+            else if (result == DiscussionPostResult.NotConfigured)
+            {
+                // Odlišná zpráva od síťového selhání - tohle znamená, že appka nemá platný token
+                // (typicky lokální build bez skutečného Secrets.cs), ne že by bylo cokoli špatně
+                // s připojením uživatele. E-mail jako záložní cesta funguje bez ohledu na tohle.
+                await DialogService.ShowAlertAsync(
+                    Tr("Odeslání není nastavené"),
+                    Tr("Odeslání přímo z aplikace teď není k dispozici. Použij prosím odeslání e-mailem níže."),
+                    "OK");
             }
             else
             {

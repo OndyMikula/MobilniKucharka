@@ -229,5 +229,7 @@
   "Odesláno": "Sent",
   "Díky! Hlášení bylo úspěšně odesláno.": "Thanks! Your report was sent successfully.",
   "Odeslání se nepodařilo": "Sending failed",
-  "Zkontroluj internetové připojení a zkus to znovu, nebo použij odeslání e-mailem níže.": "Check your internet connection and try again, or use the email option below."
+  "Zkontroluj internetové připojení a zkus to znovu, nebo použij odeslání e-mailem níže.": "Check your internet connection and try again, or use the email option below.",
+  "Odeslání není nastavené": "Sending is not configured",
+  "Odeslání přímo z aplikace teď není k dispozici. Použij prosím odeslání e-mailem níže.": "Sending directly from the app isn't available right now. Please use the email option below."
 }
