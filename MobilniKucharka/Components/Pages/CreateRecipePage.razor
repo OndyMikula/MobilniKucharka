@@ -1,6 +1,7 @@
 ﻿@page "/recipe/create"
 @page "/recipe/{Id:int}/edit"
 @namespace MobilniKucharka.Components.Pages
+@implements IDisposable
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
@@ -224,6 +225,8 @@
     {
         string dbPath = Path.Combine(FileSystem.AppDataDirectory, "kucharka.db3");
         _db = new SQLiteAsyncConnection(dbPath);
+
+        NavigationManager.LocationChanged += OnNavigatingAway;
     }
 
     protected override async Task OnParametersSetAsync()
@@ -684,8 +687,6 @@
         await NavigateBackAsync();
     }
 
-    // Stejný vzor jako RecipeDetailPage.razor - vrátí uživatele o krok zpět ve vlastní historii
-    // Blazor Routeru (history.back()), s fallbackem na seznam receptů, kdyby JS interop selhal.
     private async Task NavigateBackAsync()
     {
         try
@@ -696,5 +697,37 @@
         {
             NavigationManager.NavigateTo("/recipes");
         }
+    }
+
+     // Skutečně smysluplné pole = recept, který uživatel opravdu začal vyplňovat. Bez tohohle by
+     // autosave uložil prázdný řádek do DB jen proto, že uživatel klepl na jakékoli pole a hned ho
+     // zase opustil.
+    private bool HasMeaningfulContent()
+    {
+        if (!string.IsNullOrWhiteSpace(_titleText)) return true;
+        if (!string.IsNullOrWhiteSpace(_descriptionText)) return true;
+        if (!string.IsNullOrWhiteSpace(_savedImagePath)) return true;
+        if (!string.IsNullOrWhiteSpace(_manualCostText)) return true;
+        if (!string.IsNullOrWhiteSpace(_prepTimeText)) return true;
+        if (!string.IsNullOrWhiteSpace(_servingSizeText)) return true;
+        if (_selectedTags.Count > 0) return true;
+        if (_ingredientRows.Any(r => !string.IsNullOrWhiteSpace(r.Name) || !string.IsNullOrWhiteSpace(r.Amount))) return true;
+        if (_stepRows.Any(r => !string.IsNullOrWhiteSpace(r.Text))) return true;
+        return false;
+    }
+
+    private async void OnNavigatingAway(object? sender, LocationChangedEventArgs e)
+    {
+        // Jen u NOVÉHO receptu (_isEditingExisting == false) - u editace existujícího konceptu se
+        // nikdy nic nemaže, ať uživatel omylem nepřijde o recept, který jen dočasně vyprázdnil.
+        if (!_isEditingExisting && _currentRecipeId.HasValue && !HasMeaningfulContent())
+        {
+            await App.Database.DeleteRecipeAsync(_currentRecipeId.Value);
+        }
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnNavigatingAway;
     }
 }
