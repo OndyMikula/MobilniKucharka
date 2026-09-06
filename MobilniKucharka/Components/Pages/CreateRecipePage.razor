@@ -93,7 +93,7 @@
                 {
                     <!-- Názvy pomůcek se záměrně NEpřekládají přes Tr() - stejně jako v originálním
                          XAML (AddTagButton nastavoval Label.Text natvrdo), jde o volný text uložený
-                         česky bez ohledu na jazyk appky. -->
+                         česky bez ohledu na jazyk aplikace. -->
                     <button type="button" class="tag-chip @(_selectedTags.Contains(tag) ? "selected" : "")" @onclick="() => OnToggleTag(tag)">
                         @tag
                     </button>
@@ -414,7 +414,7 @@
 
     // Filtruje jen na číslice, stejně jako původní OnManualCostTextChanged/OnPrepTimeTextChanged -
     // ale záměrně BEZ volání TriggerAutoSaveAsync, přesně jako originál. Psaní jen do těchto dvou
-    // polí samo o sobě autosave nespustí (existující, ne nová, nekonzistence originální appky) -
+    // polí samo o sobě autosave nespustí (existující, ne nová, nekonzistence originální aplikace) -
     // aktuální hodnota se stejně uloží, jakmile autosave spustí JAKÉKOLI jiné pole (ingredience,
     // popis, tag, hodnocení...), protože TriggerAutoSaveAsync vždy čte aktuální stav všech polí.
     private void OnManualCostInput(ChangeEventArgs e)

@@ -80,12 +80,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <MauiXaml Update="Classes\Legal\LegalDocumentPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Classes\Legal\LicensePage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
 	  <MauiXaml Update="Classes\UserData\OnBoardingPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>

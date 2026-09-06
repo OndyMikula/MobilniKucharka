@@ -1,0 +1,58 @@
+﻿@page "/legal/{DocType}"
+@namespace MobilniKucharka.Components.Pages
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<div class="create-recipe-page">
+    <div class="create-recipe-header">
+        <button type="button" class="icon-btn" @onclick="NavigateBackAsync">←</button>
+        <h1 class="hub-title" style="font-size:20px;">@_title</h1>
+    </div>
+
+    <div class="create-recipe-body">
+        @foreach (var section in _sections)
+        {
+            <div class="detail-section">
+                <h2 class="detail-section-title">@section.Heading</h2>
+                <p style="white-space: pre-wrap; margin:0; font-size:14px; line-height:1.4;">@section.Body</p>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    // "tos"/"privacy"/"third-party" jsou stabilní URL segmenty, ne přímo název enumu - stejný
+    // princip jako jinde v appce (viz bookmark route se jmény kategorií), ať URL zůstává čitelná
+    // a nezávislá na přesném pojmenování LegalDocumentType.
+    [Parameter] public string DocType { get; set; } = string.Empty;
+
+    private string _title = string.Empty;
+    private List<LegalSection> _sections = [];
+
+    protected override void OnParametersSet()
+    {
+        var type = DocType switch
+        {
+            "privacy" => LegalDocumentType.PrivacyPolicy,
+            "third-party" => LegalDocumentType.ThirdPartyNotices,
+            _ => LegalDocumentType.TermsOfService
+        };
+
+        // Právní obsah je záměrně anglicky a NIKDY neprochází Tr()/DeepL (viz LegalContent.cs) -
+        // nadpis i sekce se tu zobrazují přesně tak, jak je vrací LegalContent, beze změny.
+        _title = LegalContent.GetTitle(type);
+        _sections = LegalContent.GetSections(type);
+    }
+
+    private async Task NavigateBackAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("mkNavigateBack");
+        }
+        catch
+        {
+            NavigationManager.NavigateTo("/recipes");
+        }
+    }
+}

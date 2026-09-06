@@ -318,9 +318,6 @@ public partial class SettingsPage : ContentPage
         }
     }
 
-    // Jeden odkaz "Právní informace" místo čtyř samostatných tlačítek - klepnutím nabídne action
-    // sheet se všemi 4 dokumenty. License jde do vlastní LicensePage (plné znění Apache 2.0),
-    // zbylé tři přes generickou LegalDocumentPage (viz LegalContent).
     private async void OnLegalInfoTapped(object sender, TappedEventArgs e)
     {
         string tos = Tr("Podmínky použití");
@@ -330,14 +327,17 @@ public partial class SettingsPage : ContentPage
 
         string action = await DisplayActionSheetAsync(Tr("Právní informace"), Tr("Zrušit"), null, tos, privacy, license, thirdParty);
 
-        if (action == tos)
-            await Navigation.PushAsync(new LegalDocumentPage(LegalDocumentType.TermsOfService));
-        else if (action == privacy)
-            await Navigation.PushAsync(new LegalDocumentPage(LegalDocumentType.PrivacyPolicy));
-        else if (action == license)
-            await Navigation.PushAsync(new LicensePage());
-        else if (action == thirdParty)
-            await Navigation.PushAsync(new LegalDocumentPage(LegalDocumentType.ThirdPartyNotices));
+        string? route = action == tos ? "/legal/tos"
+            : action == privacy ? "/legal/privacy"
+            : action == license ? "/license"
+            : action == thirdParty ? "/legal/third-party"
+            : null;
+
+        if (route != null)
+        {
+            App.PendingBlazorRoute = route;
+            await Navigation.PopToRootAsync();
+        }
     }
 
     private void UpdateBetaSectionVisibility()

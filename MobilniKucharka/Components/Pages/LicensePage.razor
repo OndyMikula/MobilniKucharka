@@ -1,0 +1,74 @@
+﻿@page "/license"
+@namespace MobilniKucharka.Components.Pages
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<div class="create-recipe-page">
+    <div class="create-recipe-header">
+        <button type="button" class="icon-btn" @onclick="NavigateBackAsync">←</button>
+        <h1 class="hub-title" style="font-size:20px;">License</h1>
+    </div>
+
+    <div class="create-recipe-body">
+        <div class="detail-section">
+            <h2 class="detail-section-title">App name, icon, and branding</h2>
+            <p style="margin:0; font-size:14px; line-height:1.4;">
+                The source code below is licensed under the Apache License, Version 2.0. This license covers the source code only - it does not grant rights to the app's name, icon, or branding ("Mobilní Kuchařka"), which are not covered by this license and may not be reused to imply an official or endorsed version of the app without permission.
+            </p>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="skeleton-card"></div>
+        }
+        else
+        {
+            <!-- Plné, nezkrácené znění Apache 2.0 v <pre> - viz BLAZOR_MIGRATION_PLAN.md,
+                 "Legal/license pages get simpler" - žádné LegalSection modelování potřeba,
+                 white-space: pre-wrap zachová původní formátování jedna ku jedné. -->
+            <pre style="white-space: pre-wrap; font-size:12px; line-height:1.4; font-family:inherit; margin:0;">@_licenseText</pre>
+        }
+
+        <button type="button" class="btn-action btn-primary" @onclick="OnViewOnGitHubClicked">View this file on GitHub</button>
+    </div>
+</div>
+
+@code {
+    private string _licenseText = string.Empty;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            using var stream = await FileSystem.OpenAppPackageFileAsync("LICENSE.txt");
+            using var reader = new StreamReader(stream);
+            _licenseText = await reader.ReadToEndAsync();
+        }
+        catch (Exception ex)
+        {
+            _licenseText = $"Couldn't load the license text. You can still view it on GitHub below.\n({ex.Message})";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnViewOnGitHubClicked()
+    {
+        await Launcher.Default.OpenAsync(LegalContent.LicenseFileUrl);
+    }
+
+    private async Task NavigateBackAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("mkNavigateBack");
+        }
+        catch
+        {
+            NavigationManager.NavigateTo("/recipes");
+        }
+    }
+}
