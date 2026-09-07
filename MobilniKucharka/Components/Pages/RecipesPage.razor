@@ -60,6 +60,7 @@
             <div class="empty-state">
                 <span class="empty-icon">🍲</span>
                 <p>@Tr("Žádné recepty nevyhovují filtru.")</p>
+                <button type="button" class="empty-state-link" @onclick="GoToSearch">@Tr("Hledat recepty")</button>
             </div>
         }
         else
@@ -294,5 +295,10 @@
     public void Dispose()
     {
         BlazorShellPage.ShellAppeared -= OnShellAppeared;
+    }
+
+    private void GoToSearch()
+    {
+        NavigationManager.NavigateTo("/search");
     }
 }

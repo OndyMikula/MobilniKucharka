@@ -26,8 +26,8 @@
 		<ApplicationId>com.ondymikula.mobilnikucharka</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.6</ApplicationDisplayVersion> <!-- Co vidí user (1.6), "- beta" pro oznaceni beta verze -->
-		<ApplicationVersion>14</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(14) -->
+		<ApplicationDisplayVersion>1.6.1</ApplicationDisplayVersion> <!-- Co vidí user (1.6.1), "- beta" pro oznaceni beta verze -->
+		<ApplicationVersion>15</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(15) -->
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
 
