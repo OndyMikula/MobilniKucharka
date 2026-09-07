@@ -86,7 +86,7 @@ Aplikace pro plánování jídelníčku, správu receptů a odhad nákladů na n
 
 Recepty importované z externích zdrojů se ukládají do lokální databáze při prvním zobrazení, aby šly bookmarkovat a hodnotit stejně jako vlastní recepty.
 
-**Sdílení receptů:** jednotlivé recepty lze exportovat jako obyčejný, čitelný soubor `.json` (nepotřebuje žádnou speciální appku k otevření) nebo sdílet přes dočasný odkaz uložený v samostatném GitHub repozitáři, který zároveň generuje skutečné Android App Links, takže otevření sdíleného odkazu na jiném zařízení rovnou skočí do appky.
+**Sdílení receptů:** jednotlivé recepty lze exportovat jako obyčejný, čitelný soubor `.json` (nepotřebuje žádnou speciální appku k otevření) nebo sdílet přes dočasný odkaz uložený v samostatném GitHub repozitáři, který zároveň generuje skutečné Android App Links, takže otevření sdíleného odkazu na jiném zařízení rovnou skočí do aplikace.
 
 **API klíče** nastavte v `Services/Secrets.txt` a přejmenujte na `Services/Secrets.cs`.
 

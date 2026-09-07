@@ -142,7 +142,7 @@ namespace MobilniKucharka.Services
             return translated;
         }
 
-        // Zajistí, že recept má vyplněný text v aktuálně nastaveném jazyce appky.
+        // Zajistí, že recept má vyplněný text v aktuálně nastaveném jazyce aplikace.
         // Pokud chybí (např. recept naimportovaný jen v angličtině a appka běží v češtině),
         // automaticky ho přeloží a uloží - bez nutnosti ručně mačkat "Přeložit".
         // Díky cache (viz TranslateAndSaveRecipeAsync) se tohle pro daný recept stane jen jednou navždy.

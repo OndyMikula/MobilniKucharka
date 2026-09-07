@@ -52,7 +52,7 @@ namespace MobilniKucharka.Platforms.Android
         // edge-to-edge), takže hlásí skutečnou výšku systémové navigační lišty v pixelech. Hodnota
         // jde přímo do platformově neutrálního SystemInsets (viz Classes/Navigation/SystemInsets.cs)
         // - Blazor komponenty tak nemusí odkazovat na Android-specifický kód. Zůstává aktivní po
-        // celou dobu běhu appky, takže se appčin CSS nav bar přizpůsobí i za běhu (otočení
+        // celou dobu běhu aplikace, takže se appčin CSS nav bar přizpůsobí i za běhu (otočení
         // obrazovky, přepnutí gesta/3 tlačítka v nastavení telefonu).
         private void SetupSystemInsetsListener()
         {

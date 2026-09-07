@@ -29,7 +29,7 @@ namespace MobilniKucharka.Services
     // Sjednocuje hledání receptů na internetu napříč TheMealDB a Spoonacularem pro SearchPage.
     // Dotaz se před odesláním přeloží do angličtiny (obě API jsou anglická) - díky tomu funguje
     // hledání i pro česky napsané názvy receptů, ne jen anglické. Zobrazované názvy výsledků se
-    // (v českém režimu appky) přeloží zpátky pro zobrazení - viz TranslateResultNamesForDisplayAsync.
+    // (v českém režimu aplikace) přeloží zpátky pro zobrazení - viz TranslateResultNamesForDisplayAsync.
     // Obě strany překladu (dotaz i výsledky) se cachují, ať appka za tutéž větu neplatí DeepL
     // kvótu opakovaně - viz BudgetPlannerService.GetSearchQueryTranslationAsync a
     // ExternalRecipeSearchResult.NameCs, který se propisuje přímo do uloženého receptu.
@@ -77,7 +77,7 @@ namespace MobilniKucharka.Services
 
         // Přeloží dotaz do angličtiny, pokud appka běží v češtině - obě externí API rozumí prakticky
         // jen anglickým názvům. Nejdřív zkontroluje cache (stejný dotaz už dřív přeložený), teprve
-        // pak zavolá DeepL - a výsledek si pro příště uloží. V anglickém režimu appky se žádný
+        // pak zavolá DeepL - a výsledek si pro příště uloží. V anglickém režimu aplikace se žádný
         // překlad nevolá vůbec.
         private async Task<string> TranslateQueryToEnglishAsync(string query)
         {
@@ -94,7 +94,7 @@ namespace MobilniKucharka.Services
             return translated;
         }
 
-        // Přeloží zobrazované názvy nalezených receptů do aktuálního jazyka appky (v českém režimu
+        // Přeloží zobrazované názvy nalezených receptů do aktuálního jazyka aplikace (v českém režimu
         // zpátky z angličtiny) - ukládá se do NameCs, NE do Name (Name zůstává kanonický anglický
         // název ze zdroje, potřebný pro Name_EN při uložení - viz ResolveAndSaveRecipeAsync).
         // Nejdřív zkusí jedno dávkové volání pro celý seznam najednou (šetří DeepL kvótu); pokud

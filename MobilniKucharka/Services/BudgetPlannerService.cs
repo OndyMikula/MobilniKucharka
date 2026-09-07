@@ -44,7 +44,7 @@ namespace MobilniKucharka.Services
                 }
                 else
                 {
-                    // Doplňková migrace pro appky, které už měly záložky nasazené z dřívějška -
+                    // Doplňková migrace pro aplikace, které už měly záložky nasazené z dřívějška -
                     // seed výše se spustí jen na úplně prázdné tabulce, takže existující instalace
                     // (včetně vývojového zařízení) by jinak "Vyhledané recepty" nikdy nedostaly,
                     // aniž by se jim smazala data.
@@ -212,7 +212,7 @@ namespace MobilniKucharka.Services
                     if (userEquipment.Count != 0 && !recipe.Equipment.All(e => userEquipment.Contains(e)))
                         continue;
 
-                    // Doplní jméno (a kroky) do aktuálního jazyka appky, pokud ještě chybí - díky cache uvnitř
+                    // Doplní jméno (a kroky) do aktuálního jazyka aplikace, pokud ještě chybí - díky cache uvnitř
                     // EnsureRecipeLanguageAsync se DeepL zavolá jen jednou za (recept, jazyk) navždy; další
                     // zobrazení seznamu je pak jen levná kontrola v DB, ne nové volání API.
                     var displayRecipe = await EnsureRecipeLanguageAsync(recipe.Id) ?? recipe;
@@ -319,7 +319,7 @@ namespace MobilniKucharka.Services
 
                 // Stejný "translate-on-read" vzor jako GetPlanAsync/SearchRecipesAsync - recept
                 // naimportovaný jen v jednom jazyce (např. přes SearchPage, který ukládá jen Name_EN)
-                // se tu doplní do aktuálního jazyka appky, pokud ještě nebyl zobrazen přes
+                // se tu doplní do aktuálního jazyka aplikace, pokud ještě nebyl zobrazen přes
                 // RecipeDetailPage. Díky tomu se i "Vytvořené recepty" (kam Import odkládá recepty)
                 // zobrazují správně přeložené. Cache uvnitř EnsureRecipeLanguageAsync zajistí, že se
                 // DeepL nezavolá znovu, pokud už překlad existuje.
@@ -669,7 +669,7 @@ namespace MobilniKucharka.Services
 
         // Upraví existující záložku - obrázek, popis, a (jen u nechráněných záložek) i název.
         // removeImage: true vrátí záložku na výchozí jednobarevné pozadí - hlavně pro obnovu záložek
-        // zasažených starým bugem, kdy uživatelem vybraný obrázek zmizel po aktualizaci appky (viz
+        // zasažených starým bugem, kdy uživatelem vybraný obrázek zmizel po aktualizaci aplikace (viz
         // CreateBookmarkPage.OnPickImageClicked, který teď kopíruje soubor do AppDataDirectory natrvalo).
         // Přejmenování u výchozích čtyř záložek je zakázané (viz ProtectedBookmarkNames); pokud se název
         // u nechráněné záložky změní, přepíšou se i všechny navázané RecipeBookmark záznamy, aby recepty

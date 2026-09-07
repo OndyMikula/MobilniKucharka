@@ -66,6 +66,14 @@ namespace MobilniKucharka.Services
                     processed++;
                     progress?.Report((double)processed / total);
                 }
+
+                // Preference (počet lidí, rozpočet, diety, spotřebiče, jazyk, motiv) žijí mimo
+                // FileSystem.AppDataDirectory, takže se do zálohy nedostanou automaticky přes
+                // soubory výše - přidají se jako samostatná JSON položka přímo do archivu.
+                var prefsEntry = zip.CreateEntry(PreferencesBackupService.FileNameInZip);
+                using var entryStream = prefsEntry.Open();
+                using var writer = new StreamWriter(entryStream);
+                writer.Write(PreferencesBackupService.CaptureAsJson());
             });
 
             try
@@ -93,6 +101,29 @@ namespace MobilniKucharka.Services
 
                 foreach (var entry in zip.Entries)
                 {
+                    // Preferences záznam se nikdy neextrahuje jako soubor do AppDataDirectory -
+                    // rozparsuje se rovnou z archivu a zapíše do Preferences.Default. Starší záloha
+                    // vytvořená appkou před touhle funkcí tuhle položku prostě nemá, cyklus na ni
+                    // nikdy nenarazí a zbytek importu proběhne úplně stejně jako dřív.
+                    if (PreferencesBackupService.IsPreferencesEntry(entry.Name))
+                    {
+                        try
+                        {
+                            using var entryStream = entry.Open();
+                            using var reader = new StreamReader(entryStream);
+                            string json = reader.ReadToEnd();
+                            PreferencesBackupService.ApplyFromJson(json);
+                        }
+                        catch
+                        {
+                            // poškozená/nečitelná položka - zbytek dat (recepty, záložky, fotky) se přesto obnoví normálně
+                        }
+
+                        processed++;
+                        progress?.Report((double)processed / total);
+                        continue;
+                    }
+
                     if (string.IsNullOrEmpty(entry.Name) || IsExcludedPath(entry.FullName))
                     {
                         processed++;
@@ -120,6 +151,11 @@ namespace MobilniKucharka.Services
                     progress?.Report((double)processed / total);
                 }
             });
+
+            // Musí proběhnout AŽ PO dokončení Task.Run výše (Preferences už jsou obnovené) a zpátky
+            // na volajícím vlákně (UI) - nastavení Application.Current.UserAppTheme potřebuje UI
+            // vlákno, na rozdíl od samotného zápisu do Preferences.
+            PreferencesBackupService.ApplyRuntimeSideEffects();
         }
     }
 }

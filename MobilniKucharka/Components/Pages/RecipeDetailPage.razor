@@ -47,7 +47,7 @@
                 <div class="recipe-detail-meta-row">
                     <div class="recipe-detail-meta-left">
                         <!-- EmptyColor="#FFFFFF" - hero je vždy tmavý (fotka + gradient) bez ohledu na
-                             světlý/tmavý motiv appky, výchozí var(--color-border) by tam u nehodnoceného
+                             světlý/tmavý motiv aplikace, výchozí var(--color-border) by tam u nehodnoceného
                              receptu (0.0) splývala s pozadím - viz StarRating.razor. -->
                         <StarRating Rating="_recipe.Rating" SizePx="18" EmptyColor="#FFFFFF" />
                         <span class="recipe-detail-rating-number">@_recipe.Rating.ToString("F1")</span>
@@ -185,7 +185,7 @@
                      hvězd při tažení), skutečný zápis do DB (OnUserRatingChangedAsync, sdílené s
                      klepáním na hvězdy výše) proběhne až @onchange (puštění posuvníku) - ať appka
                      nezapisuje do SQLite při každém pixelu tažení. Hodnota vždy s InvariantCulture -
-                     HTML range input vždy očekává/vrací desetinnou tečku bez ohledu na jazyk appky,
+                     HTML range input vždy očekává/vrací desetinnou tečku bez ohledu na jazyk aplikace,
                      zatímco SettingsPage.OnLanguageChanged umí nastavit CurrentCulture na "cs", kde
                      by běžný ToString()/Parse použil čárku a rozbil hodnotu. -->
                 <input type="range" class="rating-slider" min="0" max="5" step="0.5"

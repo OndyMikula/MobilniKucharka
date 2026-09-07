@@ -13,7 +13,7 @@ namespace MobilniKucharka.Translation
         private static readonly Dictionary<string, string> _aliases = [];
         private static bool _isLoaded = false;
 
-        // Zavolej jednou při startu appky (viz App.xaml.cs). Dokud nedoběhne, Tr() jede na fallbacku
+        // Zavolej jednou při startu aplikace (viz App.xaml.cs). Dokud nedoběhne, Tr() jede na fallbacku
         // (vrací český text) - žádný pád, jen krátké okno bez překladu hned po studeném startu.
         public static async Task InitializeAsync()
         {
