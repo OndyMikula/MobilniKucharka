@@ -464,6 +464,7 @@ html, body {
     align-items: center;
     gap: 10px;
     padding: 15px 15px 10px 15px;
+    padding-top: calc(15px + var(--system-top-inset, 0px));
     background-color: var(--color-bg);
     flex-shrink: 0;
 }

@@ -26,7 +26,7 @@
 		<ApplicationId>com.ondymikula.mobilnikucharka</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.6.1</ApplicationDisplayVersion> <!-- Co vidí user (1.6.1), "- beta" pro oznaceni beta verze -->
+		<ApplicationDisplayVersion>1.6.2</ApplicationDisplayVersion> <!-- Co vidí user (1.6.2), "- beta" pro oznaceni beta verze -->
 		<ApplicationVersion>15</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(15) -->
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
@@ -80,6 +80,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <MauiXaml Update="Classes\Navigation\BlazorModalPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
 	  <MauiXaml Update="Classes\UserData\OnBoardingPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>

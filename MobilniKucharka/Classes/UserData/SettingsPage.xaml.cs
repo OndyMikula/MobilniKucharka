@@ -335,8 +335,7 @@ public partial class SettingsPage : ContentPage
 
         if (route != null)
         {
-            App.PendingBlazorRoute = route;
-            await Navigation.PopToRootAsync();
+            await Navigation.PushAsync(new Classes.Navigation.BlazorModalPage(route));
         }
     }
 
@@ -394,8 +393,12 @@ public partial class SettingsPage : ContentPage
     // (App.PendingBlazorRoute + PopToRootAsync na BlazorShellPage, viz MainLayout.razor).
     private async void OnReportBugClicked(object sender, EventArgs e)
     {
-        App.PendingBlazorRoute = "/bug-report";
-        await Navigation.PopToRootAsync();
+        await Navigation.PushAsync(new Classes.Navigation.BlazorModalPage("/bug-report"));
+    }
+
+    private async void OnSuggestIdeaClicked(object sender, EventArgs e)
+    {
+        await Navigation.PushAsync(new Classes.Navigation.BlazorModalPage("/idea"));
     }
 
     private static void RestartApp()

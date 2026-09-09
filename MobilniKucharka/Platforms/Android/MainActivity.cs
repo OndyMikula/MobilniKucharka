@@ -48,12 +48,6 @@ namespace MobilniKucharka.Platforms.Android
             }
         }
 
-        // Naslouchač visí na DecorView (ten vždy pokrývá celou obrazovku bez ohledu na
-        // edge-to-edge), takže hlásí skutečnou výšku systémové navigační lišty v pixelech. Hodnota
-        // jde přímo do platformově neutrálního SystemInsets (viz Classes/Navigation/SystemInsets.cs)
-        // - Blazor komponenty tak nemusí odkazovat na Android-specifický kód. Zůstává aktivní po
-        // celou dobu běhu aplikace, takže se appčin CSS nav bar přizpůsobí i za běhu (otočení
-        // obrazovky, přepnutí gesta/3 tlačítka v nastavení telefonu).
         private void SetupSystemInsetsListener()
         {
             var decorView = Window?.DecorView;
@@ -68,11 +62,15 @@ namespace MobilniKucharka.Platforms.Android
             {
                 if (insets == null) return insets;
 
-                var navBarInsets = insets.GetInsets(WindowInsetsCompat.Type.NavigationBars());
                 double density = v?.Resources?.DisplayMetrics?.Density ?? 1.0;
-                double insetDp = (navBarInsets?.Bottom ?? 0) / density;
 
-                SystemInsets.SetBottom(insetDp);
+                var navBarInsets = insets.GetInsets(WindowInsetsCompat.Type.NavigationBars());
+                double bottomDp = (navBarInsets?.Bottom ?? 0) / density;
+                SystemInsets.SetBottom(bottomDp);
+
+                var statusBarInsets = insets.GetInsets(WindowInsetsCompat.Type.StatusBars());
+                double topDp = (statusBarInsets?.Top ?? 0) / density;
+                SystemInsets.SetTop(topDp);
 
                 return insets;
             }

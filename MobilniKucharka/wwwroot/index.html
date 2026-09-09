@@ -22,8 +22,10 @@
             document.documentElement.style.setProperty('--system-nav-inset', px + 'px');
         };
 
-        // Volané z RecipeDetailPage.razor - vrátí uživatele o jeden krok zpět ve vlastní historii
-        // Blazor Routeru (běžný browser history.back()), ne v nativním MAUI zásobníku stránek.
+        window.setSystemTopInset = function (px) {
+            document.documentElement.style.setProperty('--system-top-inset', px + 'px');
+        };
+
         window.mkNavigateBack = function () {
             history.back();
         };

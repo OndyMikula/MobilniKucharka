@@ -31,7 +31,7 @@ namespace MobilniKucharka.Services
                 await _db.CreateTableAsync<RecipeBookmark>();
                 await _db.CreateTableAsync<LocalProductAlias>();
 
-                var recipeCount = await _db.Table<Recipe>().CountAsync();
+                var recipeCount = await _db.Table<LocalProduct>().CountAsync();
                 if (recipeCount == 0)
                 {
                     await SeedDatabaseAsync();
@@ -80,58 +80,6 @@ namespace MobilniKucharka.Services
             foreach (var prod in products)
             {
                 await _db.InsertOrReplaceAsync(prod);
-            }
-
-            var r1 = new Recipe
-            {
-                Id = 1,
-                Name_CS = "Špagety s rajčatovou omáčkou",
-                Name_EN = "Spaghetti with Tomato Sauce",
-                PrepTime = 15,
-                Protein = 15,
-                Carbs = 85,
-                Fat = 5,
-                Sugar = 11,
-                ServingSize = 1,
-                ImageUrl = "https://images.unsplash.com/photo-1546549032-9571cd6b27df?w=500",
-                StepsJson_CS = JsonSerializer.Serialize(new List<string> { "Dej vařit vodu na špagety.", "Osol vodu a uvař špagety al dente.", "Ohřej rajčatovou omáčku a promíchej ji s těstovinami." }),
-                StepsJson_EN = JsonSerializer.Serialize(new List<string> { "Boil water for spaghetti.", "Salt the water and cook spaghetti al dente.", "Heat the tomato sauce and mix with pasta." }),
-                EquipmentJson = JsonSerializer.Serialize(new List<string> { "Hrnec", "Cedník" }),
-                DietaryFlagsJson = JsonSerializer.Serialize(new List<string> { "Vegetarian" })
-            };
-
-            var r2 = new Recipe
-            {
-                Id = 2,
-                Name_CS = "Míchaná vajíčka na másle",
-                Name_EN = "Scrambled Eggs on Butter",
-                PrepTime = 5,
-                Protein = 19,
-                Carbs = 2,
-                Fat = 27,
-                Sugar = 1,
-                ServingSize = 1,
-                ImageUrl = "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=500",
-                StepsJson_CS = JsonSerializer.Serialize(new List<string> { "Rozpusť na pánvi máslo.", "Rozklepni vajíčka a míchej na mírném ohni do krémova.", "Osol a ihned podávej." }),
-                StepsJson_EN = JsonSerializer.Serialize(new List<string> { "Melt butter in a pan.", "Crack the eggs and stir over low heat until creamy.", "Salt and serve immediately." }),
-                EquipmentJson = JsonSerializer.Serialize(new List<string> { "Pánev" }),
-                DietaryFlagsJson = JsonSerializer.Serialize(new List<string> { "GlutenFree", "Vegetarian" })
-            };
-
-            await _db.InsertOrReplaceAsync(r1);
-            await _db.InsertOrReplaceAsync(r2);
-
-            var ingredients = new List<RecipeIngredient>
-            {
-                new() { RecipeId = 1, ProductId = 1, AmountPerPerson = 100 },
-                new() { RecipeId = 1, ProductId = 2, AmountPerPerson = 150 },
-                new() { RecipeId = 2, ProductId = 3, AmountPerPerson = 3 },
-                new() { RecipeId = 2, ProductId = 4, AmountPerPerson = 15 }
-            };
-
-            foreach (var ing in ingredients)
-            {
-                await _db.InsertOrReplaceAsync(ing);
             }
         }
 

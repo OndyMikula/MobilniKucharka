@@ -1,4 +1,4 @@
-﻿@page "/bug-report"
+﻿@page "/idea"
 @namespace MobilniKucharka.Components.Pages
 @inject IDialogService DialogService
 
@@ -8,31 +8,23 @@
     </div>
 
     <div class="create-recipe-body">
-        <h1 class="hub-title" style="font-size:22px; margin:0 0 4px 0;">@Tr("Nahlásit chybu")</h1>
+        <h1 class="hub-title" style="font-size:22px; margin:0 0 4px 0;">@Tr("Navrhnout vylepšení")</h1>
         <p style="margin:0; color:var(--color-text-secondary); font-size:13px;">
-            @Tr("Popiš, co se stalo. Report se odešle rovnou z appky, nikam nemusíš odcházet.")
+            @Tr("Máš nápad, co by appka měla umět? Napiš mi to sem.")
         </p>
 
         <div class="form-group">
-            <label class="form-label">@Tr("Popis chyby")</label>
-            <textarea class="form-textarea" style="min-height:110px;" placeholder="@Tr("Popiš problém co nejpřesněji...")"
+            <label class="form-label">@Tr("Název nápadu")</label>
+            <input type="text" class="form-input" placeholder="@Tr("Např. Nákupní seznam")"
+                   value="@_title" disabled="@_isSending"
+                   @oninput="(e) => _title = e.Value?.ToString() ?? string.Empty" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">@Tr("Popis nápadu")</label>
+            <textarea class="form-textarea" style="min-height:110px;" placeholder="@Tr("Popiš svůj nápad co nejpřesněji...")"
                       value="@_description" disabled="@_isSending"
                       @oninput="(e) => _description = e.Value?.ToString() ?? string.Empty"></textarea>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">@Tr("Jak chybu zopakovat (nepovinné)")</label>
-            <textarea class="form-textarea" placeholder="@Tr("Co jsi dělal/a předtím, než se chyba objevila?")"
-                      value="@_reproSteps" disabled="@_isSending"
-                      @oninput="(e) => _reproSteps = e.Value?.ToString() ?? string.Empty"></textarea>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">@Tr("Automaticky přiložené informace")</label>
-            <div class="detail-card" style="font-size:13px; color:var(--color-text-secondary);">
-                <div>@Tr("Jazyk aplikace"): @_languageName</div>
-                <div>@string.Format(Tr("Verze {0}"), _appVersion)</div>
-            </div>
         </div>
 
         <button type="button" class="btn-action btn-success" style="height:55px; margin-top:6px;" @onclick="OnSendInAppAsync" disabled="@_isSending">
@@ -55,38 +47,27 @@
 @code {
     private const string DeveloperEmail = "devzoufaly@gmail.com";
 
+    private string _title = string.Empty;
     private string _description = string.Empty;
-    private string _reproSteps = string.Empty;
-    private string _appVersion = string.Empty;
-    private string _languageName = string.Empty;
     private bool _isSending = false;
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
-    protected override void OnInitialized()
+    private string BuildIdeaText()
     {
-        _appVersion = AppInfo.Current.VersionString;
-        _languageName = Preferences.Default.Get("AppLanguageName", "Čeština");
-    }
-
-    private string BuildReportText()
-    {
-        string languageCode = Preferences.Default.Get("AppLanguageCode", "cs");
+        string titlePart = string.IsNullOrWhiteSpace(_title) ? "(bez názvu)" : _title;
         string descriptionPart = string.IsNullOrWhiteSpace(_description) ? "(nevyplněno)" : _description;
-        string reproPart = string.IsNullOrWhiteSpace(_reproSteps) ? "(nevyplněno)" : _reproSteps;
 
-        return $"**Zdroj:** Nahlásit chybu\n" +
-               $"**Verze aplikace:** {_appVersion}\n" +
-               $"**Jazyk aplikace:** {_languageName} ({languageCode})\n\n" +
-               $"**Popis chyby:**\n{descriptionPart}\n\n" +
-               $"**Jak problém zopakovat:**\n{reproPart}";
+        return $"**Zdroj:** Nápady na vylepšení\n\n" +
+               $"**{titlePart}**\n\n" +
+               $"{descriptionPart}";
     }
 
     private async Task<bool> ValidateAsync()
     {
         if (string.IsNullOrWhiteSpace(_description))
         {
-            await DialogService.ShowAlertAsync(Tr("Upozornění"), Tr("Zadej prosím popis chyby."), "OK");
+            await DialogService.ShowAlertAsync(Tr("Upozornění"), Tr("Zadej prosím popis nápadu."), "OK");
             return false;
         }
         return true;
@@ -100,11 +81,11 @@
         try
         {
             var service = new GitHubDiscussionService();
-            var result = await service.PostCommentAsync(GitHubDiscussionService.BugReportDiscussionNumber, BuildReportText());
+            var result = await service.PostCommentAsync(GitHubDiscussionService.IdeaDiscussionNumber, BuildIdeaText());
 
             if (result == DiscussionPostResult.Success)
             {
-                await DialogService.ShowAlertAsync(Tr("Odesláno"), Tr("Díky! Hlášení bylo úspěšně odesláno."), "OK");
+                await DialogService.ShowAlertAsync(Tr("Odesláno"), Tr("Díky za nápad!"), "OK");
                 await NavigateBackAsync();
             }
             else if (result == DiscussionPostResult.NotConfigured)
@@ -136,8 +117,8 @@
         {
             await Email.Default.ComposeAsync(new EmailMessage
             {
-                Subject = $"Nahlášení chyby - Mobilní Kuchařka {_appVersion}",
-                Body = BuildReportText(),
+                Subject = string.IsNullOrWhiteSpace(_title) ? Tr("Nápad na vylepšení - Mobilní Kuchařka") : $"{Tr("Nápad na vylepšení")}: {_title}",
+                Body = BuildIdeaText(),
                 To = [DeveloperEmail]
             });
         }

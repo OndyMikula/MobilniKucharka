@@ -21,8 +21,6 @@
         NavigationManager.LocationChanged += OnLocationChanged;
 
         SystemInsets.BottomChanged += OnSystemInsetChanged;
-
-        Classes.Navigation.BlazorShellPage.ShellAppeared += OnPendingRouteCheck;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -31,16 +29,6 @@
         {
             await ApplySystemInsetAsync();
         }
-    }
-
-    private void OnPendingRouteCheck()
-    {
-        if (string.IsNullOrWhiteSpace(App.PendingBlazorRoute)) return;
-
-        string route = App.PendingBlazorRoute;
-        App.PendingBlazorRoute = null;
-
-        NavigationManager.NavigateTo(route);
     }
 
     private async void OnSystemInsetChanged()
@@ -98,6 +86,5 @@
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
         SystemInsets.BottomChanged -= OnSystemInsetChanged;
-        Classes.Navigation.BlazorShellPage.ShellAppeared -= OnPendingRouteCheck;
     }
 }

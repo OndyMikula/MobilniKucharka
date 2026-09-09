@@ -11,21 +11,20 @@ namespace MobilniKucharka.Services
         NetworkOrApiFailure
     }
 
+    // Obecná služba pro psaní komentářů do libovolné existující GitHub Discussion přes GraphQL -
+    // dřív specifická jen pro hlášení chyb (Discussion #56), teď sdílená i s nápady na vylepšení
+    // (Discussion #71), viz BugReportPage.razor / IdeaPage.razor.
     public class GitHubDiscussionService
     {
         private readonly HttpClient _httpClient = new();
         private const string RepoOwner = "OndyMikula";
         private const string RepoName = "MobilniKucharka";
-        private const int DiscussionNumber = 56;
         private const string GraphQlUrl = "https://api.github.com/graphql";
 
-        // Vrací rozlišený výsledek místo prostého bool - "token není nastavený" (lokální build bez
-        // reálného Secrets.cs, nebo appka postavená před přidáním téhle funkce) je úplně jiná
-        // situace než "GitHub API/síť selhaly", ale dřív obě vracely stejné false a appka to pak
-        // uživateli ukazovala jako "zkontroluj internetové připojení", i když o připojení vůbec
-        // nešlo. Debug.WriteLine na každém kroku - stejný vzor jako ImageHelper.ResolveImageSrc -
-        // ať se příště dá skutečná příčina dohledat přes adb log/VS Debug Output, ne odhadovat.
-        public async Task<DiscussionPostResult> PostBugReportAsync(string body)
+        public const int BugReportDiscussionNumber = 56;
+        public const int IdeaDiscussionNumber = 71;
+
+        public async Task<DiscussionPostResult> PostCommentAsync(int discussionNumber, string body)
         {
             if (string.IsNullOrWhiteSpace(Secrets.GitHubDiscussionToken) ||
                 Secrets.GitHubDiscussionToken.Contains("paste_your", StringComparison.OrdinalIgnoreCase))
@@ -36,7 +35,7 @@ namespace MobilniKucharka.Services
 
             try
             {
-                string? discussionId = await GetDiscussionIdAsync();
+                string? discussionId = await GetDiscussionIdAsync(discussionNumber);
                 if (string.IsNullOrWhiteSpace(discussionId))
                 {
                     Debug.WriteLine("[GitHubDiscussionService] Nepodařilo se získat ID diskuze - viz předchozí log řádek s detailem chyby.");
@@ -53,12 +52,12 @@ namespace MobilniKucharka.Services
             }
         }
 
-        private async Task<string?> GetDiscussionIdAsync()
+        private async Task<string?> GetDiscussionIdAsync(int discussionNumber)
         {
             var payload = new
             {
                 query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){discussion(number:$number){id}}}",
-                variables = new { owner = RepoOwner, name = RepoName, number = DiscussionNumber }
+                variables = new { owner = RepoOwner, name = RepoName, number = discussionNumber }
             };
 
             string? responseJson = await SendGraphQlRequestAsync(payload);

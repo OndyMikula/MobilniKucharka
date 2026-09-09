@@ -8,7 +8,6 @@ public partial class App : Application
 {
     private static BudgetPlannerService? _database;
     public static string? PendingImportGuid { get; set; }
-    public static string? PendingBlazorRoute { get; set; }
 
     public static BudgetPlannerService Database
     {
@@ -30,13 +29,6 @@ public partial class App : Application
 
         Task.Run(() => UiTranslator.InitializeAsync()).GetAwaiter().GetResult();
 
-        // OnboardingPage se dřív dala zobrazit jen ručně přes Settings ("Změnit") - appka nikdy
-        // nekontrolovala, jestli onboarding vůbec proběhl, takže po instalaci šla appka rovnou do
-        // AppShell/Blazor shellu se seedovanými ukázkovými daty a výchozími preferencemi, bez
-        // jakéhokoli prvotního nastavení. "IsOnboardingComplete" se nastavuje až na konci
-        // OnboardingPage.OnNextClicked (nebo po obnově ze zálohy - viz CompleteOnboardingAndEnterApp
-        // tam), takže dokud appka poprvé neprojde jednou z těch dvou cest, MainPage zůstává
-        // OnboardingPage při každém studeném startu.
         bool isOnboardingComplete = Preferences.Default.Get("IsOnboardingComplete", false);
         MainPage = isOnboardingComplete ? new AppShell() : new OnboardingPage();
     }

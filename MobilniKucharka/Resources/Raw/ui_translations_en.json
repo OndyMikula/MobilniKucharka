@@ -254,5 +254,18 @@
   "Odeslání přímo z aplikace teď není k dispozici. Použij prosím odeslání e-mailem níže.": "Sending directly from the app isn't available right now. Please use the email option below.",
   "Zadej prosím popis chyby.": "Please enter a bug description.",
   "Na tomto zařízení není nastavená žádná e-mailová aplikace.": "No email app is set up on this device.",
-  "Report byl zkopírován do schránky. Otevírám GitHub diskuzi, kam ho můžeš vložit.": "The report has been copied to your clipboard. Opening the GitHub discussion where you can paste it."
+  "Report byl zkopírován do schránky. Otevírám GitHub diskuzi, kam ho můžeš vložit.": "The report has been copied to your clipboard. Opening the GitHub discussion where you can paste it.",
+
+  "Zpětná vazba": "Feedback",
+  "Pošli hlášení o chybě nebo nápad na vylepšení přímo vývojáři.": "Send a bug report or a feature idea straight to the developer.",
+  "Navrhnout vylepšení": "Suggest an improvement",
+  "Máš nápad, co by appka měla umět? Napiš mi to sem.": "Have an idea for what the app should do? Write it here.",
+  "Název nápadu": "Idea title",
+  "Popis nápadu": "Idea description",
+  "Např. Nákupní seznam": "e.g. Shopping list",
+  "Popiš svůj nápad co nejpřesněji...": "Describe your idea as precisely as possible...",
+  "Zadej prosím popis nápadu.": "Please enter a description for your idea.",
+  "Díky za nápad!": "Thanks for the idea!",
+  "Nápad na vylepšení - Mobilní Kuchařka": "Feature idea - Mobilní Kuchařka",
+  "Nápad na vylepšení": "Feature idea"
 }

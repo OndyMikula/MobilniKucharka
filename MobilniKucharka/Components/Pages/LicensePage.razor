@@ -1,7 +1,5 @@
 ﻿@page "/license"
 @namespace MobilniKucharka.Components.Pages
-@inject IJSRuntime JSRuntime
-@inject NavigationManager NavigationManager
 
 <div class="create-recipe-page">
     <div class="create-recipe-header">
@@ -23,9 +21,6 @@
         }
         else
         {
-            <!-- Plné, nezkrácené znění Apache 2.0 v <pre> - viz BLAZOR_MIGRATION_PLAN.md,
-                 "Legal/license pages get simpler" - žádné LegalSection modelování potřeba,
-                 white-space: pre-wrap zachová původní formátování jedna ku jedné. -->
             <pre style="white-space: pre-wrap; font-size:12px; line-height:1.4; font-family:inherit; margin:0;">@_licenseText</pre>
         }
 
@@ -62,13 +57,10 @@
 
     private async Task NavigateBackAsync()
     {
-        try
+        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+        if (nav != null)
         {
-            await JSRuntime.InvokeVoidAsync("mkNavigateBack");
-        }
-        catch
-        {
-            NavigationManager.NavigateTo("/recipes");
+            await nav.PopAsync();
         }
     }
 }
