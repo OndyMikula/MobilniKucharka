@@ -234,6 +234,10 @@
   "Vývojářský režim byl aktivován.": "Developer mode has been activated.",
   "Vývojářský režim byl deaktivován.": "Developer mode has been deactivated.",
 
+  "Tvůj e-mail (nepovinné)": "Your email (optional)",
+  "Vyplň, pokud chceš, aby ti vývojář mohl odpovědět": "Fill in if you'd like the developer to be able to reply",
+  "Recepty se nepodařilo načíst.": "Couldn't load the recipes.",
+
   "Nahlásit chybu": "Report a bug",
   "Pošli hlášení o chybě přímo vývojáři - stačí popsat, co se stalo.": "Send a bug report straight to the developer - just describe what happened.",
   "Popiš, co se stalo: ": "Describe what happened: ",

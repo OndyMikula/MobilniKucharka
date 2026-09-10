@@ -104,7 +104,7 @@
         }
         catch (Exception ex)
         {
-            await DialogService.ShowAlertAsync("Chyba načítání", $"Recepty se nepodařilo načíst.\nDetail: {ex.Message}", "OK");
+            await DialogService.ShowAlertAsync(Tr("Chyba"), $"{Tr("Recepty se nepodařilo načíst.")}\n{Tr("Detail")}: {ex.Message}", "OK");
             _recipes = [];
         }
 

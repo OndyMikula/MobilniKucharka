@@ -45,7 +45,7 @@ jobs:
                   public const string NutritionixApiKey = "placeholder";
                   public const string GitHubShareToken = "placeholder";
                   public const string DeepLApiKey = "placeholder:fx";
-                  public const string GitHubDiscussionToken = "placeholder";
+                  public const string FeedbackDispatchToken = "placeholder";
               }
           }
           "@ | Set-Content -Path $secretsPath -Encoding utf8

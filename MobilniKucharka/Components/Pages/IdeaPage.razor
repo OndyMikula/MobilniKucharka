@@ -27,7 +27,14 @@
                       @oninput="(e) => _description = e.Value?.ToString() ?? string.Empty"></textarea>
         </div>
 
-        <button type="button" class="btn-action btn-success" style="height:55px; margin-top:6px;" @onclick="OnSendInAppAsync" disabled="@_isSending">
+        <div class="form-group">
+            <label class="form-label">@Tr("Tvůj e-mail (nepovinné)")</label>
+            <input type="email" class="form-input" placeholder="@Tr("Vyplň, pokud chceš, aby ti vývojář mohl odpovědět")"
+                   value="@_userEmail" disabled="@_isSending"
+                   @oninput="(e) => _userEmail = e.Value?.ToString() ?? string.Empty" />
+        </div>
+
+        <button type="button" class="btn-action btn-success" style="height:55px; margin-top:6px;" @onclick="OnSendAsync" disabled="@_isSending">
             @if (_isSending)
             {
                 <span>⏳ @Tr("Odesílám...")</span>
@@ -38,7 +45,7 @@
             }
         </button>
 
-        <button type="button" class="recipe-source-link" @onclick="OnSendByEmailAsync" disabled="@_isSending">
+        <button type="button" class="recipe-source-link" @onclick="OnSendByEmailFallbackAsync" disabled="@_isSending">
             @Tr("Nebo odeslat e-mailem")
         </button>
     </div>
@@ -49,18 +56,20 @@
 
     private string _title = string.Empty;
     private string _description = string.Empty;
+    private string _userEmail = string.Empty;
     private bool _isSending = false;
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
-    private string BuildIdeaText()
+    private string BuildPreview() =>
+        !string.IsNullOrWhiteSpace(_title) ? _title.Trim() : (_description.Trim().Length > 60 ? _description.Trim()[..60] + "…" : _description.Trim());
+
+    private string BuildPlainTextBody()
     {
         string titlePart = string.IsNullOrWhiteSpace(_title) ? "(bez názvu)" : _title;
         string descriptionPart = string.IsNullOrWhiteSpace(_description) ? "(nevyplněno)" : _description;
-
-        return $"**Zdroj:** Nápady na vylepšení\n\n" +
-               $"**{titlePart}**\n\n" +
-               $"{descriptionPart}";
+        string emailPart = string.IsNullOrWhiteSpace(_userEmail) ? "(neuvedeno)" : _userEmail;
+        return $"E-mail uživatele: {emailPart}\n\n{titlePart}\n\n{descriptionPart}";
     }
 
     private async Task<bool> ValidateAsync()
@@ -73,22 +82,31 @@
         return true;
     }
 
-    private async Task OnSendInAppAsync()
+    private async Task OnSendAsync()
     {
         if (!await ValidateAsync()) return;
 
         _isSending = true;
         try
         {
-            var service = new GitHubDiscussionService();
-            var result = await service.PostCommentAsync(GitHubDiscussionService.IdeaDiscussionNumber, BuildIdeaText());
+            string languageCode = Preferences.Default.Get("AppLanguageCode", "cs");
+            string languageName = Preferences.Default.Get("AppLanguageName", "Čeština");
+            var service = new FeedbackDispatchService();
+            var result = await service.SendFeedbackAsync(
+                type: "Nápad na vylepšení",
+                title: BuildPreview(),
+                description: string.IsNullOrWhiteSpace(_description) ? "(nevyplněno)" : _description,
+                reproSteps: "-",
+                appVersion: AppInfo.Current.VersionString,
+                language: $"{languageName} ({languageCode})",
+                userEmail: _userEmail.Trim());
 
-            if (result == DiscussionPostResult.Success)
+            if (result == FeedbackDispatchResult.Success)
             {
                 await DialogService.ShowAlertAsync(Tr("Odesláno"), Tr("Díky za nápad!"), "OK");
                 await NavigateBackAsync();
             }
-            else if (result == DiscussionPostResult.NotConfigured)
+            else if (result == FeedbackDispatchResult.NotConfigured)
             {
                 await DialogService.ShowAlertAsync(
                     Tr("Odeslání není nastavené"),
@@ -109,7 +127,7 @@
         }
     }
 
-    private async Task OnSendByEmailAsync()
+    private async Task OnSendByEmailFallbackAsync()
     {
         if (!await ValidateAsync()) return;
 
@@ -118,7 +136,7 @@
             await Email.Default.ComposeAsync(new EmailMessage
             {
                 Subject = string.IsNullOrWhiteSpace(_title) ? Tr("Nápad na vylepšení - Mobilní Kuchařka") : $"{Tr("Nápad na vylepšení")}: {_title}",
-                Body = BuildIdeaText(),
+                Body = BuildPlainTextBody(),
                 To = [DeveloperEmail]
             });
         }
