@@ -2,17 +2,26 @@
 @inject NavigationManager NavigationManager
 
 <div class="nav-bar">
-    <div class="nav-pill" style="@PillStyle"></div>
+    <div class="nav-bar-content">
+        <div class="nav-pill" style="@PillStyle"></div>
 
-    <button type="button" class="nav-button @(ActiveTab == AppTab.Recipes ? "active" : "")" @onclick="() => SelectTab(AppTab.Recipes)">
-        @Tr("Recepty")
-    </button>
-    <button type="button" class="nav-button @(ActiveTab == AppTab.Search ? "active" : "")" @onclick="() => SelectTab(AppTab.Search)">
-        @Tr("Hledat")
-    </button>
-    <button type="button" class="nav-button @(ActiveTab == AppTab.Bookmarks ? "active" : "")" @onclick="() => SelectTab(AppTab.Bookmarks)">
-        @Tr("Záložky")
-    </button>
+        <button type="button" class="nav-button @(ActiveTab == AppTab.Recipes ? "active" : "")" @onclick="() => SelectTab(AppTab.Recipes)">
+            @Tr("Recepty")
+        </button>
+        <button type="button" class="nav-button @(ActiveTab == AppTab.Search ? "active" : "")" @onclick="() => SelectTab(AppTab.Search)">
+            @Tr("Hledat")
+        </button>
+        <button type="button" class="nav-button @(ActiveTab == AppTab.Bookmarks ? "active" : "")" @onclick="() => SelectTab(AppTab.Bookmarks)">
+            @Tr("Záložky")
+        </button>
+    </div>
+
+    <!-- Vyplní přesně tolik místa, kolik zabírá systémová navigační lišta (viz SystemInsets.cs a
+         MainActivity.cs) - stejnou barvou jako zbytek .nav-bar, takže appka nikdy neleží pod
+         systémovými tlačítky a tlačítka výš se přitom nijak nezmenší ani nezvětší (na rozdíl od
+         přidávání paddingu přímo do .nav-bar-content, což by pod globálním
+         box-sizing: border-box jen zmenšilo prostor pro tlačítka). -->
+    <div class="nav-bar-inset-spacer"></div>
 </div>
 
 @code {
@@ -38,13 +47,6 @@
             _ => "/"
         };
 
-        // replace: true - nepřidává novou položku do WebView vlastní (JS/prohlížečové) historie
-        // při přepnutí záložky. Bez tohohle si BlazorWebView na Androidu drží historii "za sebou",
-        // a jeho VLASTNÍ vestavěné zachytávání tlačítka/gesta zpět (viz Keycode.Back handling v
-        // BlazorWebView.Android.cs, CanGoBack() -> GoBack()) tuhle historii spotřebovává dřív, než
-        // se gesto vůbec dostane k MainActivity/AppShell - proto předchozí dvě opravy neměly žádný
-        // efekt, nikdy se ke slovu nedostaly. S replace: true CanGoBack() zůstává false a gesto
-        // se konečně dostane tam, kam má.
         NavigationManager.NavigateTo(route, replace: true);
     }
 }

@@ -3,6 +3,7 @@
 @namespace MobilniKucharka.Components.Pages
 @implements IDisposable
 @inject IDialogService DialogService
+@inject NavigationManager NavigationManager
 
 <div class="hub-page">
     <!-- Header -->
@@ -59,6 +60,7 @@
             <div class="empty-state">
                 <span class="empty-icon">🍲</span>
                 <p>@Tr("Žádné recepty nevyhovují filtru.")</p>
+                <button type="button" class="empty-state-link" @onclick="GoToSearch">@Tr("Hledat recepty")</button>
             </div>
         }
         else
@@ -193,18 +195,7 @@
                 }
             }
 
-            var recipeWithCost = new RecipeWithCost
-            {
-                Recipe = savedRecipe,
-                CalculatedCost = 0,
-                IsWithinBudget = true
-            };
-
-            var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-            if (nav != null)
-            {
-                await nav.PushAsync(new Classes.Recipe.RecipeDetailPage(recipeWithCost));
-            }
+            NavigationManager.NavigateTo($"/recipe/{savedRecipe.Id}");
         }
         finally
         {
@@ -234,8 +225,7 @@
 
     private void OpenCreateRecipe()
     {
-        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-        nav?.PushAsync(new Classes.Recipe.CreateRecipePage());
+        NavigationManager.NavigateTo("/recipe/create");
     }
 
     private async Task OnResetDatabaseClicked()
@@ -305,5 +295,10 @@
     public void Dispose()
     {
         BlazorShellPage.ShellAppeared -= OnShellAppeared;
+    }
+
+    private void GoToSearch()
+    {
+        NavigationManager.NavigateTo("/search");
     }
 }

@@ -2,6 +2,7 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 
 <div class="page-shell">
     <main class="page-content">
@@ -18,6 +19,32 @@
     {
         UpdateActiveTabFromUri(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+
+        SystemInsets.BottomChanged += OnSystemInsetChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ApplySystemInsetAsync();
+        }
+    }
+
+    private async void OnSystemInsetChanged()
+    {
+        await InvokeAsync(ApplySystemInsetAsync);
+    }
+
+    private async Task ApplySystemInsetAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("setSystemNavInset", SystemInsets.BottomDp);
+        }
+        catch
+        {
+        }
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
@@ -58,5 +85,6 @@
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
+        SystemInsets.BottomChanged -= OnSystemInsetChanged;
     }
 }

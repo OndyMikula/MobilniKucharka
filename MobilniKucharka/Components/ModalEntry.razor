@@ -1,0 +1,73 @@
+﻿@namespace MobilniKucharka.Components
+@implements IDisposable
+@inject IJSRuntime JSRuntime
+
+@if (_componentType != null)
+{
+    <DynamicComponent Type="_componentType" Parameters="_parameters" />
+}
+
+@code {
+    private Type? _componentType;
+    private IDictionary<string, object>? _parameters;
+
+    protected override void OnInitialized()
+    {
+        string route = Classes.Navigation.ModalNavigationState.PendingRoute ?? string.Empty;
+        Classes.Navigation.ModalNavigationState.PendingRoute = null;
+
+        if (route.StartsWith("/legal/", StringComparison.Ordinal))
+        {
+            _componentType = typeof(Pages.LegalDocumentPage);
+            _parameters = new Dictionary<string, object> { ["DocType"] = route["/legal/".Length..] };
+        }
+        else if (route == "/license")
+        {
+            _componentType = typeof(Pages.LicensePage);
+        }
+        else if (route == "/bug-report")
+        {
+            _componentType = typeof(Pages.BugReportPage);
+        }
+        else if (route == "/idea")
+        {
+            _componentType = typeof(Pages.IdeaPage);
+        }
+
+        // @layout na jednotlivých stránkách (BugReportPage/IdeaPage/LegalDocumentPage/LicensePage)
+        // nemá tady žádný efekt - [LayoutAttribute] čte jen RouteView (přes Router), ne
+        // DynamicComponent, který tahle komponenta používá místo Routeru (cílová route je známá
+        // už při vytvoření BlazorModalPage, žádné směrování není potřeba). Proto se inset musí
+        // nastavit přímo tady - v jediné komponentě, která pro tyhle stránky skutečně vzniká.
+        Classes.Navigation.SystemInsets.TopChanged += OnSystemInsetChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ApplyTopInsetAsync();
+        }
+    }
+
+    private async void OnSystemInsetChanged()
+    {
+        await InvokeAsync(ApplyTopInsetAsync);
+    }
+
+    private async Task ApplyTopInsetAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("setSystemTopInset", Classes.Navigation.SystemInsets.TopDp);
+        }
+        catch
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        Classes.Navigation.SystemInsets.TopChanged -= OnSystemInsetChanged;
+    }
+}

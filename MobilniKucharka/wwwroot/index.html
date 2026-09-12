@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿﻿
+<!DOCTYPE html>
 <html lang="cs">
 <head>
     <meta charset="utf-8" />
@@ -16,6 +17,19 @@
         <a class="dismiss">🗙</a>
     </div>
 
+    <script>
+        window.setSystemNavInset = function (px) {
+            document.documentElement.style.setProperty('--system-nav-inset', px + 'px');
+        };
+
+        window.setSystemTopInset = function (px) {
+            document.documentElement.style.setProperty('--system-top-inset', px + 'px');
+        };
+
+        window.mkNavigateBack = function () {
+            history.back();
+        };
+    </script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
 </body>
 </html>

@@ -1,0 +1,175 @@
+﻿@page "/bookmark/create"
+@page "/bookmark/edit"
+@namespace MobilniKucharka.Components.Pages
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<div class="create-recipe-page">
+    <div class="create-recipe-header">
+        <button type="button" class="icon-btn" @onclick="NavigateBackAsync">←</button>
+    </div>
+
+    <div class="create-recipe-body">
+        <h1 class="hub-title" style="font-size:22px; margin:0 0 4px 0;">@(_isEditingExisting ? Tr("Upravit záložku") : Tr("Nová složka"))</h1>
+
+        <div class="form-group">
+            <label class="form-label">@Tr("Název záložky")</label>
+            <input type="text" class="form-input" maxlength="30" placeholder="@Tr("Např. Rychlé večeře...")"
+                   value="@_nameText" disabled="@_isProtectedBookmark"
+                   @oninput="(e) => _nameText = e.Value?.ToString() ?? string.Empty" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">@Tr("Popis (volitelný)")</label>
+            <textarea class="form-textarea" maxlength="200" placeholder="@Tr("Krátký popis záložky...")"
+                      value="@_descriptionText" @oninput="(e) => _descriptionText = e.Value?.ToString() ?? string.Empty"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">@Tr("Obrázek složky (volitelný)")</label>
+            @if (!string.IsNullOrWhiteSpace(_selectedImagePath))
+            {
+                <img src="@ImageHelper.ResolveImageSrc(_selectedImagePath)" alt="" class="recipe-image-preview" />
+            }
+            <button type="button" class="btn-action btn-primary" @onclick="OnPickImageAsync">@Tr("Vybrat z galerie")</button>
+            @if (!string.IsNullOrWhiteSpace(_selectedImagePath))
+            {
+                <button type="button" class="recipe-source-link" style="color:var(--color-danger);" @onclick="OnRemoveImage">@Tr("Odebrat obrázek")</button>
+            }
+        </div>
+
+        <button type="button" class="btn-action btn-success" style="height:55px; margin-top:6px;" @onclick="OnSaveAsync">
+            @(_isEditingExisting ? Tr("Uložit změny") : Tr("Uložit složku"))
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "name")] public string? Name { get; set; }
+
+    private bool _hasInitialized;
+    private bool _isEditingExisting;
+    private string _originalCategoryName = string.Empty;
+    private bool _isProtectedBookmark;
+    private string _nameText = string.Empty;
+    private string _descriptionText = string.Empty;
+    private string _selectedImagePath = string.Empty;
+    private bool _imageWasRemoved;
+
+    // Musí odpovídat BudgetPlannerService.ProtectedBookmarkNames - vynucené na obou stranách
+    // (UI i DB vrstva), ať se to nikdy nerozejde.
+    private static readonly string[] ProtectedBookmarkNames = ["Oblíbené", "Vytvořené recepty", "Vyhledané recepty", "Koncepty"];
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_hasInitialized) return;
+        _hasInitialized = true;
+
+        if (!string.IsNullOrWhiteSpace(Name))
+        {
+            _isEditingExisting = true;
+            _originalCategoryName = Name;
+            _isProtectedBookmark = ProtectedBookmarkNames.Contains(Name);
+            await LoadExistingBookmarkAsync(Name);
+        }
+    }
+
+    private async Task LoadExistingBookmarkAsync(string categoryName)
+    {
+        var bookmark = await App.Database.GetBookmarkByNameAsync(categoryName);
+        if (bookmark == null) return;
+
+        _nameText = _isProtectedBookmark ? Tr(bookmark.Name) : bookmark.Name;
+        _descriptionText = bookmark.Description;
+
+        if (bookmark.UseImageAsBackground)
+        {
+            _selectedImagePath = bookmark.BackgroundImage;
+        }
+    }
+
+    private async Task OnPickImageAsync()
+    {
+        try
+        {
+            var results = await MediaPicker.Default.PickPhotosAsync();
+            var result = results.FirstOrDefault();
+            if (result != null)
+            {
+                string localFileName = $"{Guid.NewGuid()}.jpg";
+                string localFilePath = Path.Combine(FileSystem.AppDataDirectory, localFileName);
+
+                using Stream sourceStream = await result.OpenReadAsync();
+                await ImageResizeService.SaveResizedAsync(sourceStream, localFilePath);
+
+                _selectedImagePath = localFilePath;
+                _imageWasRemoved = false;
+            }
+        }
+        catch (FeatureNotSupportedException)
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), Tr("Tato funkce není na vašem zařízení podporována."), "OK");
+        }
+        catch (PermissionException)
+        {
+            await DialogService.ShowAlertAsync(Tr("Práva"), Tr("Aplikace nemá oprávnění přistupovat k fotkám."), "OK");
+        }
+        catch (Exception ex)
+        {
+            // Dřív (CreateBookmarkPage.xaml.cs) tohle hlášení nešlo přes Tr() vůbec - AGENTS.md to
+            // dokonce vedlo jako otevřenou položku ("DisplayAlertAsync calls not yet wrapped in
+            // Tr()"). Migrace je dobrá příležitost to rovnou dořešit.
+            await DialogService.ShowAlertAsync(Tr("Chyba"), $"{Tr("Nepodařilo se načíst obrázek")}: {ex.Message}", "OK");
+        }
+    }
+
+    private void OnRemoveImage()
+    {
+        _selectedImagePath = string.Empty;
+        _imageWasRemoved = true;
+    }
+
+    private async Task OnSaveAsync()
+    {
+        string folderName = _nameText?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(folderName))
+        {
+            await DialogService.ShowAlertAsync(Tr("Upozornění"), Tr("Název složky nesmí být prázdný."), "OK");
+            return;
+        }
+
+        try
+        {
+            if (_isEditingExisting)
+            {
+                await App.Database.UpdateBookmarkAsync(_originalCategoryName, folderName, _selectedImagePath, _imageWasRemoved, _descriptionText?.Trim() ?? string.Empty);
+            }
+            else
+            {
+                await App.Database.InsertNewCategoryAsync(folderName, _selectedImagePath, _descriptionText?.Trim() ?? string.Empty);
+            }
+
+            await NavigateBackAsync();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), $"{Tr("Nepodařilo se uložit složku")}: {ex.Message}", "OK");
+        }
+    }
+
+    private async Task NavigateBackAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("mkNavigateBack");
+        }
+        catch
+        {
+            NavigationManager.NavigateTo("/bookmarks");
+        }
+    }
+}

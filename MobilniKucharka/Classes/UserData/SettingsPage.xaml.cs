@@ -318,9 +318,6 @@ public partial class SettingsPage : ContentPage
         }
     }
 
-    // Jeden odkaz "Právní informace" místo čtyř samostatných tlačítek - klepnutím nabídne action
-    // sheet se všemi 4 dokumenty. License jde do vlastní LicensePage (plné znění Apache 2.0),
-    // zbylé tři přes generickou LegalDocumentPage (viz LegalContent).
     private async void OnLegalInfoTapped(object sender, TappedEventArgs e)
     {
         string tos = Tr("Podmínky použití");
@@ -330,14 +327,16 @@ public partial class SettingsPage : ContentPage
 
         string action = await DisplayActionSheetAsync(Tr("Právní informace"), Tr("Zrušit"), null, tos, privacy, license, thirdParty);
 
-        if (action == tos)
-            await Navigation.PushAsync(new LegalDocumentPage(LegalDocumentType.TermsOfService));
-        else if (action == privacy)
-            await Navigation.PushAsync(new LegalDocumentPage(LegalDocumentType.PrivacyPolicy));
-        else if (action == license)
-            await Navigation.PushAsync(new LicensePage());
-        else if (action == thirdParty)
-            await Navigation.PushAsync(new LegalDocumentPage(LegalDocumentType.ThirdPartyNotices));
+        string? route = action == tos ? "/legal/tos"
+            : action == privacy ? "/legal/privacy"
+            : action == license ? "/license"
+            : action == thirdParty ? "/legal/third-party"
+            : null;
+
+        if (route != null)
+        {
+            await Navigation.PushAsync(new Classes.Navigation.BlazorModalPage(route));
+        }
     }
 
     private void UpdateBetaSectionVisibility()
@@ -387,6 +386,19 @@ public partial class SettingsPage : ContentPage
         Preferences.Default.Set("IsBetaOptedIn", false);
         UpdateBetaSectionVisibility();
         await DisplayAlertAsync(Tr("Hotovo"), Tr("Byl jsi odhlášen z beta programu."), "OK");
+    }
+
+    // Nahlásit chybu je Blazor route (/bug-report) - SettingsPage je zatím pořád nativní (Fáze 3
+    // zatím nedokončená), takže se používá stejný most jako dřív u BookmarkCategoryPage
+    // (App.PendingBlazorRoute + PopToRootAsync na BlazorShellPage, viz MainLayout.razor).
+    private async void OnReportBugClicked(object sender, EventArgs e)
+    {
+        await Navigation.PushAsync(new Classes.Navigation.BlazorModalPage("/bug-report"));
+    }
+
+    private async void OnSuggestIdeaClicked(object sender, EventArgs e)
+    {
+        await Navigation.PushAsync(new Classes.Navigation.BlazorModalPage("/idea"));
     }
 
     private static void RestartApp()

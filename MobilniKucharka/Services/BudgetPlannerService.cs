@@ -31,7 +31,7 @@ namespace MobilniKucharka.Services
                 await _db.CreateTableAsync<RecipeBookmark>();
                 await _db.CreateTableAsync<LocalProductAlias>();
 
-                var recipeCount = await _db.Table<Recipe>().CountAsync();
+                var recipeCount = await _db.Table<LocalProduct>().CountAsync();
                 if (recipeCount == 0)
                 {
                     await SeedDatabaseAsync();
@@ -44,7 +44,7 @@ namespace MobilniKucharka.Services
                 }
                 else
                 {
-                    // Doplňková migrace pro appky, které už měly záložky nasazené z dřívějška -
+                    // Doplňková migrace pro aplikace, které už měly záložky nasazené z dřívějška -
                     // seed výše se spustí jen na úplně prázdné tabulce, takže existující instalace
                     // (včetně vývojového zařízení) by jinak "Vyhledané recepty" nikdy nedostaly,
                     // aniž by se jim smazala data.
@@ -80,58 +80,6 @@ namespace MobilniKucharka.Services
             foreach (var prod in products)
             {
                 await _db.InsertOrReplaceAsync(prod);
-            }
-
-            var r1 = new Recipe
-            {
-                Id = 1,
-                Name_CS = "Špagety s rajčatovou omáčkou",
-                Name_EN = "Spaghetti with Tomato Sauce",
-                PrepTime = 15,
-                Protein = 15,
-                Carbs = 85,
-                Fat = 5,
-                Sugar = 11,
-                ServingSize = 1,
-                ImageUrl = "https://images.unsplash.com/photo-1546549032-9571cd6b27df?w=500",
-                StepsJson_CS = JsonSerializer.Serialize(new List<string> { "Dej vařit vodu na špagety.", "Osol vodu a uvař špagety al dente.", "Ohřej rajčatovou omáčku a promíchej ji s těstovinami." }),
-                StepsJson_EN = JsonSerializer.Serialize(new List<string> { "Boil water for spaghetti.", "Salt the water and cook spaghetti al dente.", "Heat the tomato sauce and mix with pasta." }),
-                EquipmentJson = JsonSerializer.Serialize(new List<string> { "Hrnec", "Cedník" }),
-                DietaryFlagsJson = JsonSerializer.Serialize(new List<string> { "Vegetarian" })
-            };
-
-            var r2 = new Recipe
-            {
-                Id = 2,
-                Name_CS = "Míchaná vajíčka na másle",
-                Name_EN = "Scrambled Eggs on Butter",
-                PrepTime = 5,
-                Protein = 19,
-                Carbs = 2,
-                Fat = 27,
-                Sugar = 1,
-                ServingSize = 1,
-                ImageUrl = "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=500",
-                StepsJson_CS = JsonSerializer.Serialize(new List<string> { "Rozpusť na pánvi máslo.", "Rozklepni vajíčka a míchej na mírném ohni do krémova.", "Osol a ihned podávej." }),
-                StepsJson_EN = JsonSerializer.Serialize(new List<string> { "Melt butter in a pan.", "Crack the eggs and stir over low heat until creamy.", "Salt and serve immediately." }),
-                EquipmentJson = JsonSerializer.Serialize(new List<string> { "Pánev" }),
-                DietaryFlagsJson = JsonSerializer.Serialize(new List<string> { "GlutenFree", "Vegetarian" })
-            };
-
-            await _db.InsertOrReplaceAsync(r1);
-            await _db.InsertOrReplaceAsync(r2);
-
-            var ingredients = new List<RecipeIngredient>
-            {
-                new() { RecipeId = 1, ProductId = 1, AmountPerPerson = 100 },
-                new() { RecipeId = 1, ProductId = 2, AmountPerPerson = 150 },
-                new() { RecipeId = 2, ProductId = 3, AmountPerPerson = 3 },
-                new() { RecipeId = 2, ProductId = 4, AmountPerPerson = 15 }
-            };
-
-            foreach (var ing in ingredients)
-            {
-                await _db.InsertOrReplaceAsync(ing);
             }
         }
 
@@ -212,7 +160,7 @@ namespace MobilniKucharka.Services
                     if (userEquipment.Count != 0 && !recipe.Equipment.All(e => userEquipment.Contains(e)))
                         continue;
 
-                    // Doplní jméno (a kroky) do aktuálního jazyka appky, pokud ještě chybí - díky cache uvnitř
+                    // Doplní jméno (a kroky) do aktuálního jazyka aplikace, pokud ještě chybí - díky cache uvnitř
                     // EnsureRecipeLanguageAsync se DeepL zavolá jen jednou za (recept, jazyk) navždy; další
                     // zobrazení seznamu je pak jen levná kontrola v DB, ne nové volání API.
                     var displayRecipe = await EnsureRecipeLanguageAsync(recipe.Id) ?? recipe;
@@ -319,7 +267,7 @@ namespace MobilniKucharka.Services
 
                 // Stejný "translate-on-read" vzor jako GetPlanAsync/SearchRecipesAsync - recept
                 // naimportovaný jen v jednom jazyce (např. přes SearchPage, který ukládá jen Name_EN)
-                // se tu doplní do aktuálního jazyka appky, pokud ještě nebyl zobrazen přes
+                // se tu doplní do aktuálního jazyka aplikace, pokud ještě nebyl zobrazen přes
                 // RecipeDetailPage. Díky tomu se i "Vytvořené recepty" (kam Import odkládá recepty)
                 // zobrazují správně přeložené. Cache uvnitř EnsureRecipeLanguageAsync zajistí, že se
                 // DeepL nezavolá znovu, pokud už překlad existuje.
@@ -669,7 +617,7 @@ namespace MobilniKucharka.Services
 
         // Upraví existující záložku - obrázek, popis, a (jen u nechráněných záložek) i název.
         // removeImage: true vrátí záložku na výchozí jednobarevné pozadí - hlavně pro obnovu záložek
-        // zasažených starým bugem, kdy uživatelem vybraný obrázek zmizel po aktualizaci appky (viz
+        // zasažených starým bugem, kdy uživatelem vybraný obrázek zmizel po aktualizaci aplikace (viz
         // CreateBookmarkPage.OnPickImageClicked, který teď kopíruje soubor do AppDataDirectory natrvalo).
         // Přejmenování u výchozích čtyř záložek je zakázané (viz ProtectedBookmarkNames); pokud se název
         // u nechráněné záložky změní, přepíšou se i všechny navázané RecipeBookmark záznamy, aby recepty

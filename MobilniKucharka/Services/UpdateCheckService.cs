@@ -58,6 +58,15 @@ namespace MobilniKucharka.Services
                 string tagName = releaseElement.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? "" : "";
                 string htmlUrl = releaseElement.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() ?? "" : "";
 
+                // Skutečný GitHub příznak, ne odhad z textu verze - release-beta.yml ho nastavuje vždy
+                // na true, bez ohledu na to, jestli ApplicationDisplayVersion zrovna obsahuje i textové
+                // "-beta". Dřív se beta-příslušnost nejnovějšího releasu poznávala JEN z textu ve verzi,
+                // takže remízu v porovnání čísel (viz CompareVersions) rozhodoval fallback na text, který
+                // u releasu bez "-beta" v čísle vždy prohlásil release za "stabilní" - i když šel z beta
+                // větve - a update se tak nepoznal. Tohle appku nutí spolehnout se na kanál (prerelease
+                // flag), ne na to, jestli si autor pamatoval napsat "-beta" i do čísla verze.
+                bool latestIsPrerelease = releaseElement.TryGetProperty("prerelease", out var prereleaseProp) && prereleaseProp.GetBoolean();
+
                 string? apkUrl = null;
                 if (releaseElement.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
                 {
@@ -77,7 +86,7 @@ namespace MobilniKucharka.Services
 
                 return new UpdateInfo
                 {
-                    IsUpdateAvailable = CompareVersions(latestVersion, currentVersion) > 0,
+                    IsUpdateAvailable = CompareVersions(latestVersion, currentVersion, latestIsPrerelease, isBetaBuild) > 0,
                     LatestVersion = latestVersion,
                     ReleaseUrl = htmlUrl,
                     ApkDownloadUrl = apkUrl
@@ -117,18 +126,25 @@ namespace MobilniKucharka.Services
         [GeneratedRegex(@"^\d+(\.\d+)*")]
         private static partial Regex VersionCoreRegexGen();
 
-        private static (string Core, bool IsBeta) SplitVersionAndBeta(string version)
+        // knownIsBeta: pokud je appka o kanálu (beta/stabilní) informovaná spolehlivěji než jen z
+        // textu verze - viz latestIsPrerelease výše - dostane přednost. Textová detekce zůstává jako
+        // fallback: funguje zpětně i pro starší GitHub tagy z doby před touto opravou a je jediná
+        // dostupná možnost pro AKTUÁLNĚ nainstalovanou appku (appka sama neví, jestli byla
+        // nainstalována z prerelease - to se dá poznat jen textem v její vlastní verzi).
+        private static (string Core, bool IsBeta) SplitVersionAndBeta(string version, bool? knownIsBeta = null)
         {
-            bool isBeta = version.Contains("beta", StringComparison.OrdinalIgnoreCase);
+            bool textIsBeta = version.Contains("beta", StringComparison.OrdinalIgnoreCase);
+            bool isBeta = knownIsBeta ?? textIsBeta;
+
             var match = VersionCoreRegexGen().Match(version);
             string core = match.Success ? match.Value : version;
             return (core, isBeta);
         }
 
-        private static int CompareVersions(string v1, string v2)
+        private static int CompareVersions(string v1, string v2, bool? v1IsBeta = null, bool? v2IsBeta = null)
         {
-            var (core1, isBeta1) = SplitVersionAndBeta(v1);
-            var (core2, isBeta2) = SplitVersionAndBeta(v2);
+            var (core1, isBeta1) = SplitVersionAndBeta(v1, v1IsBeta);
+            var (core2, isBeta2) = SplitVersionAndBeta(v2, v2IsBeta);
 
             var parts1 = core1.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();
             var parts2 = core2.Split('.').Select(p => int.TryParse(p, out var n) ? n : 0).ToArray();

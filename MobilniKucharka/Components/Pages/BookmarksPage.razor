@@ -2,6 +2,7 @@
 @namespace MobilniKucharka.Components.Pages
 @implements IDisposable
 @inject IDialogService DialogService
+@inject NavigationManager NavigationManager
 
 <div class="hub-page">
     <!-- Header -->
@@ -188,14 +189,17 @@
 
     private void OnCategoryClicked(string categoryName)
     {
-        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-        nav?.PushAsync(new BookmarkCategoryPage(categoryName));
+        NavigationManager.NavigateTo($"/bookmark-category?name={Uri.EscapeDataString(categoryName)}");
     }
 
     private void OpenCreateBookmark()
     {
-        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-        nav?.PushAsync(new CreateBookmarkPage());
+        NavigationManager.NavigateTo("/bookmark/create");
+    }
+
+    private void OpenEditBookmark(string categoryName)
+    {
+        NavigationManager.NavigateTo($"/bookmark/edit?name={Uri.EscapeDataString(categoryName)}");
     }
 
     private async Task OnBookmarkOptionsClicked(Bookmark bookmark)
@@ -235,12 +239,6 @@
                 await LoadBookmarksAsync();
             }
         }
-    }
-
-    private void OpenEditBookmark(string categoryName)
-    {
-        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-        nav?.PushAsync(new CreateBookmarkPage(categoryName));
     }
 
     private async Task OnPageOptionsClicked()
