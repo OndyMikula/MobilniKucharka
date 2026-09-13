@@ -163,7 +163,7 @@ namespace MobilniKucharka.Services
                     // Doplní jméno (a kroky) do aktuálního jazyka aplikace, pokud ještě chybí - díky cache uvnitř
                     // EnsureRecipeLanguageAsync se DeepL zavolá jen jednou za (recept, jazyk) navždy; další
                     // zobrazení seznamu je pak jen levná kontrola v DB, ne nové volání API.
-                    var displayRecipe = await EnsureRecipeLanguageAsync(recipe.Id) ?? recipe;
+                    var displayRecipe = await EnsureRecipeLanguageAsync(recipe.Id, recipe) ?? recipe;
 
                     var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(displayRecipe, peopleCount, allProducts, allIngredients, allAliases);
 
@@ -226,7 +226,7 @@ namespace MobilniKucharka.Services
                 {
                     // Stejná logika jako v GetPlanAsync - doplní překlad jména/kroků, pokud ještě chybí
                     // (např. čerstvě naimportovaný recept ze SearchPage), s cache proti opakovaným DeepL voláním.
-                    var displayRecipe = await EnsureRecipeLanguageAsync(match.Id) ?? match;
+                    var displayRecipe = await EnsureRecipeLanguageAsync(match.Id, match) ?? match;
 
                     var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(displayRecipe, peopleCount, allProducts, allIngredients, allAliases);
 
@@ -274,7 +274,7 @@ namespace MobilniKucharka.Services
                 var displayRecipes = new List<Recipe>();
                 foreach (var recipe in matchedRecipes)
                 {
-                    displayRecipes.Add(await EnsureRecipeLanguageAsync(recipe.Id) ?? recipe);
+                    displayRecipes.Add(await EnsureRecipeLanguageAsync(recipe.Id, recipe) ?? recipe);
                 }
 
                 return displayRecipes;
@@ -590,7 +590,7 @@ namespace MobilniKucharka.Services
         // Výchozí čtyři záložky - jejich Name je použitý jako doslovný srovnávací klíč napříč kódem
         // (AddRecipeToCategoryAsync, GetRecipesByCategoryAsync, BookmarksPage.razor.TranslateCategoryName...),
         // takže se nikdy nesmí přejmenovat. Obrázek/popis u nich ale klidně editovatelné jsou.
-        private static readonly string[] ProtectedBookmarkNames = ["Oblíbené", "Vytvořené recepty", "Vyhledané recepty", "Koncepty"];
+        public static readonly string[] ProtectedBookmarkNames = ["Oblíbené", "Vytvořené recepty", "Vyhledané recepty", "Koncepty"];
 
         public async Task InsertNewCategoryAsync(string category, string imagePath, string description = "")
         {

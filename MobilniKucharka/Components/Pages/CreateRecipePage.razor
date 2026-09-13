@@ -209,6 +209,8 @@
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
+    private CancellationTokenSource? _autoSaveDebounceCts;
+
     private class IngredientRowModel
     {
         public string Name { get; set; } = string.Empty;
@@ -356,13 +358,13 @@
     {
         if (name != null) row.Name = name;
         if (amount != null) row.Amount = amount;
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     private void OnIngredientUnitChanged(IngredientRowModel row, string? unit)
     {
         row.Unit = unit ?? "g";
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     private void OnAddIngredientRow() => _ingredientRows.Add(new IngredientRowModel { Unit = "g" });
@@ -370,7 +372,7 @@
     private void OnStepTextChanged(StepRowModel row, string? text)
     {
         row.Text = text ?? string.Empty;
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     private void MoveStepRow(int index, int direction)
@@ -382,7 +384,7 @@
         _stepRows.RemoveAt(index);
         _stepRows.Insert(newIndex, item);
 
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     private void OnAddStepRow() => _stepRows.Add(new StepRowModel());
@@ -392,7 +394,7 @@
         if (!_selectedTags.Add(tag))
             _selectedTags.Remove(tag);
 
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     private void OnCreateTag()
@@ -409,7 +411,7 @@
     private void OnDescriptionInput(ChangeEventArgs e)
     {
         _descriptionText = e.Value?.ToString() ?? string.Empty;
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     // Filtruje jen na číslice, stejně jako původní OnManualCostTextChanged/OnPrepTimeTextChanged -
@@ -577,6 +579,23 @@
         }
     }
 
+    private void QueueAutoSave()
+    {
+        _autoSaveDebounceCts?.Cancel();
+        _autoSaveDebounceCts = new CancellationTokenSource();
+        var token = _autoSaveDebounceCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(400, token);
+                await InvokeAsync(TriggerAutoSaveAsync);
+            }
+            catch (TaskCanceledException) { }
+        });
+    }
+
     private static string NormalizeToBaseUnit(string pickerUnit) => pickerUnit switch
     {
         "kg" => "g",
@@ -729,5 +748,6 @@
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnNavigatingAway;
+        _autoSaveDebounceCts?.Cancel();
     }
 }

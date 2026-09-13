@@ -146,11 +146,15 @@ namespace MobilniKucharka.Services
         // Pokud chybí (např. recept naimportovaný jen v angličtině a appka běží v češtině),
         // automaticky ho přeloží a uloží - bez nutnosti ručně mačkat "Přeložit".
         // Díky cache (viz TranslateAndSaveRecipeAsync) se tohle pro daný recept stane jen jednou navždy.
-        public async Task<Recipe?> EnsureRecipeLanguageAsync(int recipeId)
+
+        public async Task<Recipe?> EnsureRecipeLanguageAsync(int recipeId) =>
+            await EnsureRecipeLanguageAsync(recipeId, null);
+
+        public async Task<Recipe?> EnsureRecipeLanguageAsync(int recipeId, Recipe? preloaded)
         {
             await EnsureInitializedAsync();
 
-            var recipe = await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
+            var recipe = preloaded ?? await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
             if (recipe == null) return null;
 
             string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
@@ -162,19 +166,13 @@ namespace MobilniKucharka.Services
             var otherSteps = otherLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
 
             bool nameOk = !string.IsNullOrWhiteSpace(currentName);
-
-            // "Hotovo" znamená: jméno je vyplněné A (zdrojový jazyk nemá žádné kroky, NEBO cílový jazyk
-            // kroky taky má). Dřív se kontrolovalo jen jméno, takže recept s vyplněným jménem ale prázdnými
-            // kroky (např. z dřív přerušeného překladu) navždy vypadal jako hotový a nikdy se nedokončil.
             bool stepsOk = otherSteps.Count == 0 || currentSteps.Count > 0;
             if (nameOk && stepsOk)
                 return recipe;
 
             if (string.IsNullOrWhiteSpace(otherName))
-                return recipe; // není z čeho překládat
+                return recipe;
 
-            // Jméno může už být hotové (recept uložený rovnou s Name_CS z RecipeSearchService, viz
-            // TranslateResultNamesForDisplayAsync), zatímco kroky ještě ne - pak přeložíme jen kroky.
             bool success = await TranslateAndSaveRecipeAsync(recipeId, fromLang: otherLang, toLang: currentLang, skipName: nameOk);
             if (!success) return recipe;
 

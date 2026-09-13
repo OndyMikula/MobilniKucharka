@@ -117,7 +117,7 @@
                 <div class="detail-card">
                     @foreach (var ingredient in _ingredients)
                     {
-                        <div class="ingredient-row" @onclick="() => OnIngredientTappedAsync(ingredient)">
+                        <div class="ingredient-row" @key="ingredient.ProductId" @onclick="() => OnIngredientTappedAsync(ingredient)">
                             <span class="ingredient-name">@ingredient.Name</span>
                             <span class="ingredient-amount">@ingredient.AmountText</span>
                             <span class="ingredient-cost">@ingredient.CostText</span>
