@@ -6,7 +6,7 @@ namespace MobilniKucharka.Translation
     // Překlad receptů CS <-> EN přes DeepL API.
     public class TranslationService
     {
-        private readonly HttpClient _httpClient = new();
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
 
         private static bool IsFreeApiKey =>
             !string.IsNullOrEmpty(Secrets.DeepLApiKey) && Secrets.DeepLApiKey.EndsWith(":fx", StringComparison.OrdinalIgnoreCase);

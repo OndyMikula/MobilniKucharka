@@ -10,7 +10,7 @@ namespace MobilniKucharka.Services.Api
     //pak po vyplneni vsech polí button Poslat posle data vyvojarum API
     public class OpenFoodFactsService
     {
-        private readonly HttpClient _httpClient = new();
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
 
         public OpenFoodFactsService()
         {
@@ -97,8 +97,8 @@ namespace MobilniKucharka.Services.Api
                 { "nutriment_proteins_100g", protein.ToString(CultureInfo.InvariantCulture) },
                 { "nutriment_carbohydrates_100g", carbs.ToString(CultureInfo.InvariantCulture) },
                 { "nutriment_fat_100g", fat.ToString(CultureInfo.InvariantCulture) },
-                { "user_id", "OndyMikula_App" },
-                { "password", "OpenFoodFactsPassword" }
+                { "user_id", Secrets.OpenFoodFactsUserId },
+                { "password", Secrets.OpenFoodFactsPassword }
             };
 
             var content = new FormUrlEncodedContent(fields);

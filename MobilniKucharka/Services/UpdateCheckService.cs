@@ -13,7 +13,7 @@ namespace MobilniKucharka.Services
 
     public partial class UpdateCheckService
     {
-        private readonly HttpClient _httpClient = new();
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
         private const string RepoOwner = "OndyMikula";
         private const string RepoName = "MobilniKucharka";
 

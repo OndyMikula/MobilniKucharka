@@ -4,7 +4,7 @@ namespace MobilniKucharka.Services.Api
 {
     public class TheMealDbService
     {
-        private readonly HttpClient _httpClient = new();
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
         private readonly NutritionixService _nutritionixService = new();
         private static readonly Random _random = new();
 

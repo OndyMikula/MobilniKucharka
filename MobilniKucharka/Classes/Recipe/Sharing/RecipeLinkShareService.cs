@@ -9,7 +9,7 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
         private const string RepoOwner = "OndyMikula";
         private const string RepoName = "MobilniKucharka-SharedRecipes";
         private const string BranchName = "main";
-        private static readonly HttpClient _httpClient = new();
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
 
         public static async Task<string?> ShareViaLinkAsync(Recipe recipe)
         {

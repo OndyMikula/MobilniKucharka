@@ -10,7 +10,7 @@
 
     public class CsuPriceImportService
     {
-        private readonly HttpClient _httpClient = new();
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
         private const string CsvUrl = "https://data.csu.gov.cz/opendata/sady/CEN02/distribuce/csv";
 
         public async Task<List<CsuPriceEntry>> FetchLatestConsumerPricesAsync()

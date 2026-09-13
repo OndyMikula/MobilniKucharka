@@ -8,7 +8,7 @@ namespace MobilniKucharka.Services.Api
     //(např. text "1 banán a miska ovesných vloček" převede na přesná nutriční data)."
     public class NutritionixService
     {
-        private readonly HttpClient _httpClient = new();
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
         private static readonly string AppId = Secrets.NutritionixAppId;
         private static readonly string ApiKey = Secrets.NutritionixApiKey;
 

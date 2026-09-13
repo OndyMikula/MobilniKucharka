@@ -7,7 +7,7 @@ namespace MobilniKucharka.Services.Api
     //spoonacular - "stahovat si recepty ze Spoonacularu
     public class SpoonacularService(string dbPath)
     {
-        private readonly HttpClient _httpClient = new();
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
         private readonly SQLiteAsyncConnection _db = new(dbPath);
         private static readonly string ApiKey = Secrets.SpoonacularApiKey;
 
