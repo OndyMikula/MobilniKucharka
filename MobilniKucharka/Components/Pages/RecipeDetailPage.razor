@@ -397,25 +397,25 @@
     {
         if (ingredient.ProductId <= 0)
         {
-            await DialogService.ShowAlertAsync("Chyba", "Tuto surovinu se nepodařilo přiřadit k produktu. Zkus recept znovu otevřít.", "OK");
+            await DialogService.ShowAlertAsync(Tr("Chyba"), Tr("Tuto surovinu se nepodařilo přiřadit k produktu. Zkus recept znovu otevřít."), "OK");
             return;
         }
 
-        string? action = await DialogService.ShowActionSheetAsync(ingredient.Name, "Zrušit", null,
-            "Zadat vlastní cenu", "Propojit s existující surovinou", "Změnit jednotku");
+        string? action = await DialogService.ShowActionSheetAsync(ingredient.Name, Tr("Zrušit"), null,
+            Tr("Zadat vlastní cenu"), Tr("Propojit s existující surovinou"), Tr("Změnit jednotku"));
 
-        if (string.IsNullOrEmpty(action) || action == "Zrušit") return;
+        if (string.IsNullOrEmpty(action) || action == Tr("Zrušit")) return;
 
         await PromoteFromSearchTempAsync();
 
-        if (action == "Zadat vlastní cenu")
+        if (action == Tr("Zadat vlastní cenu"))
         {
             if (ingredient.RawAmount <= 0)
             {
                 string? manualResult = await DialogService.ShowPromptAsync(
-                    "Vlastní cena suroviny",
-                    $"Množství pro \"{ingredient.Name}\" nejde rozeznat, zadej rovnou cenu za jednotku (Kč), nebo nech prázdné pro průměrnou cenu.",
-                    "Uložit", "Zrušit", keyboard: Keyboard.Numeric);
+                    Tr("Vlastní cena suroviny"),
+                    string.Format(Tr("Množství pro \"{0}\" nejde rozeznat, zadej rovnou cenu za jednotku (Kč), nebo nech prázdné pro průměrnou cenu."), ingredient.Name),
+                    Tr("Uložit"), Tr("Zrušit"), keyboard: Keyboard.Numeric);
 
                 if (manualResult == null) return;
 
@@ -429,9 +429,9 @@
             }
 
             string? result = await DialogService.ShowPromptAsync(
-                "Vlastní cena suroviny",
-                $"Kolik jsi celkem zaplatil/a za {ingredient.AmountText} suroviny \"{ingredient.Name}\"? (Kč)\nCena se přepočítá na jednotku a použije se i v ostatních receptech s jiným množstvím.",
-                "Uložit", "Zrušit", keyboard: Keyboard.Numeric);
+                Tr("Vlastní cena suroviny"),
+                string.Format(Tr("Kolik jsi celkem zaplatil/a za {0} suroviny \"{1}\"? (Kč)\nCena se přepočítá na jednotku a použije se i v ostatních receptech s jiným množstvím."), ingredient.AmountText, ingredient.Name),
+                Tr("Uložit"), Tr("Zrušit"), keyboard: Keyboard.Numeric);
 
             if (result == null) return;
 
@@ -446,18 +446,18 @@
             }
             else
             {
-                await DialogService.ShowAlertAsync("Neplatná hodnota", $"\"{result}\" se nepodařilo rozpoznat jako číslo. Zkus to znovu, jen s číslicemi (např. 25 nebo 25.50).", "OK");
+                await DialogService.ShowAlertAsync(Tr("Neplatná hodnota"), string.Format(Tr("\"{0}\" se nepodařilo rozpoznat jako číslo. Zkus to znovu, jen s číslicemi (např. 25 nebo 25.50)."), result), "OK");
                 return;
             }
 
             await LoadIngredientsAndStepsAsync();
         }
-        else if (action == "Propojit s existující surovinou")
+        else if (action == Tr("Propojit s existující surovinou"))
         {
             var allProducts = await App.Database.GetAllLocalProductsAsync();
             string[] names = [.. allProducts.Select(p => p.Name_CS)];
 
-            string? chosen = await DialogService.ShowActionSheetAsync("Propojit s...", "Zrušit", null, names);
+            string? chosen = await DialogService.ShowActionSheetAsync(Tr("Propojit s..."), Tr("Zrušit"), null, names);
             var match = allProducts.FirstOrDefault(p => p.Name_CS == chosen);
 
             if (match != null)
@@ -466,10 +466,10 @@
                 await LoadIngredientsAndStepsAsync();
             }
         }
-        else if (action == "Změnit jednotku")
+        else if (action == Tr("Změnit jednotku"))
         {
             string[] unitOptions = ["g", "ml", "ks"];
-            string? chosenUnit = await DialogService.ShowActionSheetAsync("Vyber jednotku", "Zrušit", null, unitOptions);
+            string? chosenUnit = await DialogService.ShowActionSheetAsync(Tr("Vyber jednotku"), Tr("Zrušit"), null, unitOptions);
 
             if (chosenUnit != null && unitOptions.Contains(chosenUnit))
             {
