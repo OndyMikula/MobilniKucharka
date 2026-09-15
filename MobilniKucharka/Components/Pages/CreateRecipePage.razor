@@ -172,7 +172,6 @@
     private int? _currentRecipeId;
     private SQLiteAsyncConnection _db = null!;
     private bool _isLoadingRecipe = false;
-    private readonly NutritionixService _nutritionixService = new();
 
     // Perzistentní objekt receptu - stejný důvod jako v původním XAML code-behind: autosave do něj
     // MUTUJE, místo aby pokaždé vytvářel nový Recipe() a přes UpdateAsync smazal pole, která tahle
@@ -514,7 +513,7 @@
         string queryText = string.Join(", ", ingredientRows.Select(i =>
             string.IsNullOrWhiteSpace(i.Amount) ? i.Name : $"{i.Amount} {i.Name}"));
 
-        var parsed = await _nutritionixService.ParseNaturalTextAsync(queryText);
+        var parsed = await NutritionixService.ParseNaturalTextAsync(queryText);
 
         if (parsed != null && parsed.Count > 0)
         {
@@ -546,6 +545,7 @@
         _recipe.ServingSize = int.TryParse(_servingSizeText, out var draftServings) && draftServings > 0 ? draftServings : 0;
         _recipe.DescriptionText = _descriptionText ?? string.Empty;
         _recipe.IngredientsRaw = string.Join("\n", ingredientPairs.Select(i => $"{i.Name}|{i.Amount}"));
+        _recipe.ContentLanguage = currentLang;
         _recipe.EquipmentJson = JsonSerializer.Serialize(_selectedTags);
         _recipe.PrepTime = int.TryParse(_prepTimeText, out var draftPrepTime) ? draftPrepTime : 0;
         _recipe.Protein = _cachedProtein;
@@ -655,6 +655,7 @@
             _recipe.IsNutritionEstimated = _cachedIsNutritionEstimated;
             _recipe.ServingSize = int.TryParse(_servingSizeText, out var servings) && servings > 0 ? servings : 0;
             _recipe.IngredientsRaw = string.Join("\n", ingredientPairs.Select(i => $"{i.Name}|{i.Amount}"));
+            _recipe.ContentLanguage = currentLang;
             _recipe.EquipmentJson = JsonSerializer.Serialize(_selectedTags);
             _recipe.PrepTime = int.TryParse(_prepTimeText, out var prepTime) ? prepTime : 0;
             _recipe.Protein = protein;

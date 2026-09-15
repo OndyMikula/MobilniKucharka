@@ -6,13 +6,13 @@ namespace MobilniKucharka.Services.Api
     //Nutritionix API "Bezplatný vývojářský tarif (Development Tier)" nabízí přístup k databázi
     //běžných potravin i restauračních menu a obsahuje pokročilé NLP (přirozené zpracování jazyka) pro analýzu textu
     //(např. text "1 banán a miska ovesných vloček" převede na přesná nutriční data)."
-    public class NutritionixService
+    public static class NutritionixService
     {
         private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
         private static readonly string AppId = Secrets.NutritionixAppId;
         private static readonly string ApiKey = Secrets.NutritionixApiKey;
 
-        public async Task<List<ParsedIngredient>?> ParseNaturalTextAsync(string queryText)
+        public static async Task<List<ParsedIngredient>?> ParseNaturalTextAsync(string queryText)
         {
             var url = "https://trackapi.nutritionix.com/v2/natural/nutrients";
 
@@ -28,16 +28,13 @@ namespace MobilniKucharka.Services.Api
                 var response = await _httpClient.PostAsync(url, content);
                 if (!response.IsSuccessStatusCode) return null;
 
-                // 1. Načteme to jen jako hloupý text
                 var contentString = await response.Content.ReadAsStringAsync();
 
-                // 2. Zkontrolujeme, jestli to vůbec vypadá jako JSON (JSON vždy začíná { nebo [ )
                 if (string.IsNullOrWhiteSpace(contentString) || (!contentString.StartsWith('{') && !contentString.StartsWith('[')))
                 {
-                    return null; // Zabalíme to dřív, než to stihne spadnout
+                    return null;
                 }
 
-                // 3. Až teď to bezpečně převedeme
                 var root = JsonSerializer.Deserialize<JsonElement>(contentString);
                 var parsedList = new List<ParsedIngredient>();
 

@@ -537,8 +537,8 @@
         if (_recipe == null) return;
 
         string[] options = _isDeveloperMode
-            ? [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Smazat recept"), "🔧 " + Tr("Zobrazit syrová data kroků")]
-            : [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Smazat recept")];
+            ? [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Přeložit recept znovu"), Tr("Smazat recept"), "🔧 " + Tr("Zobrazit syrová data kroků")]
+            : [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Přeložit recept znovu"), Tr("Smazat recept")];
 
         string? action = await DialogService.ShowActionSheetAsync(Tr("Možnosti receptu"), Tr("Zrušit"), null, options);
 
@@ -550,10 +550,25 @@
             await OpenBookmarksOverlayAsync();
         else if (action == Tr("Upravit recept"))
             await OnEditRecipeClickedAsync();
+        else if (action == Tr("Přeložit recept znovu"))
+            await OnForceRetranslateClickedAsync();
         else if (action == Tr("Smazat recept"))
             _showDeleteOverlay = true;
         else if (action == "🔧 " + Tr("Zobrazit syrová data kroků"))
             await ShowRawStepsDiagnosticAsync();
+    }
+
+    private async Task OnForceRetranslateClickedAsync()
+    {
+        if (_recipe == null) return;
+        await PromoteFromSearchTempAsync();
+
+        var updated = await App.Database.ForceRetranslateRecipeAsync(_recipe.Id);
+        if (updated != null)
+        {
+            _recipe = updated;
+            await LoadIngredientsAndStepsAsync();
+        }
     }
 
     private async Task OnEditRecipeClickedAsync()

@@ -2,13 +2,12 @@
 
 namespace MobilniKucharka.Services.Api
 {
-    public class TheMealDbService
+    public static class TheMealDbService
     {
         private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
-        private readonly NutritionixService _nutritionixService = new();
         private static readonly Random _random = new();
 
-        public async Task<MealDbRecipe?> GetRandomRecipeMatchingDietAsync(List<string> userDiets)
+        public static async Task<MealDbRecipe?> GetRandomRecipeMatchingDietAsync(List<string> userDiets)
         {
             string? category = null;
             if (userDiets.Contains("Vegan")) category = "Vegan";
@@ -28,21 +27,21 @@ namespace MobilniKucharka.Services.Api
             return await GetRandomRecipeAsync();
         }
 
-        public async Task<MealDbRecipe?> GetRandomRecipeAsync()
+        public static async Task<MealDbRecipe?> GetRandomRecipeAsync()
         {
             return await FetchSingleRecipeAsync("https://www.themealdb.com/api/json/v1/1/random.php");
         }
 
-        public async Task<MealDbRecipe?> GetRecipeByExternalIdAsync(string mealId)
+        public static async Task<MealDbRecipe?> GetRecipeByExternalIdAsync(string mealId)
         {
             return await FetchSingleRecipeAsync($"https://www.themealdb.com/api/json/v1/1/lookup.php?i={mealId}");
         }
 
-        // Hledání receptů podle názvu (dotaz už bývá anglicky - viz RecipeSearchService, který ho
-        // před voláním přeloží). search.php vrací rovnou kompletní data pro každý nalezený recept,
-        // takže tady zatím NEřešíme nutrici - ta se dotáhne až pro konkrétně vybraný recept přes
+        // Hledání receptů podle textového dotazu (dotaz už bývá anglicky - viz RecipeSearchService,
+        // který ho před voláním přeloží). search.php vrací rovnou kompletní data pro každý nalezený
+        // recept, takže tady zatím NEřešíme nutrici - ta se dotáhne až pro konkrétně vybraný recept přes
         // CompleteRecipeWithNutritionAsync, aby se Nutritionix nevolal zbytečně pro celý seznam.
-        public async Task<List<MealDbRecipe>> SearchByNameAsync(string name, CancellationToken cancellationToken)
+        public static async Task<List<MealDbRecipe>> SearchByNameAsync(string name, CancellationToken cancellationToken)
         {
             string url = $"https://www.themealdb.com/api/json/v1/1/search.php?s={Uri.EscapeDataString(name)}";
             try
@@ -66,7 +65,7 @@ namespace MobilniKucharka.Services.Api
             }
             catch (OperationCanceledException)
             {
-                throw; // ať volající (RecipeSearchService/SearchPage) pozná rozdíl mezi timeoutem a "nic se nenašlo"
+                throw;
             }
             catch
             {
@@ -76,14 +75,14 @@ namespace MobilniKucharka.Services.Api
 
         // Dopočítá nutrici (přes Nutritionix, případně lokální odhad) pro recept už vybraný
         // uživatelem ze seznamu výsledků hledání - viz SearchByNameAsync výše.
-        public async Task<MealDbRecipe> CompleteRecipeWithNutritionAsync(MealDbRecipe recipe)
+        public static async Task<MealDbRecipe> CompleteRecipeWithNutritionAsync(MealDbRecipe recipe)
         {
             var ingredientPairs = recipe.Ingredients.Select(i => (i.Name, i.Measure)).ToList();
             await FillNutritionAsync(recipe, ingredientPairs);
             return recipe;
         }
 
-        private async Task<List<string>> GetMealIdsByCategoryAsync(string category)
+        private static async Task<List<string>> GetMealIdsByCategoryAsync(string category)
         {
             string url = $"https://www.themealdb.com/api/json/v1/1/filter.php?c={category}";
             try
@@ -116,7 +115,7 @@ namespace MobilniKucharka.Services.Api
             }
         }
 
-        private async Task<MealDbRecipe?> FetchSingleRecipeAsync(string url)
+        private static async Task<MealDbRecipe?> FetchSingleRecipeAsync(string url)
         {
             try
             {
@@ -142,9 +141,6 @@ namespace MobilniKucharka.Services.Api
             }
         }
 
-        // Sdílený parser jednoho "meal" JSON elementu na MealDbRecipe - používá ho jak
-        // FetchSingleRecipeAsync (random/lookup), tak SearchByNameAsync (search.php).
-        // Nutrici záměrně neplní - to dělá až volající (FillNutritionAsync/CompleteRecipeWithNutritionAsync).
         private static MealDbRecipe ParseMealElement(JsonElement meal)
         {
             var recipe = new MealDbRecipe
@@ -184,14 +180,14 @@ namespace MobilniKucharka.Services.Api
             return list;
         }
 
-        private async Task FillNutritionAsync(MealDbRecipe recipe, List<(string Ingredient, string Measure)> ingredients)
+        private static async Task FillNutritionAsync(MealDbRecipe recipe, List<(string Ingredient, string Measure)> ingredients)
         {
             if (ingredients.Count == 0) return;
 
             string queryText = string.Join(", ", ingredients.Select(i =>
                 string.IsNullOrWhiteSpace(i.Measure) ? i.Ingredient : $"{i.Measure} {i.Ingredient}"));
 
-            var parsed = await _nutritionixService.ParseNaturalTextAsync(queryText);
+            var parsed = await NutritionixService.ParseNaturalTextAsync(queryText);
 
             if (parsed != null && parsed.Count > 0)
             {
@@ -200,7 +196,7 @@ namespace MobilniKucharka.Services.Api
                 recipe.Fat = Math.Round(parsed.Sum(p => p.Fat), 1);
                 recipe.Sugar = Math.Round(parsed.Sum(p => p.Sugar), 1);
                 recipe.Kcal = Math.Round(parsed.Sum(p => p.Calories), 0);
-                return; // IsNutritionEstimated zůstává false (výchozí hodnota) - jde o reálná data
+                return;
             }
 
             var (Protein, Carbs, Fat, Sugar) = NutritionEstimationService.EstimateNutrition([.. ingredients.Select(i => (i.Ingredient, i.Measure))]);
@@ -208,13 +204,9 @@ namespace MobilniKucharka.Services.Api
             recipe.Carbs = Carbs;
             recipe.Fat = Fat;
             recipe.Sugar = Sugar;
-            recipe.IsNutritionEstimated = true; // <- sem to patří
+            recipe.IsNutritionEstimated = true;
         }
 
-        // Odhad dietních příznaků z MealDB kategorie - použito jen pro filtrování výsledků hledání
-        // (viz RecipeSearchService). Stejná logika žije i jako soukromá kopie v
-        // BudgetPlannerService.SaveExternalRecipeAsync - úmyslně duplikováno, ať se nemusí sahat
-        // do velkého hlavního souboru kvůli jedné drobné funkci.
         public static List<string> GuessDietFlagsFromCategory(string mealDbCategory)
         {
             return mealDbCategory switch

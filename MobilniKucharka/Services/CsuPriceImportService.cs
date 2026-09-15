@@ -8,35 +8,35 @@
         public string Month { get; set; } = string.Empty; // "2026-06"
     }
 
-    public class CsuPriceImportService
+    public static class CsuPriceImportService
     {
         private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
         private const string CsvUrl = "https://data.csu.gov.cz/opendata/sady/CEN02/distribuce/csv";
 
-        public async Task<List<CsuPriceEntry>> FetchLatestConsumerPricesAsync()
+        public static async Task<List<CsuPriceEntry>> FetchLatestConsumerPricesAsync()
         {
-            var latest = new Dictionary<string, CsuPriceEntry>(); // klíč = název produktu bez prefixu/jednotky
+            var latest = new Dictionary<string, CsuPriceEntry>();
 
             try
             {
                 string csv = await _httpClient.GetStringAsync(CsvUrl);
                 using var reader = new StringReader(csv);
 
-                string? line = reader.ReadLine(); // hlavička, přeskočíme
+                string? line = reader.ReadLine();
                 while ((line = reader.ReadLine()) != null)
                 {
                     var fields = ParseCsvLine(line);
                     if (fields.Length < 7) continue;
 
-                    string indicator = fields[0]; // např. "S  Hovězí maso zadní bez kosti [kg]"
-                    string month = fields[5];     // "2026-06"
+                    string indicator = fields[0];
+                    string month = fields[5];
                     string valueRaw = fields[6];
 
-                    if (!indicator.StartsWith("S ")) continue; // chceme jen spotřebitelské ceny
+                    if (!indicator.StartsWith("S ")) continue;
                     if (!double.TryParse(valueRaw, System.Globalization.CultureInfo.InvariantCulture, out double price)) continue;
 
                     var (name, unit) = SplitNameAndUnit(indicator);
-                    string key = name; // "- od 2026" už je odstraněno v SplitNameAndUnit
+                    string key = name;
 
                     if (!latest.TryGetValue(key, out var existing) || string.CompareOrdinal(month, existing.Month) > 0)
                     {
@@ -46,7 +46,7 @@
             }
             catch
             {
-                return []; // bez internetu / nedostupné -> prázdný seznam, volající strana ponechá stávající ceny
+                return [];
             }
 
             return [.. latest.Values];
@@ -54,7 +54,6 @@
 
         private static (string Name, string Unit) SplitNameAndUnit(string indicator)
         {
-            // Odstraníme prefix "S  " a případný suffix " - od 2026"
             string cleaned = indicator[1..].Trim();
             cleaned = cleaned.Replace(" - od 2026", "").Trim();
 
@@ -73,7 +72,6 @@
 
         private static string[] ParseCsvLine(string line)
         {
-            // Jednoduchý CSV parser respektující uvozovky (hodnoty jsou obalené v " ")
             return [.. line.Split(',').Select(f => f.Trim('"'))];
         }
     }

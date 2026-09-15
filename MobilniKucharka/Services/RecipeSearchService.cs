@@ -10,10 +10,6 @@ namespace MobilniKucharka.Services
         Spoonacular
     }
 
-    // Lehký záznam pro zobrazení v seznamu výsledků hledání (SearchPage). Name je vždy kanonický
-    // anglický název ze zdrojového API (potřebný pro Name_EN při uložení) - NameCs, pokud existuje,
-    // je jen pro zobrazení a pro znovupoužití při uložení receptu (viz DisplayName a
-    // BudgetPlannerService.SaveExternalRecipeAsync/SpoonacularService.GetRecipeWithCacheAsync).
     public class ExternalRecipeSearchResult
     {
         public ExternalRecipeSource Source { get; set; }
@@ -26,18 +22,9 @@ namespace MobilniKucharka.Services
         public string DisplayName => !string.IsNullOrWhiteSpace(NameCs) ? NameCs : Name;
     }
 
-    // Sjednocuje hledání receptů na internetu napříč TheMealDB a Spoonacularem pro SearchPage.
-    // Dotaz se před odesláním přeloží do angličtiny (obě API jsou anglická) - díky tomu funguje
-    // hledání i pro česky napsané názvy receptů, ne jen anglické. Zobrazované názvy výsledků se
-    // (v českém režimu aplikace) přeloží zpátky pro zobrazení - viz TranslateResultNamesForDisplayAsync.
-    // Obě strany překladu (dotaz i výsledky) se cachují, ať appka za tutéž větu neplatí DeepL
-    // kvótu opakovaně - viz BudgetPlannerService.GetSearchQueryTranslationAsync a
-    // ExternalRecipeSearchResult.NameCs, který se propisuje přímo do uloženého receptu.
     public class RecipeSearchService(string dbPath)
     {
-        private readonly TheMealDbService _mealDbService = new();
         private readonly SpoonacularService _spoonacularService = new(dbPath);
-        private readonly TranslationService _translationService = new();
 
         public async Task<List<ExternalRecipeSearchResult>> SearchAsync(string rawQuery, bool applyDietFilter, CancellationToken cancellationToken)
         {
@@ -65,20 +52,14 @@ namespace MobilniKucharka.Services
         public async Task<MealDbRecipe?> CompleteMealDbResultAsync(ExternalRecipeSearchResult result)
         {
             if (result.Source != ExternalRecipeSource.MealDb || result.MealDbData == null) return null;
-            return await _mealDbService.CompleteRecipeWithNutritionAsync(result.MealDbData);
+            return await TheMealDbService.CompleteRecipeWithNutritionAsync(result.MealDbData);
         }
 
-        // translatedNameCs: propíše se přímo do Name_CS uloženého receptu, pokud appka během
-        // hledání recept už přeložila pro zobrazení - viz ExternalRecipeSearchResult.NameCs.
         public async Task<Recipe?> GetSpoonacularRecipeAsync(int spoonacularId, string? translatedNameCs = null)
         {
             return await _spoonacularService.GetRecipeWithCacheAsync(spoonacularId, translatedNameCs);
         }
 
-        // Přeloží dotaz do angličtiny, pokud appka běží v češtině - obě externí API rozumí prakticky
-        // jen anglickým názvům. Nejdřív zkontroluje cache (stejný dotaz už dřív přeložený), teprve
-        // pak zavolá DeepL - a výsledek si pro příště uloží. V anglickém režimu aplikace se žádný
-        // překlad nevolá vůbec.
         private async Task<string> TranslateQueryToEnglishAsync(string query)
         {
             string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
@@ -87,25 +68,20 @@ namespace MobilniKucharka.Services
             string? cached = await App.Database.GetSearchQueryTranslationAsync(query);
             if (!string.IsNullOrWhiteSpace(cached)) return cached;
 
-            string? translated = await _translationService.TranslateAsync(query, targetAppLang: "en", sourceAppLang: "cs");
+            string? translated = await TranslationService.TranslateAsync(query, targetAppLang: "en", sourceAppLang: "cs");
             if (string.IsNullOrWhiteSpace(translated)) return query;
 
             await App.Database.SaveSearchQueryTranslationAsync(query, translated);
             return translated;
         }
 
-        // Přeloží zobrazované názvy nalezených receptů do aktuálního jazyka aplikace (v českém režimu
-        // zpátky z angličtiny) - ukládá se do NameCs, NE do Name (Name zůstává kanonický anglický
-        // název ze zdroje, potřebný pro Name_EN při uložení - viz ResolveAndSaveRecipeAsync).
-        // Nejdřív zkusí jedno dávkové volání pro celý seznam najednou (šetří DeepL kvótu); pokud
-        // tohle selže nebo vrátí neočekávaný počet položek, zkusí to znovu recept po receptu.
         private async Task TranslateResultNamesForDisplayAsync(List<ExternalRecipeSearchResult> results)
         {
             string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
-            if (currentLang != "cs" || results.Count == 0) return; // zdroje jsou anglicky - v EN režimu není co překládat
+            if (currentLang != "cs" || results.Count == 0) return;
 
             var names = results.Select(r => r.Name).ToList();
-            var translated = await _translationService.TranslateBatchAsync(names, targetAppLang: "cs", sourceAppLang: "en");
+            var translated = await TranslationService.TranslateBatchAsync(names, targetAppLang: "cs", sourceAppLang: "en");
 
             if (translated != null && translated.Count == results.Count)
             {
@@ -119,7 +95,7 @@ namespace MobilniKucharka.Services
 
             foreach (var result in results)
             {
-                string? singleTranslated = await _translationService.TranslateAsync(result.Name, targetAppLang: "cs", sourceAppLang: "en");
+                string? singleTranslated = await TranslationService.TranslateAsync(result.Name, targetAppLang: "cs", sourceAppLang: "en");
                 if (!string.IsNullOrWhiteSpace(singleTranslated))
                     result.NameCs = singleTranslated;
             }
@@ -133,9 +109,9 @@ namespace MobilniKucharka.Services
                 : [.. raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
         }
 
-        private async Task<List<ExternalRecipeSearchResult>> SearchMealDbAsync(string query, List<string> userDiets, CancellationToken cancellationToken)
+        private static async Task<List<ExternalRecipeSearchResult>> SearchMealDbAsync(string query, List<string> userDiets, CancellationToken cancellationToken)
         {
-            var meals = await _mealDbService.SearchByNameAsync(query, cancellationToken);
+            var meals = await TheMealDbService.SearchByNameAsync(query, cancellationToken);
 
             if (userDiets.Count > 0)
                 meals = [.. meals.Where(m => TheMealDbService.GuessDietFlagsFromCategory(m.Category).Any(userDiets.Contains))];
@@ -153,7 +129,7 @@ namespace MobilniKucharka.Services
         private async Task<List<ExternalRecipeSearchResult>> SearchSpoonacularAsync(string query, List<string> userDiets, CancellationToken cancellationToken)
         {
             string? diet = userDiets.Contains("Vegan") ? "vegan" : userDiets.Contains("Vegetarian") ? "vegetarian" : null;
-            return await _spoonacularService.SearchRecipesAsync(query, diet, cancellationToken);
+            return await SpoonacularService.SearchRecipesAsync(query, diet, cancellationToken);
         }
     }
 }

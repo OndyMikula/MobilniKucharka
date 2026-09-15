@@ -32,7 +32,10 @@ namespace MobilniKucharka.Classes.Recipe
         public bool IsNutritionEstimated { get; set; } // TRUE = Nutriční hodnoty jsou odhadnuté, FALSE = Nutriční hodnoty jsou přesné (např. z API)
         public int ServingSize { get; set; }
         public string IngredientsRaw { get; set; } = string.Empty; // Suroviny (např. "1 vejce|1 ks\nMouka|200 g")
-        public string StepsRaw { get; set; } = string.Empty; // Postup (např. "1. Smíchejte ingredience.\n2. Pečte 20 minut.")
+
+        // "" = neznámé (starší recept založený před zavedením tohoto pole) - viz migrace v
+        // EnsureContentLanguageMigrationAsync. Jakmile se jednou nastaví na "cs"/"en", zůstává tak.
+        public string ContentLanguage { get; set; } = string.Empty; public string StepsRaw { get; set; } = string.Empty; // Postup (např. "1. Smíchejte ingredience.\n2. Pečte 20 minut.")
 
         // UKLÁDÁNÍ DO DB: JSON řetězce pro češtinu i angličtinu
         public string StepsJson_CS { get; set; } = "[]";

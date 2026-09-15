@@ -45,8 +45,6 @@ namespace MobilniKucharka.Services.Api
                 {
                     ExternalSourceId = $"spoon_{spoonacularId}",
                     Name_EN = data.GetProperty("title").GetString() ?? "",
-                    // Stejná logika jako v BudgetPlannerService.SaveExternalRecipeAsync - pokud appka
-                    // recept už přeložila pro zobrazení v seznamu hledání, použije se to rovnou.
                     Name_CS = translatedNameCs ?? string.Empty,
                     PrepTime = data.GetProperty("readyInMinutes").GetInt32(),
                     ImageUrl = data.GetProperty("image").GetString() ?? "",
@@ -59,6 +57,7 @@ namespace MobilniKucharka.Services.Api
 
                     StepsJson_EN = ExtractSteps(data),
                     IngredientsRaw = ExtractIngredientsRaw(data),
+                    ContentLanguage = "en",
 
                     ServingSize = data.TryGetProperty("servings", out var servingsProp) && servingsProp.GetInt32() > 0
                         ? servingsProp.GetInt32()
@@ -83,7 +82,7 @@ namespace MobilniKucharka.Services.Api
         // Hledání receptů podle textového dotazu (dotaz už bývá anglicky - viz RecipeSearchService,
         // který ho před voláním přeloží). Vrací jen lehká data (id/název/obrázek) - plné detaily se
         // dotáhnou (a rovnou uloží do DB, viz GetRecipeWithCacheAsync) až po výběru receptu.
-        public async Task<List<ExternalRecipeSearchResult>> SearchRecipesAsync(string query, string? diet, CancellationToken cancellationToken)
+        public static async Task<List<ExternalRecipeSearchResult>> SearchRecipesAsync(string query, string? diet, CancellationToken cancellationToken)
         {
             string dietParam = string.IsNullOrWhiteSpace(diet) ? "" : $"&diet={Uri.EscapeDataString(diet)}";
             string url = $"https://api.spoonacular.com/recipes/complexSearch?apiKey={ApiKey}&query={Uri.EscapeDataString(query)}&number=10{dietParam}";

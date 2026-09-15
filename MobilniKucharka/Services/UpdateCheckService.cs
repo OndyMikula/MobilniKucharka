@@ -11,13 +11,13 @@ namespace MobilniKucharka.Services
         public string? ApkDownloadUrl { get; set; }
     }
 
-    public partial class UpdateCheckService
+    public static partial class UpdateCheckService
     {
         private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
         private const string RepoOwner = "OndyMikula";
         private const string RepoName = "MobilniKucharka";
 
-        public async Task<UpdateInfo?> CheckForUpdateAsync()
+        public static async Task<UpdateInfo?> CheckForUpdateAsync()
         {
             if (IsInstalledFromGooglePlay())
                 return null;
@@ -58,13 +58,6 @@ namespace MobilniKucharka.Services
                 string tagName = releaseElement.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? "" : "";
                 string htmlUrl = releaseElement.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() ?? "" : "";
 
-                // Skutečný GitHub příznak, ne odhad z textu verze - release-beta.yml ho nastavuje vždy
-                // na true, bez ohledu na to, jestli ApplicationDisplayVersion zrovna obsahuje i textové
-                // "-beta". Dřív se beta-příslušnost nejnovějšího releasu poznávala JEN z textu ve verzi,
-                // takže remízu v porovnání čísel (viz CompareVersions) rozhodoval fallback na text, který
-                // u releasu bez "-beta" v čísle vždy prohlásil release za "stabilní" - i když šel z beta
-                // větve - a update se tak nepoznal. Tohle appku nutí spolehnout se na kanál (prerelease
-                // flag), ne na to, jestli si autor pamatoval napsat "-beta" i do čísla verze.
                 bool latestIsPrerelease = releaseElement.TryGetProperty("prerelease", out var prereleaseProp) && prereleaseProp.GetBoolean();
 
                 string? apkUrl = null;
@@ -126,11 +119,6 @@ namespace MobilniKucharka.Services
         [GeneratedRegex(@"^\d+(\.\d+)*")]
         private static partial Regex VersionCoreRegexGen();
 
-        // knownIsBeta: pokud je appka o kanálu (beta/stabilní) informovaná spolehlivěji než jen z
-        // textu verze - viz latestIsPrerelease výše - dostane přednost. Textová detekce zůstává jako
-        // fallback: funguje zpětně i pro starší GitHub tagy z doby před touto opravou a je jediná
-        // dostupná možnost pro AKTUÁLNĚ nainstalovanou appku (appka sama neví, jestli byla
-        // nainstalována z prerelease - to se dá poznat jen textem v její vlastní verzi).
         private static (string Core, bool IsBeta) SplitVersionAndBeta(string version, bool? knownIsBeta = null)
         {
             bool textIsBeta = version.Contains("beta", StringComparison.OrdinalIgnoreCase);
@@ -158,7 +146,7 @@ namespace MobilniKucharka.Services
             }
 
             if (isBeta1 == isBeta2) return 0;
-            return isBeta1 ? -1 : 1; // beta a stabilní se stejným číslem -> stabilní vyhrává
+            return isBeta1 ? -1 : 1;
         }
     }
 }

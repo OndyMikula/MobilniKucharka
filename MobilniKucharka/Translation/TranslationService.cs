@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace MobilniKucharka.Translation
 {
     // Překlad receptů CS <-> EN přes DeepL API.
-    public class TranslationService
+    public static class TranslationService
     {
         private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
 
@@ -20,7 +20,7 @@ namespace MobilniKucharka.Translation
         private static string ToDeepLSourceCode(string appLangCode) =>
             appLangCode.Equals("en", StringComparison.OrdinalIgnoreCase) ? "EN" : "CS";
 
-        public async Task<List<string>?> TranslateBatchAsync(List<string> texts, string targetAppLang, string? sourceAppLang = null)
+        public static async Task<List<string>?> TranslateBatchAsync(List<string> texts, string targetAppLang, string? sourceAppLang = null)
         {
             if (texts == null || texts.Count == 0) return [];
             if (string.IsNullOrWhiteSpace(Secrets.DeepLApiKey))
@@ -44,8 +44,6 @@ namespace MobilniKucharka.Translation
 
                 using var content = new FormUrlEncodedContent(form);
                 using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint) { Content = content };
-                // DeepL očekává klíč v hlavičce, ne jako "auth_key" v těle requestu - tohle je jediná
-                // podporovaná metoda pro nové účty. Bez ní appka dostane 403 s "Missing Authorization header".
                 request.Headers.Add("Authorization", $"DeepL-Auth-Key {Secrets.DeepLApiKey}");
 
                 var response = await _httpClient.SendAsync(request);
@@ -81,14 +79,14 @@ namespace MobilniKucharka.Translation
             }
         }
 
-        public async Task<string?> TranslateAsync(string text, string targetAppLang, string? sourceAppLang = null)
+        public static async Task<string?> TranslateAsync(string text, string targetAppLang, string? sourceAppLang = null)
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
             var result = await TranslateBatchAsync([text], targetAppLang, sourceAppLang);
             return result?.FirstOrDefault();
         }
 
-        public async Task<bool> TranslateRecipeNameAndStepsAsync(MobilniKucharka.Classes.Recipe.Recipe recipe, string fromLang, string toLang, bool skipName = false)
+        public static async Task<bool> TranslateRecipeNameAndStepsAsync(MobilniKucharka.Classes.Recipe.Recipe recipe, string fromLang, string toLang, bool skipName = false)
         {
             bool fromCs = fromLang.Equals("cs", StringComparison.OrdinalIgnoreCase);
             var sourceSteps = fromCs ? recipe.Steps_CS : recipe.Steps_EN;
@@ -98,7 +96,7 @@ namespace MobilniKucharka.Translation
                 batch.Add(fromCs ? recipe.Name_CS : recipe.Name_EN);
             batch.AddRange(sourceSteps);
 
-            if (batch.Count == 0) return true; // jméno přeskočeno a žádné kroky k překladu - není chyba
+            if (batch.Count == 0) return true;
 
             var translated = await TranslateBatchAsync(batch, toLang, fromLang);
             if (translated == null || translated.Count != batch.Count) return false;

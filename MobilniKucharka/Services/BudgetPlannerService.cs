@@ -44,10 +44,6 @@ namespace MobilniKucharka.Services
                 }
                 else
                 {
-                    // Doplňková migrace pro aplikace, které už měly záložky nasazené z dřívějška -
-                    // seed výše se spustí jen na úplně prázdné tabulce, takže existující instalace
-                    // (včetně vývojového zařízení) by jinak "Vyhledané recepty" nikdy nedostaly,
-                    // aniž by se jim smazala data.
                     await EnsureSearchedRecipesBookmarkExistsAsync();
                 }
 
@@ -752,11 +748,6 @@ namespace MobilniKucharka.Services
             var recipe = new Recipe
             {
                 Name_EN = mealDbRecipe.Name,
-                // Pokud appka recept už jednou přeložila pro zobrazení v seznamu výsledků hledání
-                // (viz RecipeSearchService.TranslateResultNamesForDisplayAsync), použijeme ten
-                // překlad rovnou - ať se za tutéž větu neplatí DeepL kvóta podruhé jen proto, že
-                // recept mezitím "přešel" ze seznamu do uloženého receptu. Bez něj zůstane prázdné
-                // a doplní ho EnsureRecipeLanguageAsync při prvním zobrazení, stejně jako dřív.
                 Name_CS = translatedNameCs ?? string.Empty,
                 ExternalSourceId = externalId,
                 ImageUrl = mealDbRecipe.ImageUrl,
@@ -767,11 +758,10 @@ namespace MobilniKucharka.Services
                 Sugar = mealDbRecipe.Sugar,
                 IsNutritionEstimated = mealDbRecipe.IsNutritionEstimated,
                 StepsJson_EN = JsonSerializer.Serialize(SplitInstructions(mealDbRecipe.Instructions)),
-                // StepsJson_CS necháváme prázdné ze stejného důvodu jako dřív - hledání nikdy
-                // nepřekládá kroky, jen zobrazované názvy v seznamu.
                 EquipmentJson = "[]",
                 DietaryFlagsJson = JsonSerializer.Serialize(GuessDietFlags(mealDbRecipe.Category)),
                 IngredientsRaw = string.Join("\n", mealDbRecipe.Ingredients.Select(i => $"{i.Name}|{i.Measure}")),
+                ContentLanguage = "en",
                 SourceUrl = mealDbRecipe.SourceUrl,
                 ServingSize = 0
             };
@@ -921,7 +911,6 @@ namespace MobilniKucharka.Services
             await _db.InsertAsync(recipe);
             return recipe.Id;
         }
-
 
         public async Task ResetDatabaseAsync()
         {

@@ -290,8 +290,7 @@ public partial class SettingsPage : ContentPage
 
     private async void OnCheckForUpdatesClicked(object sender, EventArgs e)
     {
-        var updateService = new UpdateCheckService();
-        var info = await updateService.CheckForUpdateAsync();
+        var info = await UpdateCheckService.CheckForUpdateAsync();
 
         if (info == null)
         {

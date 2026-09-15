@@ -102,19 +102,15 @@ namespace MobilniKucharka.Services
                 var recipe = await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
                 if (recipe == null) return false;
 
-                // Uložíme aktuální (zdrojový) text do cache dřív, než ho případně přepíšeme -
-                // DescriptionText/IngredientsRaw je na Recipe jen jedno pole, tohle je jediné místo,
-                // kde obě jazykové verze přežijí.
                 await SaveTranslationCacheAsync(recipeId, "DescriptionText", fromLang, recipe.DescriptionText);
                 await SaveTranslationCacheAsync(recipeId, "IngredientsRaw", fromLang, recipe.IngredientsRaw);
 
-                var translationService = new TranslationService();
-
-                bool namesStepsOk = await translationService.TranslateRecipeNameAndStepsAsync(recipe, fromLang, toLang, skipName);
+                bool namesStepsOk = await TranslationService.TranslateRecipeNameAndStepsAsync(recipe, fromLang, toLang, skipName);
                 if (!namesStepsOk) return false;
 
-                recipe.DescriptionText = await GetOrTranslateFieldAsync(translationService, recipeId, "DescriptionText", recipe.DescriptionText, fromLang, toLang);
-                recipe.IngredientsRaw = await GetOrTranslateFieldAsync(translationService, recipeId, "IngredientsRaw", recipe.IngredientsRaw, fromLang, toLang);
+                recipe.DescriptionText = await GetOrTranslateFieldAsync(recipeId, "DescriptionText", recipe.DescriptionText, fromLang, toLang);
+                recipe.IngredientsRaw = await GetOrTranslateFieldAsync(recipeId, "IngredientsRaw", recipe.IngredientsRaw, fromLang, toLang);
+                recipe.ContentLanguage = toLang;
 
                 await _db.UpdateAsync(recipe);
                 return true;
@@ -126,17 +122,15 @@ namespace MobilniKucharka.Services
             }
         }
 
-        // Vrátí přeložený text z cache, pokud tam pro daný jazyk už je; jinak zavolá DeepL
-        // a výsledek do cache uloží pro příště (žádný recept se pak nepřekládá dvakrát).
-        private async Task<string> GetOrTranslateFieldAsync(TranslationService translationService, int recipeId, string fieldName, string sourceText, string fromLang, string toLang)
+        private async Task<string> GetOrTranslateFieldAsync(int recipeId, string fieldName, string sourceText, string fromLang, string toLang)
         {
             string? cached = await GetTranslationCacheAsync(recipeId, fieldName, toLang);
             if (cached != null) return cached;
 
             if (string.IsNullOrWhiteSpace(sourceText)) return sourceText;
 
-            string? translated = await translationService.TranslateAsync(sourceText, toLang, fromLang);
-            if (string.IsNullOrWhiteSpace(translated)) return sourceText; // překlad selhal, necháme původní text
+            string? translated = await TranslationService.TranslateAsync(sourceText, toLang, fromLang);
+            if (string.IsNullOrWhiteSpace(translated)) return sourceText;
 
             await SaveTranslationCacheAsync(recipeId, fieldName, toLang, translated);
             return translated;
@@ -148,7 +142,7 @@ namespace MobilniKucharka.Services
         // Díky cache (viz TranslateAndSaveRecipeAsync) se tohle pro daný recept stane jen jednou navždy.
 
         public async Task<Recipe?> EnsureRecipeLanguageAsync(int recipeId) =>
-            await EnsureRecipeLanguageAsync(recipeId, null);
+    await EnsureRecipeLanguageAsync(recipeId, null);
 
         public async Task<Recipe?> EnsureRecipeLanguageAsync(int recipeId, Recipe? preloaded)
         {
@@ -167,7 +161,8 @@ namespace MobilniKucharka.Services
 
             bool nameOk = !string.IsNullOrWhiteSpace(currentName);
             bool stepsOk = otherSteps.Count == 0 || currentSteps.Count > 0;
-            if (nameOk && stepsOk)
+            bool contentOk = recipe.ContentLanguage == currentLang;
+            if (nameOk && stepsOk && contentOk)
                 return recipe;
 
             if (string.IsNullOrWhiteSpace(otherName))
@@ -176,6 +171,26 @@ namespace MobilniKucharka.Services
             bool success = await TranslateAndSaveRecipeAsync(recipeId, fromLang: otherLang, toLang: currentLang, skipName: nameOk);
             if (!success) return recipe;
 
+            return await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
+        }
+
+        // Ruční vynucení překladu (Možnosti receptu > Přeložit recept znovu) - pro recepty, kde
+        // IngredientsRaw/DescriptionText obsahují smíchaný jazyk (typicky vlastní/sdílený recept),
+        // což automatická kontrola výše neumí spolehlivě odhalit.
+        public async Task<Recipe?> ForceRetranslateRecipeAsync(int recipeId)
+        {
+            await EnsureInitializedAsync();
+
+            var recipe = await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
+            if (recipe == null) return null;
+
+            string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
+            string otherLang = currentLang == "cs" ? "en" : "cs";
+            string otherName = otherLang == "cs" ? recipe.Name_CS : recipe.Name_EN;
+
+            if (string.IsNullOrWhiteSpace(otherName)) return recipe;
+
+            await TranslateAndSaveRecipeAsync(recipeId, fromLang: otherLang, toLang: currentLang, skipName: false);
             return await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
         }
     }

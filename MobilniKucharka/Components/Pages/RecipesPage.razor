@@ -170,8 +170,7 @@
         try
         {
             var userDiets = ParseUserDiets();
-            var mealDbService = new TheMealDbService();
-            var found = await mealDbService.GetRandomRecipeMatchingDietAsync(userDiets);
+            var found = await TheMealDbService.GetRandomRecipeMatchingDietAsync(userDiets);
 
             if (found == null)
             {
@@ -272,8 +271,7 @@
 
     private async Task CheckForUpdatesAsync()
     {
-        var updateService = new UpdateCheckService();
-        var info = await updateService.CheckForUpdateAsync();
+        var info = await UpdateCheckService.CheckForUpdateAsync();
 
         if (info != null && info.IsUpdateAvailable)
         {
