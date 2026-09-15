@@ -370,7 +370,7 @@ html, body {
     overflow: hidden;
     box-shadow: var(--shadow-sm);
     cursor: pointer;
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
 }
 
 .recipe-card:active {
@@ -1075,7 +1075,7 @@ html, body {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    transition: transform var(--transition-fast);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .bookmark-card:active {

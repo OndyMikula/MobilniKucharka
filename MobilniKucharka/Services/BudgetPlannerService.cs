@@ -47,6 +47,8 @@ namespace MobilniKucharka.Services
                     await EnsureSearchedRecipesBookmarkExistsAsync();
                 }
 
+                await EnsureContentLanguageMigrationAsync();
+
                 _isInitialized = true;
             }
             catch (Exception ex)

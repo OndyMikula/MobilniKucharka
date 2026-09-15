@@ -193,5 +193,25 @@ namespace MobilniKucharka.Services
             await TranslateAndSaveRecipeAsync(recipeId, fromLang: otherLang, toLang: currentLang, skipName: false);
             return await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
         }
+
+        // Jednorázová migrace pro recepty založené před zavedením ContentLanguage - importované
+        // recepty (MealDB/Spoonacular) jsou VŽDY anglicky u zdroje, takže se jim pole vynuceně
+        // vyprázdní, což donutí EnsureRecipeLanguageAsync znovu přepočítat i IngredientsRaw/
+        // DescriptionText, i kdyby Name_CS/Steps_CS už dřív vypadaly hotové.
+        public async Task EnsureContentLanguageMigrationAsync()
+        {
+            const string prefKey = "ContentLanguageMigrationDone_v1";
+            if (Preferences.Default.Get(prefKey, false)) return;
+
+            var imported = await _db.Table<Recipe>().Where(r => r.ExternalSourceId != "").ToListAsync();
+
+            foreach (var recipe in imported)
+            {
+                recipe.ContentLanguage = string.Empty;
+                await _db.UpdateAsync(recipe);
+            }
+
+            Preferences.Default.Set(prefKey, true);
+        }
     }
 }

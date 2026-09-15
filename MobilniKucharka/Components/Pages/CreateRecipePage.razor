@@ -138,6 +138,11 @@
         </div>
 
         <!-- ULOZENI -->
+        @if (_isDraftSaved)
+        {
+            <span class="recipe-source-link" style="text-decoration:none; color:var(--color-success);">✓ @Tr("Uloženo")</span>
+        }
+
         <button type="button" class="btn-action btn-success" style="height:55px; margin-top:10px;" @onclick="OnSaveClickedAsync">
             @Tr("Uložit recept")
         </button>
@@ -203,6 +208,9 @@
     private double _cachedFat;
     private double _cachedSugar;
     private bool _cachedIsNutritionEstimated;
+
+    private bool _isDraftSaved = false;
+    private CancellationTokenSource? _savedIndicatorCts;
 
     private static readonly Regex AmountSplitRegex = new(@"^(\d+(?:[.,]\d+)?)\s*(.*)$", RegexOptions.Compiled);
 
@@ -577,6 +585,41 @@
             _recipe.Id = _currentRecipeId.Value;
             await _db.UpdateAsync(_recipe);
         }
+
+        if (_currentRecipeId == null)
+        {
+            await _db.InsertAsync(_recipe);
+            _currentRecipeId = _recipe.Id;
+            await App.Database.AddRecipeToCategoryAsync(_currentRecipeId.Value, "Koncepty");
+        }
+        else
+        {
+            _recipe.Id = _currentRecipeId.Value;
+            await _db.UpdateAsync(_recipe);
+        }
+
+        ShowSavedIndicator();
+    }
+
+    // Briefly shows "Uloženo" after an autosave, then hides it again.
+    private void ShowSavedIndicator()
+    {
+        _isDraftSaved = true;
+        StateHasChanged();
+
+        _savedIndicatorCts?.Cancel();
+        _savedIndicatorCts = new CancellationTokenSource();
+        var token = _savedIndicatorCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(1500, token);
+                await InvokeAsync(() => { _isDraftSaved = false; StateHasChanged(); });
+            }
+            catch (TaskCanceledException) { }
+        });
     }
 
     private void QueueAutoSave()
@@ -749,6 +792,6 @@
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnNavigatingAway;
-        _autoSaveDebounceCts?.Cancel();
+        _savedIndicatorCts?.Cancel();
     }
 }
