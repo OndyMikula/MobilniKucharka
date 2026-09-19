@@ -8,7 +8,8 @@
 <div class="create-recipe-page">
     <div class="create-recipe-header">
         <button type="button" class="icon-btn" @onclick="OnBackClicked">←</button>
-        <h1 class="hub-title" style="font-size: 20px;">@Tr("Nastavení")</h1>
+        <h1 class="hub-title" style="font-size: 20px; flex:1;">@Tr("Nastavení")</h1>
+        <button type="button" class="icon-btn" @onclick="OnDevModeTapped">...</button>
     </div>
 
     <div class="create-recipe-body">
@@ -92,9 +93,6 @@
         <!-- PRÁVNÍ INFORMACE -->
         <button type="button" class="recipe-source-link" @onclick="OnLegalInfoClickedAsync">@Tr("Právní informace")</button>
         <span style="font-size:11px; color:var(--color-text-muted); text-align:center;">@_appVersionText</span>
-
-        <!-- Dočasný vývojářský přepínač - stejná logika (3 kliknutí do 2s) jako starý native SettingsPage. -->
-        <button type="button" class="btn-dev" style="align-self:center;" @onclick="OnDevModeTapped">...</button>
 
     </div>
 </div>
@@ -190,12 +188,14 @@
         string currentSavedCode = Preferences.Default.Get("AppLanguageCode", "cs");
         if (currentSavedCode == newCode) return;
 
-        string title = newCode == "en" ? "Language Change" : "Změna jazyka";
-        string message = newCode == "en"
+        // Dialog se ptá VŽDY v aktuálním (nikoli cílovém) jazyce - kdo klikl omylem, musí rozumět
+        // otázce, ne novému jazyku, který ještě nezná.
+        string title = currentSavedCode == "en" ? "Language Change" : "Změna jazyka";
+        string message = currentSavedCode == "en"
             ? "The app needs to reload to apply the language change. Do you want to reload now?"
             : "Pro uplatnění změn je potřeba aplikaci znovu načíst. Chcete ji restartovat nyní?";
-        string accept = newCode == "en" ? "Restart" : "Restartovat";
-        string cancel = newCode == "en" ? "Cancel" : "Zrušit";
+        string accept = currentSavedCode == "en" ? "Restart" : "Restartovat";
+        string cancel = currentSavedCode == "en" ? "Cancel" : "Zrušit";
 
         bool shouldRestart = await DialogService.ShowConfirmAsync(title, message, accept, cancel);
         if (!shouldRestart) return;
