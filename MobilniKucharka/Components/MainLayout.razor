@@ -28,7 +28,15 @@
         if (firstRender)
         {
             await ApplySystemInsetAsync();
+            await ApplyAppThemeAsync();
         }
+    }
+
+    private async Task ApplyAppThemeAsync()
+    {
+        string theme = Preferences.Default.Get("AppTheme", "Podle systému");
+        string jsTheme = theme switch { "Světlý" => "light", "Tmavý" => "dark", _ => "system" };
+        try { await JSRuntime.InvokeVoidAsync("setAppTheme", jsTheme); } catch { }
     }
 
     private async void OnSystemInsetChanged()

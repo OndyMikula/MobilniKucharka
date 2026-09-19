@@ -1,0 +1,517 @@
+﻿@page "/settings"
+@namespace MobilniKucharka.Components.Pages
+@using CommunityToolkit.Maui.Storage
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<div class="create-recipe-page">
+    <div class="create-recipe-header">
+        <button type="button" class="icon-btn" @onclick="OnBackClicked">←</button>
+        <h1 class="hub-title" style="font-size: 20px;">@Tr("Nastavení")</h1>
+    </div>
+
+    <div class="create-recipe-body">
+
+        <!-- VZHLED -->
+        <div class="form-group">
+            <label class="form-label">@Tr("Vzhled aplikace")</label>
+            <SegmentedControl Options="_themeOptions" SelectedValue="@_selectedTheme" SelectedValueChanged="OnThemeSelectedAsync" />
+        </div>
+
+        <!-- JAZYK -->
+        <div class="form-group">
+            <label class="form-label">@Tr("Jazyk aplikace")</label>
+            <SegmentedControl Options="_languageOptions" SelectedValue="@_selectedLanguageCode" SelectedValueChanged="OnLanguageSelectedAsync" />
+            <span style="font-size:12px; color:var(--color-text-muted);">@Tr("Změna jazyka se projeví po restartu aplikace.")</span>
+        </div>
+
+        <!-- BETA PROGRAM: NEZAREGISTROVANÝ -->
+        @if (_showBetaOptIn)
+        {
+            <div class="form-group" style="margin-top:10px;">
+                <label class="form-label">@Tr("Beta program")</label>
+                <span style="font-size:12px; color:var(--color-text-muted);">@Tr("Připoj se do beta programu a dostávej nové verze dřív, ještě před oficiálním vydáním. Beta verze mohou obsahovat chyby.")</span>
+                <label class="form-label" style="font-size:14px;">@Tr("Kód beta programu:")</label>
+                <input type="text" class="form-input" placeholder="@Tr("Zadej kód")" @bind="_betaCodeInput" />
+                <button type="button" class="btn-action" style="background-color:#9C27B0;" @onclick="OnRegisterBetaClickedAsync">@Tr("Připojit se")</button>
+            </div>
+        }
+
+        <!-- BETA PROGRAM: JIŽ ZAREGISTROVANÝ -->
+        @if (_showBetaOptedIn)
+        {
+            <div class="form-group" style="margin-top:10px;">
+                <label class="form-label">@Tr("Beta program")</label>
+                <span style="font-size:12px; color:var(--color-success);">@_betaStatusText</span>
+                @if (_showUnregisterBeta)
+                {
+                    <button type="button" class="btn-action" style="background-color:#888888;" @onclick="OnUnregisterBetaClickedAsync">@Tr("Odhlásit se z beta programu")</button>
+                }
+            </div>
+        }
+
+        <!-- SDÍLENÍ RECEPTU ZE SOUBORU/ODKAZU -->
+        <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">@Tr("Sdílet recepty")</label>
+            <span style="font-size:12px; color:var(--color-text-muted);">@Tr("Vloží recept, který ti poslal někdo jiný ze svého zařízení.")</span>
+            <button type="button" class="btn-action" style="background-color:#9C27B0;" @onclick="OnImportRecipeClickedAsync">@Tr("Načíst recept ze souboru")</button>
+            <label class="form-label" style="font-size:14px; margin-top:8px;">@Tr("Nebo vlož odkaz na sdílený recept:")</label>
+            <div style="display:flex; gap:8px;">
+                <input type="text" class="form-input" style="flex:1;" placeholder="@Tr("Vlož odkaz sem")" @bind="_recipeLinkInput" />
+                <button type="button" class="btn-action" style="background-color:#9C27B0; width:auto; padding:0 16px;" @onclick="OnImportFromLinkClickedAsync">@Tr("Importovat")</button>
+            </div>
+        </div>
+
+        <!-- ZÁLOHA DAT -->
+        <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">@Tr("Záloha dat")</label>
+            <span style="font-size:12px; color:var(--color-text-muted);">@Tr("Exportuje všechny recepty, záložky a nastavení do jednoho souboru, který můžeš přenést na jiné zařízení.")</span>
+            <button type="button" class="btn-action btn-primary" @onclick="OnExportDataClickedAsync">@Tr("Exportovat data")</button>
+            <button type="button" class="btn-action" style="background-color:#607D8B;" @onclick="OnSaveDataToDeviceClickedAsync">@Tr("Uložit zálohu do zařízení")</button>
+            <button type="button" class="btn-action" style="background-color:#FF9800;" @onclick="OnLoadDataClickedAsync">@Tr("Načíst data ze zálohy")</button>
+        </div>
+
+        <!-- AKTUALIZACE -->
+        <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">@Tr("Vyhledat aktualizace")</label>
+            <span style="font-size:12px; color:var(--color-text-muted);">@Tr("Vyhledá nejnovější dostupnou verzi a porovná ji s nainstalovanou verzí.")</span>
+            <button type="button" class="btn-action btn-primary" @onclick="OnCheckForUpdatesClickedAsync">@Tr("Vyhledat aktualizace")</button>
+        </div>
+
+        <!-- ZPĚTNÁ VAZBA -->
+        <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">@Tr("Zpětná vazba")</label>
+            <span style="font-size:12px; color:var(--color-text-muted);">@Tr("Pošli hlášení o chybě nebo nápad na vylepšení přímo vývojáři.")</span>
+            <div style="display:flex; gap:10px;">
+                <button type="button" class="btn-action" style="background-color:#9C27B0; flex:1;" @onclick="OnReportBugClicked">@Tr("Nahlásit chybu")</button>
+                <button type="button" class="btn-action" style="background-color:#673AB7; flex:1;" @onclick="OnSuggestIdeaClicked">@Tr("Navrhnout vylepšení")</button>
+            </div>
+        </div>
+
+        <!-- PRÁVNÍ INFORMACE -->
+        <button type="button" class="recipe-source-link" @onclick="OnLegalInfoClickedAsync">@Tr("Právní informace")</button>
+        <span style="font-size:11px; color:var(--color-text-muted); text-align:center;">@_appVersionText</span>
+
+        <!-- Dočasný vývojářský přepínač - stejná logika (3 kliknutí do 2s) jako starý native SettingsPage. -->
+        <button type="button" class="btn-dev" style="align-self:center;" @onclick="OnDevModeTapped">...</button>
+
+    </div>
+</div>
+
+@if (_showBackupOverlay)
+{
+    <div class="modal-overlay">
+        <div class="modal-card loading-modal">
+            <p class="loading-text">@_backupProgressLabel</p>
+            <div class="progress-bar-track">
+                <div class="progress-bar-fill" style="width:@(_backupProgressPercent)%;"></div>
+            </div>
+            <span style="font-size:12px; color:var(--color-text-muted);">@_backupProgressPercent %</span>
+        </div>
+    </div>
+}
+
+@code {
+    private List<(string Value, string Label)> _themeOptions = [];
+    private List<(string Value, string Label)> _languageOptions = [];
+
+    private string _selectedTheme = "Podle systému";
+    private string _selectedLanguageCode = "cs";
+
+    private bool _showBackupOverlay;
+    private string _backupProgressLabel = string.Empty;
+    private int _backupProgressPercent;
+
+    private bool _isDeveloperMode;
+    private int _devModeTapCount;
+    private DateTime _lastDevModeTapTime = DateTime.MinValue;
+
+    private bool _showBetaOptIn;
+    private bool _showBetaOptedIn;
+    private bool _showUnregisterBeta;
+    private string _betaCodeInput = string.Empty;
+    private string _betaStatusText = string.Empty;
+
+    private string _recipeLinkInput = string.Empty;
+    private string _appVersionText = string.Empty;
+
+    private static readonly FilePickerFileType ZipFileType = new(new Dictionary<DevicePlatform, IEnumerable<string>>
+    {
+        { DevicePlatform.Android, new[] { "application/zip", "application/x-zip-compressed" } }
+    });
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    protected override void OnInitialized()
+    {
+        _themeOptions =
+        [
+            ("Podle systému", Tr("Podle systému")),
+            ("Světlý", Tr("Světlý")),
+            ("Tmavý", Tr("Tmavý"))
+        ];
+
+        _languageOptions = [("cs", "Čeština"), ("en", "English")];
+
+        _selectedTheme = Preferences.Default.Get("AppTheme", "Podle systému");
+        _selectedLanguageCode = Preferences.Default.Get("AppLanguageCode", "cs");
+
+        _isDeveloperMode = Preferences.Default.Get("IsDeveloperMode", false);
+        UpdateBetaSectionVisibility();
+
+        _appVersionText = string.Format(Tr("Verze {0}"), AppInfo.Current.VersionString);
+    }
+
+    private async Task OnThemeSelectedAsync(string selectedTheme)
+    {
+        _selectedTheme = selectedTheme;
+        Preferences.Default.Set("AppTheme", selectedTheme);
+
+        Application.Current!.UserAppTheme = selectedTheme switch
+        {
+            "Světlý" => AppTheme.Light,
+            "Tmavý" => AppTheme.Dark,
+            _ => AppTheme.Unspecified
+        };
+
+        string jsTheme = selectedTheme switch { "Světlý" => "light", "Tmavý" => "dark", _ => "system" };
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("setAppTheme", jsTheme);
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task OnLanguageSelectedAsync(string newCode)
+    {
+        string currentSavedCode = Preferences.Default.Get("AppLanguageCode", "cs");
+        if (currentSavedCode == newCode) return;
+
+        string title = newCode == "en" ? "Language Change" : "Změna jazyka";
+        string message = newCode == "en"
+            ? "The app needs to reload to apply the language change. Do you want to reload now?"
+            : "Pro uplatnění změn je potřeba aplikaci znovu načíst. Chcete ji restartovat nyní?";
+        string accept = newCode == "en" ? "Restart" : "Restartovat";
+        string cancel = newCode == "en" ? "Cancel" : "Zrušit";
+
+        bool shouldRestart = await DialogService.ShowConfirmAsync(title, message, accept, cancel);
+        if (!shouldRestart) return;
+
+        string newName = newCode == "en" ? "English" : "Čeština";
+        Preferences.Default.Set("AppLanguageName", newName);
+        Preferences.Default.Set("AppLanguageCode", newCode);
+
+        var culture = new System.Globalization.CultureInfo(newCode);
+        Thread.CurrentThread.CurrentCulture = culture;
+        Thread.CurrentThread.CurrentUICulture = culture;
+        System.Globalization.CultureInfo.DefaultThreadCurrentCulture = culture;
+        System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = culture;
+
+        App.ResetDatabase();
+        Application.Current!.Windows[0].Page = new AppShell();
+    }
+
+    private async Task OnExportDataClickedAsync()
+    {
+        _showBackupOverlay = true;
+        _backupProgressLabel = Tr("Exportuji data...");
+        _backupProgressPercent = 0;
+
+        var progress = new Progress<double>(value =>
+        {
+            _backupProgressPercent = (int)(value * 100);
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            string zipPath = await DataBackupService.ExportAsync(progress);
+            _showBackupOverlay = false;
+
+            await Share.Default.RequestAsync(new ShareFileRequest
+            {
+                Title = Tr("Uložit zálohu Mobilní Kuchařky"),
+                File = new ShareFile(zipPath)
+            });
+        }
+        catch (Exception ex)
+        {
+            _showBackupOverlay = false;
+            await DialogService.ShowAlertAsync(Tr("Chyba"), $"{Tr("Export se nepodařil")}: {ex.Message}", "OK");
+        }
+    }
+
+    private async Task OnSaveDataToDeviceClickedAsync()
+    {
+        _showBackupOverlay = true;
+        _backupProgressLabel = Tr("Exportuji data...");
+        _backupProgressPercent = 0;
+
+        var progress = new Progress<double>(value =>
+        {
+            _backupProgressPercent = (int)(value * 100);
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            string zipPath = await DataBackupService.ExportAsync(progress);
+            _showBackupOverlay = false;
+
+            using var stream = File.OpenRead(zipPath);
+            var result = await FileSaver.Default.SaveAsync(Path.GetFileName(zipPath), stream, CancellationToken.None);
+
+            if (result.IsSuccessful)
+                await DialogService.ShowAlertAsync(Tr("Hotovo"), $"{Tr("Záloha byla uložena do: ")}{result.FilePath}", "OK");
+        }
+        catch (Exception ex)
+        {
+            _showBackupOverlay = false;
+            await DialogService.ShowAlertAsync(Tr("Chyba"), $"{Tr("Uložení se nepodařilo")}: {ex.Message}", "OK");
+        }
+    }
+
+    private async Task OnLoadDataClickedAsync()
+    {
+        try
+        {
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = Tr("Vyber soubor zálohy (.zip)"),
+                FileTypes = ZipFileType
+            });
+            if (result == null) return;
+
+            bool confirm = await DialogService.ShowConfirmAsync(Tr("Načíst zálohu"), Tr("Tímto se přepíší všechna aktuální data v aplikaci. Pokračovat?"), Tr("Ano"), Tr("Zrušit"));
+            if (!confirm) return;
+
+            _showBackupOverlay = true;
+            _backupProgressLabel = Tr("Načítám data...");
+            _backupProgressPercent = 0;
+
+            string localCopyPath = Path.Combine(FileSystem.CacheDirectory, $"import_{Guid.NewGuid()}.zip");
+            using (var sourceStream = await result.OpenReadAsync())
+            using (var localStream = File.Create(localCopyPath))
+            {
+                await sourceStream.CopyToAsync(localStream);
+            }
+
+            var progress = new Progress<double>(value =>
+            {
+                _backupProgressPercent = (int)(value * 100);
+                InvokeAsync(StateHasChanged);
+            });
+
+            await DataBackupService.ImportAsync(localCopyPath, progress);
+            File.Delete(localCopyPath);
+
+            _showBackupOverlay = false;
+            await DialogService.ShowAlertAsync(Tr("Hotovo"), Tr("Data byla načtena. Aplikace se nyní restartuje."), "OK");
+
+            App.ResetDatabase();
+            Application.Current!.Windows[0].Page = new AppShell();
+        }
+        catch (Exception ex)
+        {
+            _showBackupOverlay = false;
+            await DialogService.ShowAlertAsync(Tr("Chyba"), $"{Tr("Načtení se nepodařilo")}: {ex.Message}", "OK");
+        }
+    }
+
+    private async Task OnImportRecipeClickedAsync()
+    {
+        try
+        {
+            var result = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = Tr("Vyber soubor receptu") });
+            if (result == null) return;
+
+            var recipe = await RecipeShareService.ImportRecipeAsync(result.FullPath);
+
+            int newId = await App.Database.ImportSharedRecipeAsync(recipe);
+            await App.Database.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
+
+            await DialogService.ShowAlertAsync(Tr("Hotovo"), string.Format(Tr("Recept \"{0}\" byl naimportován."), recipe.Name), "OK");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), $"{Tr("Import se nepodařil")}: {ex.Message}", "OK");
+        }
+    }
+
+    private async Task OnImportFromLinkClickedAsync()
+    {
+        string link = _recipeLinkInput?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(link))
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), Tr("Nejdřív vlož odkaz."), "OK");
+            return;
+        }
+
+        string? guid = ExtractGuidFromLink(link);
+        if (guid == null)
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), Tr("Tento odkaz nevypadá jako platný odkaz na recept."), "OK");
+            return;
+        }
+
+        var recipe = await RecipeLinkShareService.ImportFromLinkAsync(guid);
+        if (recipe == null)
+        {
+            await DialogService.ShowAlertAsync(Tr("Odkaz neplatný"), Tr("Tento odkaz na recept už není platný (buď vypršel, nebo už byl použit)."), "OK");
+            return;
+        }
+
+        int newId = await App.Database.ImportSharedRecipeAsync(recipe);
+        await App.Database.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
+
+        _recipeLinkInput = string.Empty;
+        await DialogService.ShowAlertAsync(Tr("Hotovo"), string.Format(Tr("Recept \"{0}\" byl naimportován."), recipe.Name), "OK");
+    }
+
+    private static string? ExtractGuidFromLink(string link)
+    {
+        var queryMatch = System.Text.RegularExpressions.Regex.Match(link, @"[?&]id=([a-fA-F0-9]+)");
+        if (queryMatch.Success) return queryMatch.Groups[1].Value;
+
+        var pathMatch = System.Text.RegularExpressions.Regex.Match(link, @"recipe/([a-fA-F0-9]+)");
+        if (pathMatch.Success) return pathMatch.Groups[1].Value;
+
+        return null;
+    }
+
+    private async Task OnCheckForUpdatesClickedAsync()
+    {
+        var info = await UpdateCheckService.CheckForUpdateAsync();
+
+        if (info == null)
+        {
+            await DialogService.ShowAlertAsync(Tr("Kontrola aktualizací"), Tr("Nepodařilo se zkontrolovat aktualizace. Zkontroluj internetové připojení."), "OK");
+            return;
+        }
+
+        if (!info.IsUpdateAvailable)
+        {
+            await DialogService.ShowAlertAsync(Tr("Kontrola aktualizací"), Tr("Používáš nejnovější verzi."), "OK");
+            return;
+        }
+
+        bool download = await DialogService.ShowConfirmAsync(
+            Tr("Nová verze je k dispozici"),
+            string.Format(Tr("Je dostupná nová verze aplikace ({0}). Chceš ji instalovat? Všechny recepty, záložky a nastavení zůstanou zachovány."), info.LatestVersion),
+            Tr("Instalovat"), Tr("Pokračovat bez instalace"));
+
+        if (download)
+        {
+            string urlToOpen = !string.IsNullOrWhiteSpace(info.ApkDownloadUrl) ? info.ApkDownloadUrl : info.ReleaseUrl;
+            if (!string.IsNullOrWhiteSpace(urlToOpen))
+                await Launcher.Default.OpenAsync(urlToOpen);
+        }
+    }
+
+    private void UpdateBetaSectionVisibility()
+    {
+        if (!_isDeveloperMode)
+        {
+            _showBetaOptIn = false;
+            _showBetaOptedIn = false;
+            return;
+        }
+
+        bool isBetaBuild = AppInfo.Current.VersionString.Contains("beta", StringComparison.OrdinalIgnoreCase);
+        bool isOptedIn = Preferences.Default.Get("IsBetaOptedIn", false);
+        bool effectivelyOptedIn = isBetaBuild || isOptedIn;
+
+        _showBetaOptedIn = effectivelyOptedIn;
+        _showBetaOptIn = !effectivelyOptedIn;
+
+        if (effectivelyOptedIn)
+        {
+            _betaStatusText = isBetaBuild
+                ? "🧪 " + Tr("Právě běžíš na beta verzi aplikace.")
+                : "✅ " + Tr("Jsi připojen jako beta tester. Dostáváš i beta verze aplikace.");
+            _showUnregisterBeta = !isBetaBuild;
+        }
+    }
+
+    private async Task OnRegisterBetaClickedAsync()
+    {
+        if (string.Equals(_betaCodeInput?.Trim(), "beta", StringComparison.OrdinalIgnoreCase))
+        {
+            Preferences.Default.Set("IsBetaOptedIn", true);
+            _betaCodeInput = string.Empty;
+            UpdateBetaSectionVisibility();
+            await DialogService.ShowAlertAsync(Tr("Hotovo"), Tr("Jsi přihlášen jako beta tester. Nyní budeš dostávat i beta verze."), "OK");
+        }
+        else
+        {
+            await DialogService.ShowAlertAsync(Tr("Špatný kód"), Tr("Zadaný kód není správný."), "OK");
+        }
+    }
+
+    private async Task OnUnregisterBetaClickedAsync()
+    {
+        Preferences.Default.Set("IsBetaOptedIn", false);
+        UpdateBetaSectionVisibility();
+        await DialogService.ShowAlertAsync(Tr("Hotovo"), Tr("Byl jsi odhlášen z beta programu."), "OK");
+    }
+
+    private async Task OnLegalInfoClickedAsync()
+    {
+        string tos = Tr("Podmínky použití");
+        string privacy = Tr("Zásady ochrany osobních údajů");
+        string license = Tr("Licence");
+        string thirdParty = Tr("Zdroje a licence třetích stran");
+
+        string? action = await DialogService.ShowActionSheetAsync(Tr("Právní informace"), Tr("Zrušit"), null, tos, privacy, license, thirdParty);
+
+        string? route = action == tos ? "/legal/tos"
+            : action == privacy ? "/legal/privacy"
+            : action == license ? "/license"
+            : action == thirdParty ? "/legal/third-party"
+            : null;
+
+        if (route != null)
+        {
+            var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+            await nav!.PushAsync(new Classes.Navigation.BlazorModalPage(route));
+        }
+    }
+
+    private void OnReportBugClicked()
+    {
+        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+        nav?.PushAsync(new Classes.Navigation.BlazorModalPage("/bug-report"));
+    }
+
+    private void OnSuggestIdeaClicked()
+    {
+        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
+        nav?.PushAsync(new Classes.Navigation.BlazorModalPage("/idea"));
+    }
+
+    private void OnDevModeTapped()
+    {
+        var now = DateTime.Now;
+        if ((now - _lastDevModeTapTime).TotalSeconds > 2)
+            _devModeTapCount = 0;
+
+        _lastDevModeTapTime = now;
+        _devModeTapCount++;
+
+        if (_devModeTapCount >= 3)
+        {
+            _devModeTapCount = 0;
+            _isDeveloperMode = !_isDeveloperMode;
+            Preferences.Default.Set("IsDeveloperMode", _isDeveloperMode);
+            UpdateBetaSectionVisibility();
+        }
+    }
+
+    private void OnBackClicked()
+    {
+        NavigationManager.NavigateTo("/recipes");
+    }
+}

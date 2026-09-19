@@ -67,6 +67,84 @@
         --color-skeleton: #2C2C2C;
     }
 }
+/* Explicit override for a user-chosen theme (set via window.setAppTheme) - wins over the OS
+   media-query above regardless of system setting. No attribute present = follow system. */
+:root[data-theme="light"] {
+    --color-bg: #F5F5F5;
+    --color-surface: #FFFFFF;
+    --color-surface-card: #FFFFFF;
+    --color-surface-hover: #F8F9FA;
+    --color-surface-active: #EEEEEE;
+    --color-border: #E0E0E0;
+    --color-border-light: #EEEEEE;
+    --color-text: #111111;
+    --color-text-secondary: #666666;
+    --color-text-muted: #888888;
+    --color-nav-bg: #E0E0E0;
+    --color-nav-text: #111111;
+    --color-pill-bg: #2196F3;
+    --color-pill-text: #FFFFFF;
+    --color-skeleton: #E0E0E0;
+}
+
+:root[data-theme="dark"] {
+    --color-bg: #121212;
+    --color-surface: #1E1E1E;
+    --color-surface-card: #1E1E1E;
+    --color-surface-hover: #262626;
+    --color-surface-active: #303030;
+    --color-border: #2C2C2C;
+    --color-border-light: #222222;
+    --color-text: #FFFFFF;
+    --color-text-secondary: #BBBBBB;
+    --color-text-muted: #888888;
+    --color-nav-bg: #1F1F1F;
+    --color-nav-text: #FFFFFF;
+    --color-pill-bg: #2196F3;
+    --color-pill-text: #FFFFFF;
+    --color-skeleton: #2C2C2C;
+}
+
+.segmented-control {
+    position: relative;
+    display: flex;
+    background-color: var(--color-border-light);
+    border-radius: var(--radius-md);
+    padding: 4px;
+}
+
+.segmented-pill {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    height: calc(100% - 8px);
+    background-color: var(--color-primary);
+    border-radius: calc(var(--radius-md) - 4px);
+    transition: transform var(--transition-normal);
+    z-index: 0;
+    pointer-events: none;
+}
+
+.segmented-option {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 0;
+    border: none;
+    background: transparent;
+    padding: 10px 8px;
+    margin: 0 2px;
+    border-radius: calc(var(--radius-md) - 4px);
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--transition-normal);
+}
+
+    .segmented-option.selected {
+        color: #FFFFFF;
+    }
 
 *, *::before, *::after {
     box-sizing: border-box;
@@ -1310,6 +1388,20 @@ html, body {
     margin: 0;
     font-weight: bold;
     font-size: 15px;
+}
+
+.progress-bar-track {
+    width: 100%;
+    height: 8px;
+    background-color: var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background-color: var(--color-primary);
+    transition: width var(--transition-fast);
 }
 
 /* Skeleton Loading */

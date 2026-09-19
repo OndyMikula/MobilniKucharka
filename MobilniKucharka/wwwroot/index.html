@@ -29,6 +29,14 @@
         window.mkNavigateBack = function () {
             history.back();
         };
+
+        window.setAppTheme = function (theme) {
+            if (theme === 'light' || theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', theme);
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+        };
     </script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
 </body>

@@ -212,8 +212,7 @@
 
     private void OpenSettings()
     {
-        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-        nav?.PushAsync(new SettingsPage());
+        NavigationManager.NavigateTo("/settings");
     }
 
     private void OpenOnboarding()
