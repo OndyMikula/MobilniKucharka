@@ -1,0 +1,42 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject IJSRuntime JSRuntime
+
+<div class="onboarding-shell">
+    @Body
+</div>
+
+@code {
+    // Samostatný layout bez BottomNavBar - onboarding nemá záložky. Insety řeší nezávisle,
+    // stejným vzorem jako ModalEntry.razor (žádný sdílený JS kontext s MainLayout).
+    protected override void OnInitialized()
+    {
+        Classes.Navigation.SystemInsets.TopChanged += OnInsetChanged;
+        Classes.Navigation.SystemInsets.BottomChanged += OnInsetChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await ApplyInsetsAsync();
+    }
+
+    private async void OnInsetChanged() => await InvokeAsync(ApplyInsetsAsync);
+
+    private async Task ApplyInsetsAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("setSystemTopInset", Classes.Navigation.SystemInsets.TopDp);
+            await JSRuntime.InvokeVoidAsync("setSystemNavInset", Classes.Navigation.SystemInsets.BottomDp);
+        }
+        catch
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        Classes.Navigation.SystemInsets.TopChanged -= OnInsetChanged;
+        Classes.Navigation.SystemInsets.BottomChanged -= OnInsetChanged;
+    }
+}

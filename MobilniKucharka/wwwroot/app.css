@@ -186,6 +186,101 @@ html, body {
     min-height: 0;
 }
 
+.onboarding-shell {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding-top: var(--system-top-inset, 0px);
+    padding-bottom: var(--system-nav-inset, 0px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background-color: var(--color-bg);
+}
+
+.onboarding-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 20px;
+}
+
+.onboarding-step-header {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 10px 0 20px 0;
+}
+
+.onboarding-step-title {
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    color: var(--color-text);
+}
+
+.onboarding-step-desc {
+    font-size: 14px;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.onboarding-step-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 20px;
+}
+
+.stepper-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+}
+
+.stepper-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
+    border: none;
+    background-color: var(--color-primary);
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.stepper-value {
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--color-primary);
+    min-width: 90px;
+    text-align: center;
+}
+
+.onboarding-nav-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    padding-top: 15px;
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+}
+
+    .checkbox-row input[type="checkbox"] {
+        width: 22px;
+        height: 22px;
+        accent-color: var(--color-primary);
+    }
+
 /* Bottom Navigation Bar */
 .nav-bar {
     display: flex;

@@ -1,0 +1,298 @@
+﻿@page "/onboarding"
+@namespace MobilniKucharka.Components.Pages
+@layout MobilniKucharka.Components.Layout.OnboardingLayout
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<div class="onboarding-body">
+
+    @if (_showWizardChrome)
+    {
+        <div class="progress-bar-track">
+            <div class="progress-bar-fill" style="width:@(_progress * 100)%; background-color:#4CAF50;"></div>
+        </div>
+    }
+
+    <div class="onboarding-step-header">
+        <h1 class="onboarding-step-title">@_stepTitle</h1>
+        <p class="onboarding-step-desc">@_stepDescription</p>
+    </div>
+
+    <div class="onboarding-step-body">
+        @switch (_currentStep)
+        {
+            case Step.Language:
+                <div style="display:flex; flex-direction:column; gap:15px;">
+                    <button type="button" class="btn-action btn-primary" style="height:55px;" @onclick='() => OnLanguageChosen("cs", "Čeština")'>Čeština</button>
+                    <button type="button" class="btn-action" style="height:55px; background-color:transparent; color:var(--color-primary); border:1px solid var(--color-primary);" @onclick='() => OnLanguageChosen("en", "English")'>English</button>
+                </div>
+                break;
+
+            case Step.Backup:
+                <div style="display:flex; flex-direction:column; gap:20px; align-items:center;">
+                    <span style="font-size:50px;">👋</span>
+                    <button type="button" class="btn-action btn-primary" style="height:55px; width:100%;" @onclick="OnContinueWithoutBackupClicked">@Tr("Nemám zálohu - pokračovat")</button>
+                    <button type="button" class="btn-action" style="height:55px; width:100%; background-color:#607D8B;" @onclick="OnLoadBackupClickedAsync">@Tr("Načíst data ze zálohy")</button>
+                </div>
+                break;
+
+            case Step.Budget:
+                <div class="detail-card" style="display:flex; flex-direction:column; gap:10px;">
+                    <label class="form-label">@Tr("Pro kolik lidí bude nákup?")</label>
+                    <div class="stepper-row">
+                        <button type="button" class="stepper-btn" @onclick="() => ChangePeopleCount(-1)">−</button>
+                        <span class="stepper-value">@UiTranslator.TrPeopleCount(_peopleCount)</span>
+                        <button type="button" class="stepper-btn" @onclick="() => ChangePeopleCount(1)">+</button>
+                    </div>
+                </div>
+
+                <div class="detail-card" style="display:flex; flex-direction:column; gap:10px;">
+                    <label class="form-label">@Tr("Tvůj týdenní budget na suroviny:")</label>
+                    <input type="range" class="rating-slider" style="width:100%;" min="500" max="10000" step="50"
+                           value="@_weeklyBudget" @oninput="OnBudgetSliderInput" />
+                    <span style="text-align:center; font-weight:bold; color:var(--color-success);">@($"{_weeklyBudget:N0} Kč")</span>
+                </div>
+                break;
+
+            case Step.Diets:
+                <label class="checkbox-row"><input type="checkbox" @bind="_isVegetarian" /><span>@Tr("Vegetarián")</span></label>
+                <label class="checkbox-row"><input type="checkbox" @bind="_isVegan" /><span>@Tr("Vegan")</span></label>
+                <label class="checkbox-row"><input type="checkbox" @bind="_isLactoseFree" /><span>@Tr("Bezlaktózová dieta")</span></label>
+                break;
+
+            case Step.Appliances:
+                <label class="checkbox-row"><input type="checkbox" @bind="_hasOven" /><span>@Tr("Trouba")</span></label>
+                <label class="checkbox-row"><input type="checkbox" @bind="_hasStove" /><span>@Tr("Sporák / Varná deska")</span></label>
+                <label class="checkbox-row"><input type="checkbox" @bind="_hasKettle" /><span>@Tr("Rychlovarná konvice")</span></label>
+                <label class="checkbox-row"><input type="checkbox" @bind="_hasMicrowave" /><span>@Tr("Mikrovlnná trouba")</span></label>
+                break;
+        }
+    </div>
+
+    @if (_showWizardChrome)
+    {
+        <div class="onboarding-nav-row">
+            @if (_currentStepIndex > 0)
+            {
+                <button type="button" class="btn-action" style="background-color:#9E9E9E;" @onclick="OnBackClicked">@Tr("Zpět")</button>
+            }
+            else
+            {
+                <div></div>
+            }
+            <button type="button" class="btn-action btn-primary" @onclick="OnNextClickedAsync">
+                @(_currentStepIndex == _steps.Count - 1 ? Tr("Vygenerovat jídelníček") : Tr("Pokračovat"))
+            </button>
+        </div>
+    }
+</div>
+
+@if (_showBackupOverlay)
+{
+    <div class="modal-overlay">
+        <div class="modal-card loading-modal">
+            <p class="loading-text">@_backupProgressLabel</p>
+            <div class="progress-bar-track">
+                <div class="progress-bar-fill" style="width:@(_backupProgressPercent)%;"></div>
+            </div>
+            <span style="font-size:12px; color:var(--color-text-muted);">@_backupProgressPercent %</span>
+        </div>
+    </div>
+}
+
+@code {
+    private enum Step { Language, Backup, Budget, Diets, Appliances }
+
+    private List<Step> _steps = [];
+    private int _currentStepIndex;
+    private Step _currentStep => _steps[_currentStepIndex];
+    private bool _isFirstLaunch;
+
+    private int _peopleCount = 2;
+    private double _weeklyBudget = 2000;
+    private bool _isVegetarian, _isVegan, _isLactoseFree;
+    private bool _hasOven = true, _hasStove = true, _hasKettle = true, _hasMicrowave = true;
+
+    private bool _showBackupOverlay;
+    private string _backupProgressLabel = string.Empty;
+    private int _backupProgressPercent;
+
+    private static readonly FilePickerFileType ZipFileType = new(new Dictionary<DevicePlatform, IEnumerable<string>>
+    {
+        { DevicePlatform.Android, new[] { "application/zip", "application/x-zip-compressed" } }
+    });
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    private bool _showWizardChrome => _currentStep is Step.Budget or Step.Diets or Step.Appliances;
+    private double _progress => _showWizardChrome ? (double)(_currentStepIndex + 1) / _steps.Count : 0;
+
+    private string _stepTitle = string.Empty;
+    private string _stepDescription = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _isFirstLaunch = !Preferences.Default.Get("IsOnboardingComplete", false);
+
+        _steps = _isFirstLaunch
+            ? [Step.Language, Step.Backup, Step.Budget, Step.Diets, Step.Appliances]
+            : [Step.Budget, Step.Diets, Step.Appliances];
+
+        _weeklyBudget = Preferences.Default.Get("WeeklyBudget", 2000.0);
+        _peopleCount = Preferences.Default.Get("PeopleCount", 2);
+
+        UpdateStepText();
+    }
+
+    private void UpdateStepText()
+    {
+        switch (_currentStep)
+        {
+            case Step.Language:
+                _stepTitle = "Vítej v Mobilní Kuchařce! / Welcome to Mobilní Kuchařka!";
+                _stepDescription = "Vyber jazyk aplikace. / Choose the app language.";
+                break;
+            case Step.Backup:
+                _stepTitle = Tr("Vítej v Mobilní Kuchařce");
+                _stepDescription = Tr("Než začneš, můžeš obnovit svá data ze zálohy, nebo začít úplně od začátku.");
+                break;
+            case Step.Budget:
+                _stepTitle = Tr("Počet lidí a rozpočet");
+                _stepDescription = Tr("Nastav, kolik lidí budeš krmit a kolik peněz chceš utratit.");
+                break;
+            case Step.Diets:
+                _stepTitle = Tr("Stravovací návyky");
+                _stepDescription = Tr("Omezíme recepty, které nevyhovují tvým potřebám.");
+                break;
+            case Step.Appliances:
+                _stepTitle = Tr("Co máš v kuchyni?");
+                _stepDescription = Tr("Nebudeme ti navrhovat pečení v troubě, pokud máš jen mikrovlnku.");
+                break;
+        }
+    }
+
+    private void OnLanguageChosen(string code, string displayName)
+    {
+        Preferences.Default.Set("AppLanguageCode", code);
+        Preferences.Default.Set("AppLanguageName", displayName);
+
+        var culture = new System.Globalization.CultureInfo(code);
+        Thread.CurrentThread.CurrentCulture = culture;
+        Thread.CurrentThread.CurrentUICulture = culture;
+        System.Globalization.CultureInfo.DefaultThreadCurrentCulture = culture;
+        System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = culture;
+
+        AdvanceStep();
+    }
+
+    private void ChangePeopleCount(int delta)
+    {
+        int newValue = Math.Clamp(_peopleCount + delta, 1, 10);
+        _peopleCount = newValue;
+    }
+
+    private void OnBudgetSliderInput(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double val))
+            _weeklyBudget = Math.Round(val / 50.0) * 50;
+    }
+
+    private void OnContinueWithoutBackupClicked() => AdvanceStep();
+
+    private async Task OnLoadBackupClickedAsync()
+    {
+        try
+        {
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = Tr("Vyber soubor zálohy (.zip)"),
+                FileTypes = ZipFileType
+            });
+            if (result == null) return;
+
+            _showBackupOverlay = true;
+            _backupProgressLabel = Tr("Načítám data...");
+            _backupProgressPercent = 0;
+
+            string localCopyPath = Path.Combine(FileSystem.CacheDirectory, $"import_{Guid.NewGuid()}.zip");
+            using (var sourceStream = await result.OpenReadAsync())
+            using (var localStream = File.Create(localCopyPath))
+            {
+                await sourceStream.CopyToAsync(localStream);
+            }
+
+            var progress = new Progress<double>(value =>
+            {
+                _backupProgressPercent = (int)(value * 100);
+                InvokeAsync(StateHasChanged);
+            });
+
+            await DataBackupService.ImportAsync(localCopyPath, progress);
+            File.Delete(localCopyPath);
+
+            _showBackupOverlay = false;
+            await DialogService.ShowAlertAsync(Tr("Hotovo"), Tr("Data byla načtena. Aplikace se nyní restartuje."), "OK");
+
+            CompleteOnboardingAndEnterApp();
+        }
+        catch (Exception ex)
+        {
+            _showBackupOverlay = false;
+            await DialogService.ShowAlertAsync(Tr("Chyba"), $"{Tr("Načtení se nepodařilo")}: {ex.Message}", "OK");
+        }
+    }
+
+    private void OnBackClicked()
+    {
+        if (_currentStepIndex > 0)
+        {
+            _currentStepIndex--;
+            UpdateStepText();
+        }
+    }
+
+    private async Task OnNextClickedAsync()
+    {
+        if (_currentStepIndex < _steps.Count - 1)
+        {
+            AdvanceStep();
+        }
+        else
+        {
+            SaveFinalData();
+            CompleteOnboardingAndEnterApp();
+        }
+    }
+
+    private void AdvanceStep()
+    {
+        _currentStepIndex++;
+        UpdateStepText();
+    }
+
+    private void SaveFinalData()
+    {
+        var diets = new List<string>();
+        if (_isVegetarian) diets.Add("Vegetarian");
+        if (_isVegan) diets.Add("Vegan");
+        if (_isLactoseFree) diets.Add("LactoseFree");
+
+        var appliances = new List<string>();
+        if (_hasOven) appliances.Add("Trouba");
+        if (_hasStove) appliances.Add("Sporák");
+        if (_hasKettle) appliances.Add("Konvice");
+        if (_hasMicrowave) appliances.Add("Mikrovlnka");
+
+        Preferences.Default.Set("PeopleCount", _peopleCount);
+        Preferences.Default.Set("WeeklyBudget", _weeklyBudget);
+        Preferences.Default.Set("UserDiets", string.Join(",", diets));
+        Preferences.Default.Set("UserAppliances", string.Join(",", appliances));
+    }
+
+    private static void CompleteOnboardingAndEnterApp()
+    {
+        Preferences.Default.Set("IsOnboardingComplete", true);
+        App.ResetDatabase();
+        Application.Current!.Windows[0].Page = new AppShell();
+    }
+}

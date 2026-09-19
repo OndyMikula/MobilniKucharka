@@ -103,6 +103,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (!Preferences.Default.Get("IsOnboardingComplete", false))
+        {
+            NavigationManager.NavigateTo("/onboarding", replace: true);
+            return;
+        }
+
         BlazorShellPage.ShellAppeared += OnShellAppeared;
         await LoadPageDataAsync();
         _ = CheckForUpdatesAsync();
@@ -217,8 +223,7 @@
 
     private void OpenOnboarding()
     {
-        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-        nav?.PushAsync(new OnboardingPage());
+        NavigationManager.NavigateTo("/onboarding");
     }
 
     private void OpenCreateRecipe()
