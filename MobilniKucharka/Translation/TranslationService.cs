@@ -8,11 +8,18 @@ namespace MobilniKucharka.Translation
     {
         private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
 
+        private static DateTime _quotaCheckedAtUtc = DateTime.MinValue;
+        private static bool _quotaExceeded;
+        private static readonly TimeSpan QuotaCheckInterval = TimeSpan.FromHours(6);
+
         private static bool IsFreeApiKey =>
             !string.IsNullOrEmpty(Secrets.DeepLApiKey) && Secrets.DeepLApiKey.EndsWith(":fx", StringComparison.OrdinalIgnoreCase);
 
         private static string Endpoint =>
             IsFreeApiKey ? "https://api-free.deepl.com/v2/translate" : "https://api.deepl.com/v2/translate";
+
+        private static string UsageEndpoint =>
+            IsFreeApiKey ? "https://api-free.deepl.com/v2/usage" : "https://api.deepl.com/v2/usage";
 
         private static string ToDeepLTargetCode(string appLangCode) =>
             appLangCode.Equals("en", StringComparison.OrdinalIgnoreCase) ? "EN-US" : "CS";
@@ -20,12 +27,55 @@ namespace MobilniKucharka.Translation
         private static string ToDeepLSourceCode(string appLangCode) =>
             appLangCode.Equals("en", StringComparison.OrdinalIgnoreCase) ? "EN" : "CS";
 
+        // /v2/usage se nepočítá do kvóty - bezpečné volat před každým překladem. Cachuje se na 6
+        // hodin. Developer/Pro tarif má CELOŽIVOTNÍ (neobnovující se) limit 1 000 000 znaků.
+        private static async Task<bool> HasQuotaAvailableAsync()
+        {
+            if (DateTime.UtcNow - _quotaCheckedAtUtc < QuotaCheckInterval)
+                return !_quotaExceeded;
+
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, UsageEndpoint);
+                request.Headers.Add("Authorization", $"DeepL-Auth-Key {Secrets.DeepLApiKey}");
+
+                var response = await _httpClient.SendAsync(request);
+                _quotaCheckedAtUtc = DateTime.UtcNow;
+
+                if (!response.IsSuccessStatusCode) return true;
+
+                string json = await response.Content.ReadAsStringAsync();
+                var data = JsonSerializer.Deserialize<JsonElement>(json);
+
+                long used = data.TryGetProperty("character_count", out var usedProp) ? usedProp.GetInt64() : 0;
+                long limit = data.TryGetProperty("character_limit", out var limitProp) ? limitProp.GetInt64() : long.MaxValue;
+
+                _quotaExceeded = limit > 0 && used >= limit - 2000;
+
+                if (_quotaExceeded)
+                    System.Diagnostics.Debug.WriteLine($"[DeepL] Kvóta téměř vyčerpána: {used}/{limit} znaků.");
+
+                return !_quotaExceeded;
+            }
+            catch
+            {
+                _quotaCheckedAtUtc = DateTime.UtcNow;
+                return true;
+            }
+        }
+
         public static async Task<List<string>?> TranslateBatchAsync(List<string> texts, string targetAppLang, string? sourceAppLang = null)
         {
             if (texts == null || texts.Count == 0) return [];
             if (string.IsNullOrWhiteSpace(Secrets.DeepLApiKey))
             {
                 System.Diagnostics.Debug.WriteLine("[DeepL] Chybí Secrets.DeepLApiKey - překlad se nespustil.");
+                return null;
+            }
+
+            if (!await HasQuotaAvailableAsync())
+            {
+                System.Diagnostics.Debug.WriteLine("[DeepL] Překlad přeskočen - kvóta téměř vyčerpaná.");
                 return null;
             }
 
