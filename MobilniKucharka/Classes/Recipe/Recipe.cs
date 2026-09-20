@@ -33,12 +33,9 @@ namespace MobilniKucharka.Classes.Recipe
         public int ServingSize { get; set; }
         public string IngredientsRaw { get; set; } = string.Empty; // Suroviny (např. "1 vejce|1 ks\nMouka|200 g")
 
-        // Jazyk, ve kterém jsou NAPSANÉ (nikdy nepřekládané) DescriptionText/IngredientsRaw -
-        // nastavuje se JEDNOU při vytvoření/importu a NIKDY se nemění. Zobrazení v jiném jazyce jde
-        // vždy přes RecipeTranslationCache (viz EnsureRecipeLanguageAsync/BuildDisplayRecipeAsync) -
-        // tahle dvě pole samotná se překladem už nikdy nepřepisují, aby se originál nikdy neztratil.
-        public string ContentLanguage { get; set; } = string.Empty;
-        public string StepsRaw { get; set; } = string.Empty; // Postup (např. "1. Smíchejte ingredience.\n2. Pečte 20 minut.")
+        // "" = neznámé (starší recept založený před zavedením tohoto pole) - viz migrace v
+        // EnsureContentLanguageMigrationAsync. Jakmile se jednou nastaví na "cs"/"en", zůstává tak.
+        public string ContentLanguage { get; set; } = string.Empty; public string StepsRaw { get; set; } = string.Empty; // Postup (např. "1. Smíchejte ingredience.\n2. Pečte 20 minut.")
 
         // UKLÁDÁNÍ DO DB: JSON řetězce pro češtinu i angličtinu
         public string StepsJson_CS { get; set; } = "[]";
@@ -144,9 +141,5 @@ namespace MobilniKucharka.Classes.Recipe
                 DietaryFlagsJson = JsonSerializer.Serialize(value);
             }
         }
-
-        // Mělká kopie pro DISPLAY účely - EnsureRecipeLanguageAsync ji používá k vrácení přeložené
-        // verze IngredientsRaw/DescriptionText, aniž by se cokoliv zapsalo zpět do DB.
-        public Recipe ShallowClone() => (Recipe)MemberwiseClone();
     }
 }

@@ -41,8 +41,6 @@ jobs:
               public static class Secrets
               {
                   public const string SpoonacularApiKey = "placeholder";
-                  public const string OpenFoodFactsUserId = "placeholder";
-                  public const string OpenFoodFactsPassword = "placeholder";
                   public const string NutritionixAppId = "placeholder";
                   public const string NutritionixApiKey = "placeholder";
                   public const string GitHubShareToken = "placeholder";

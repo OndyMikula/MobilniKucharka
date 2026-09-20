@@ -137,7 +137,7 @@
                         <h2 class="detail-section-title">@Tr("Potřebné pomůcky")</h2>
                     </div>
                     <div class="equipment-chips-row">
-                        @foreach (var tag in _displayEquipment)
+                        @foreach (var tag in _recipe.Equipment)
                         {
                             <span class="equipment-chip">@tag</span>
                         }
@@ -242,7 +242,6 @@
     private bool _isFavorite;
     private List<DisplayIngredient> _ingredients = [];
     private List<DisplayStep> _steps = [];
-    private List<string> _displayEquipment = [];
     private string _totalPriceText = string.Empty;
     private string _peopleCountBadgeText = string.Empty;
     private bool _showBookmarkOverlay;
@@ -383,12 +382,6 @@
         string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
         var rawSteps = currentLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
         _steps = rawSteps.Select((stepText, index) => new DisplayStep { StepNumber = index + 1, StepText = stepText }).ToList();
-
-        // Equipment je jednojazyčné pole jako IngredientsRaw, ale nepřekládá se přes DeepL napřímo -
-        // jde o pár krátkých opakujících se slov, takže se překládá přes sdílený slovník.
-        _displayEquipment = recipe.Equipment.Count > 0 && !string.IsNullOrWhiteSpace(recipe.ContentLanguage) && recipe.ContentLanguage != currentLang
-            ? await EquipmentTranslationService.TranslateEquipmentListAsync(recipe.Equipment, recipe.ContentLanguage, currentLang)
-            : recipe.Equipment;
 
         var (totalCost, allPriced) = await App.Database.GetRecipeCostDetailsAsync(recipe.Id, peopleCount);
         _totalPriceText = allPriced && totalCost > 0
@@ -645,7 +638,7 @@
             }
         }
 
-        await DialogService.ShowAlertAsync(Tr("Syrová data kroků"), sb.Length > 0 ? sb.ToString() : Tr("Žádné kroky."), "OK");
+        await DialogService.ShowAlertAsync("Syrová data kroků", sb.Length > 0 ? sb.ToString() : "Žádné kroky.", "OK");
     }
 
     private void OnCancelDeleteClicked() => _showDeleteOverlay = false;
