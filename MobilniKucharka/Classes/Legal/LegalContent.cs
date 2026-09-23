@@ -3,6 +3,7 @@
     public static class LegalContent
     {
         public const string LicenseFileUrl = "https://github.com/OndyMikula/MobilniKucharka/blob/main/LICENSE";
+        public const string SourceCodeUrl = "https://github.com/OndyMikula/MobilniKucharka";
 
         public static string GetTitle(LegalDocumentType type) => type switch
         {
