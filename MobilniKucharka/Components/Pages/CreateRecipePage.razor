@@ -58,7 +58,7 @@
                         <input type="text" class="form-input" placeholder="@Tr("Název ingredience")"
                                value="@row.Name" @oninput="(e) => OnIngredientFieldChanged(row, name: e.Value?.ToString())"
                                @onfocus="() => OnIngredientNameFocused(row)" @onblur="OnIngredientNameBlurredAsync" />
-                        <input type="text" inputmode="decimal" class="form-input" placeholder="@GetAmountPlaceholder(row.Unit)"
+                        <input type="text" inputmode="@(row.Unit == CustomUnitKey ? "text" : "decimal")" class="form-input" placeholder="@GetAmountPlaceholder(row.Unit)"
                                value="@row.Amount" @oninput="(e) => OnIngredientFieldChanged(row, amount: e.Value?.ToString())" />
                         <select class="form-select" value="@row.Unit" @onchange="(e) => OnIngredientUnitChanged(row, e.Value?.ToString())">
                             @foreach (var unit in UnitOptions)

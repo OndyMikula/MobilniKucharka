@@ -44,6 +44,7 @@
         <div class="dev-tools-row">
             <button type="button" class="btn-dev" @onclick="OnResetDatabaseClicked">@Tr("🔄 Resetovat testovací databázi")</button>
             <button type="button" class="btn-dev" @onclick="OnRepairStepsClicked">@Tr("🔧 Opravit formátování kroků")</button>
+            <button type="button" class="btn-dev" @onclick='() => NavigationManager.NavigateTo("/dev-export")'>@Tr("📤 Export dat pro vývojáře")</button>
         </div>
     }
 

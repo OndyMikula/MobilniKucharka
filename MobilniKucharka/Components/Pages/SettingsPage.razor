@@ -64,6 +64,13 @@
             </div>
         </div>
 
+        <!-- SPRÁVA SUROVIN -->
+        <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">@Tr("Suroviny")</label>
+            <span style="font-size:12px; color:var(--color-text-muted);">@Tr("Přejmenuj, smaž, vytvoř nebo sluč jednotlivé suroviny napříč recepty.")</span>
+            <button type="button" class="btn-action btn-primary" @onclick='() => NavigationManager.NavigateTo("/settings/ingredients")'>@Tr("Spravovat suroviny")</button>
+        </div>
+
         <!-- ZÁLOHA DAT -->
         <div class="form-group" style="margin-top:10px;">
             <label class="form-label">@Tr("Záloha dat")</label>

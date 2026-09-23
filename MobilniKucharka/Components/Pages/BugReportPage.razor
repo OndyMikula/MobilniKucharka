@@ -5,13 +5,20 @@
 <div class="create-recipe-page">
     <div class="create-recipe-header">
         <button type="button" class="icon-btn" @onclick="NavigateBackAsync">←</button>
+        <h1 class="hub-title" style="font-size:20px;">@Tr("Nahlásit chybu")</h1>
     </div>
 
     <div class="create-recipe-body">
-        <h1 class="hub-title" style="font-size:22px; margin:0 0 4px 0;">@Tr("Nahlásit chybu")</h1>
         <p style="margin:0; color:var(--color-text-secondary); font-size:13px;">
-            @Tr("Popiš, co se stalo. Report se odešle rovnou z aplikace, nikam nemusíš odcházet.")
+            @Tr("Popiš, co se stalo. Report se odešle rovnou z appky, nikam nemusíš odcházet.")
         </p>
+
+        <div class="form-group">
+            <label class="form-label">@Tr("Název chyby (nepovinné)")</label>
+            <input type="text" class="form-input" placeholder="@Tr("Např. Recept se neuloží")"
+                   value="@_title" disabled="@_isSending"
+                   @oninput="(e) => _title = e.Value?.ToString() ?? string.Empty" />
+        </div>
 
         <div class="form-group">
             <label class="form-label">@Tr("Popis chyby")</label>
@@ -62,6 +69,7 @@
 @code {
     private const string DeveloperEmail = "devzoufaly@gmail.com";
 
+    private string _title = string.Empty;
     private string _description = string.Empty;
     private string _reproSteps = string.Empty;
     private string _userEmail = string.Empty;
@@ -77,11 +85,10 @@
         _languageName = Preferences.Default.Get("AppLanguageName", "Čeština");
     }
 
-    private static string BuildPreview(string text)
-    {
-        string trimmed = text.Trim();
-        return trimmed.Length > 60 ? trimmed[..60] + "…" : trimmed;
-    }
+    // Prázdný nadpis -> místo useknuté (a matoucí) ukázky popisu se do e-mailu pošle verze
+    // appky, ať pole "Název/nadpis" nikdy nevypadá jako náhodně vygenerovaný text.
+    private string ResolveTitle() =>
+        !string.IsNullOrWhiteSpace(_title) ? _title.Trim() : _appVersion;
 
     private string BuildPlainTextBody()
     {
@@ -114,7 +121,7 @@
             var service = new FeedbackDispatchService();
             var result = await service.SendFeedbackAsync(
                 type: "Nahlásit chybu",
-                title: BuildPreview(_description),
+                title: ResolveTitle(),
                 description: string.IsNullOrWhiteSpace(_description) ? "(nevyplněno)" : _description,
                 reproSteps: string.IsNullOrWhiteSpace(_reproSteps) ? "(nevyplněno)" : _reproSteps,
                 appVersion: _appVersion,

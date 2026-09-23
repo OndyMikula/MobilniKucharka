@@ -1,0 +1,112 @@
+﻿@page "/dev-export"
+@namespace MobilniKucharka.Components.Pages
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<div class="create-recipe-page">
+    <div class="create-recipe-header">
+        <button type="button" class="icon-btn" @onclick="OnBackClicked">←</button>
+        <h1 class="hub-title" style="font-size: 20px;">@Tr("Export dat pro vývojáře")</h1>
+    </div>
+
+    <div class="create-recipe-body">
+
+        <label class="checkbox-row">
+            <input type="checkbox" @bind="_exportSettings" />
+            <span>@Tr("Nastavení (preference)")</span>
+        </label>
+
+        <label class="checkbox-row">
+            <input type="checkbox" @bind="_exportIngredients" />
+            <span>@Tr("Seznam surovin (CSV s cenami)")</span>
+        </label>
+
+        <label class="checkbox-row">
+            <input type="checkbox" @bind="_exportRecipes" />
+            <span>@Tr("Recepty")</span>
+        </label>
+
+        @if (_exportRecipes)
+        {
+            <div class="detail-card" style="max-height:300px; overflow-y:auto;">
+                <button type="button" class="recipe-source-link" @onclick="SelectAllRecipes">@Tr("Vybrat vše")</button>
+                @foreach (var recipe in _allRecipes)
+                {
+                    <label class="checkbox-row" @key="recipe.Id">
+                        <input type="checkbox" checked="@_selectedRecipeIds.Contains(recipe.Id)" @onchange="() => ToggleRecipe(recipe.Id)" />
+                        <span>@recipe.Name</span>
+                    </label>
+                }
+            </div>
+        }
+
+        <button type="button" class="btn-action btn-primary" style="height:55px; margin-top:10px;" @onclick="OnExportClickedAsync">
+            @Tr("Exportovat vybrané")
+        </button>
+    </div>
+</div>
+
+@code {
+    private bool _exportSettings;
+    private bool _exportIngredients;
+    private bool _exportRecipes;
+    private List<Recipe> _allRecipes = [];
+    private HashSet<int> _selectedRecipeIds = [];
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allRecipes = await App.Database.GetAllRecipesAsync();
+    }
+
+    private void ToggleRecipe(int id)
+    {
+        if (!_selectedRecipeIds.Add(id)) _selectedRecipeIds.Remove(id);
+    }
+
+    private void SelectAllRecipes()
+    {
+        _selectedRecipeIds = [.. _allRecipes.Select(r => r.Id)];
+    }
+
+    private async Task OnExportClickedAsync()
+    {
+        var files = new List<ShareFile>();
+
+        if (_exportSettings)
+            files.Add(new ShareFile(await DeveloperExportService.ExportSettingsJsonAsync()));
+
+        if (_exportIngredients)
+        {
+            var products = await App.Database.GetAllLocalProductsAsync();
+            files.Add(new ShareFile(await DeveloperExportService.ExportIngredientsCsvAsync(products)));
+        }
+
+        if (_exportRecipes)
+        {
+            foreach (var recipeId in _selectedRecipeIds)
+            {
+                var recipe = await App.Database.GetRecipeByIdAsync(recipeId);
+                if (recipe != null)
+                {
+                    string path = await RecipeShareService.ExportRecipeAsync(recipe);
+                    files.Add(new ShareFile(path));
+                }
+            }
+        }
+
+        if (files.Count == 0)
+        {
+            await DialogService.ShowAlertAsync(Tr("Upozornění"), Tr("Vyber aspoň jednu položku k exportu."), "OK");
+            return;
+        }
+
+        if (files.Count == 1)
+            await Share.Default.RequestAsync(new ShareFileRequest { Title = Tr("Export dat"), File = files[0] });
+        else
+            await Share.Default.RequestAsync(new ShareMultipleFilesRequest { Title = Tr("Export dat"), Files = files });
+    }
+
+    private void OnBackClicked() => NavigationManager.NavigateTo("/recipes");
+}

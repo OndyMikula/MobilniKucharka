@@ -1045,7 +1045,89 @@ namespace MobilniKucharka.Services
                 _cachedProducts = null;
             }
         }
+
+        public async Task<bool> RenameProductAsync(int productId, string newNameCs, string newNameEn)
+        {
+            await EnsureInitializedAsync();
+            var product = await _db.Table<LocalProduct>().Where(p => p.Id == productId).FirstOrDefaultAsync();
+            if (product == null) return false;
+
+            product.Name_CS = newNameCs.Trim();
+            product.Name_EN = newNameEn.Trim();
+            await _db.UpdateAsync(product);
+            _cachedProducts = null;
+            return true;
+        }
+
+        // Vrátí počet receptů, které surovinu používají - ať uživatel před smazáním ví, co se
+        // dotkne (stejný princip jako u DeleteBookmarkAsync, jen tady se smazání týká i receptů).
+        public async Task<int> CountRecipesUsingProductAsync(int productId)
+        {
+            await EnsureInitializedAsync();
+            var links = await _db.Table<RecipeIngredient>().Where(ri => ri.ProductId == productId).ToListAsync();
+            return links.Select(ri => ri.RecipeId).Distinct().Count();
+        }
+
+        public async Task DeleteProductAsync(int productId)
+        {
+            await EnsureInitializedAsync();
+
+            var product = await _db.Table<LocalProduct>().Where(p => p.Id == productId).FirstOrDefaultAsync();
+            if (product != null) await _db.DeleteAsync(product);
+
+            var links = await _db.Table<RecipeIngredient>().Where(ri => ri.ProductId == productId).ToListAsync();
+            foreach (var link in links) await _db.DeleteAsync(link);
+
+            var aliases = await _db.Table<LocalProductAlias>().Where(a => a.ProductId == productId).ToListAsync();
+            foreach (var alias in aliases) await _db.DeleteAsync(alias);
+
+            _cachedProducts = null;
+        }
+
+        public async Task<LocalProduct> CreateProductAsync(string nameCs, string nameEn, string unit)
+        {
+            await EnsureInitializedAsync();
+
+            var product = new LocalProduct
+            {
+                Name_CS = nameCs.Trim(),
+                Name_EN = string.IsNullOrWhiteSpace(nameEn) ? nameCs.Trim() : nameEn.Trim(),
+                Unit = unit,
+                PriceAverage = 0
+            };
+
+            await _db.InsertAsync(product);
+            _cachedProducts = null;
+            return product;
+        }
+
+        // Ruční sloučení 2+ vybraných surovin do jedné (Nastavení > Suroviny) - kanonický je vždy
+        // první v seznamu (uživatel ho vybírá explicitně, na rozdíl od automatického MergeDuplicate-
+        // ProductsAsync, kde se kanonický odhaduje podle počtu použití).
+        public async Task<int> MergeSelectedProductsAsync(int canonicalId, List<int> duplicateIds)
+        {
+            await EnsureInitializedAsync();
+
+            var canonical = await _db.Table<LocalProduct>().Where(p => p.Id == canonicalId).FirstOrDefaultAsync();
+            if (canonical == null) return 0;
+
+            int merged = 0;
+            foreach (var dupId in duplicateIds)
+            {
+                if (dupId == canonicalId) continue;
+                var duplicate = await _db.Table<LocalProduct>().Where(p => p.Id == dupId).FirstOrDefaultAsync();
+                if (duplicate == null) continue;
+
+                await MergeProductPairAsync(canonical, duplicate);
+                merged++;
+            }
+
+            _cachedProducts = null;
+            _cachedAliases = null;
+            return merged;
+        }
     }
+}
 
     public class RecipeWithCost
     {
@@ -1068,4 +1150,3 @@ namespace MobilniKucharka.Services
         public double RawAmount { get; set; }
         public double CostValue { get; set; }
     }
-}
