@@ -16,7 +16,7 @@
 
         <!-- Vyplní přesně tolik prostoru, kolik zabírá systémová navigační lišta (viz
              MainActivity.SystemBottomInsetChanged), stejnou barvou jako appčin vlastní spodní
-             nav bar (BottomNavBar.razor / -color-nav-bg v app.css) - appka tak nikdy neleží pod
+             nav bar (BottomNavBar.razor / -color-nav-bg v app.css) - aplikace tak nikdy neleží pod
              systémovými tlačítky zpět/domů/přehled aplikací. Výška 0 na zařízeních/OS verzích,
              kde k překryvu vůbec nedochází. -->
         <BoxView Grid.Row="1" x:Name="SystemNavInsetSpacer" HeightRequest="0"

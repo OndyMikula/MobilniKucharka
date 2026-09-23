@@ -113,6 +113,60 @@
         await LoadPageDataAsync();
         _ = CheckForUpdatesAsync();
         CheckPendingImport();
+        _ = RunProductCleanupAsync();
+        _ = RunRecipeLanguageFixAsync();
+    }
+
+    // Jednorázově doplní ContentLanguage receptům založeným před zavedením tohohle pole - bez
+    // toho aplikace u starých receptů nikdy nezkusí přeložit suroviny/popis (viz Kuřecí tacos apod.).
+    private async Task RunRecipeLanguageFixAsync()
+    {
+        try
+        {
+            int fixedCount = await App.Database.EnsureContentLanguageMigrationAsync();
+
+            if (fixedCount > 0)
+            {
+                await DialogService.ShowAlertAsync(
+                    Tr("Opraveny starší recepty"),
+                    string.Format(Tr("U {0} starších receptů aplikace teď poprvé pozná, ve kterém jazyce jsou napsané suroviny a popis - při dalším otevření se ti zobrazí přeložené do aktuálního jazyka, pokud je potřeba."), fixedCount),
+                    "OK");
+
+                await LoadPageDataAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Chyba při opravě jazyka receptů: {ex.Message}");
+        }
+    }
+
+    // Na pozadí, při každém spuštění, sloučí duplicitní suroviny (jiná diakritika/velikost
+    // písmen, nebo stejná surovina zapsaná zvlášť česky a anglicky). GetOrCreateLocalProductByNameAsync
+    // teď duplicitám aktivně předchází při vzniku, takže tohle běží hlavně jako pojistka pro vzácný
+    // okrajový případ (DeepL dočasně nedostupné přesně ve chvíli založení nové suroviny) - žádné
+    // ruční tlačítko není potřeba, oprava se sama zopakuje při dalším spuštění aplikace. Uživatele
+    // vyruší jen tehdy, když se skutečně něco sloučilo.
+    private async Task RunProductCleanupAsync()
+    {
+        try
+        {
+            int mergedCount = await App.Database.MergeDuplicateProductsAsync();
+
+            if (mergedCount > 0)
+            {
+                await DialogService.ShowAlertAsync(
+                    Tr("Vyčištěny duplicitní suroviny"),
+                    string.Format(Tr("Některé suroviny byly v appce zapsané vícekrát (např. jednou česky, jednou anglicky, nebo s jiným velkým písmenem). Sloučili jsme {0} takových duplicit - tvoje recepty ani ceny se tím nezměnily, jen se sjednotily záznamy surovin."), mergedCount),
+                    "OK");
+
+                await LoadPageDataAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Chyba při čištění surovin: {ex.Message}");
+        }
     }
 
     private async void OnShellAppeared()

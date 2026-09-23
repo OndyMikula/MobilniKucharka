@@ -160,7 +160,7 @@ namespace MobilniKucharka.Services.Api
         // Sestaví IngredientsRaw ve stejném formátu "Název|Množství", jaký používá MealDB import
         // i ruční tvorba receptu (viz CreateRecipePage.TriggerAutoSaveAsync) - tedy jméno a
         // množství oddělené "|", jedna surovina na řádek. Množství bereme z "measures.metric" (ne
-        // "measures.us"), aby jednotky (g/ml/kg/l) odpovídaly tomu, co appka jinde umí parsovat
+        // "measures.us"), aby jednotky (g/ml/kg/l) odpovídaly tomu, co aplikace jinde umí parsovat
         // (viz NutritionEstimationService.ConvertToProductUnit/DetectUnitFamily).
         private static string ExtractIngredientsRaw(JsonElement root)
         {
@@ -204,7 +204,7 @@ namespace MobilniKucharka.Services.Api
             return string.Join("\n", lines);
         }
 
-        // Sjednotí Spoonacularovy metrické jednotky na tvar, který appka jinde rozpoznává
+        // Sjednotí Spoonacularovy metrické jednotky na tvar, který aplikace jinde rozpoznává
         // (g/kg/ml/l). Prázdná jednotka (kusové suroviny jako "1 vejce") se bere jako "ks".
         private static string NormalizeMetricUnit(string unit)
         {

@@ -2,6 +2,7 @@ using MobilniKucharka.Classes;
 using MobilniKucharka.Classes.Recipe;
 using MobilniKucharka.Classes.UserData.Bookmark;
 using MobilniKucharka.Services.Api;
+using MobilniKucharka.Translation;
 using SQLite;
 using System.Diagnostics;
 using System.Text.Json;
@@ -46,8 +47,6 @@ namespace MobilniKucharka.Services
                 {
                     await EnsureSearchedRecipesBookmarkExistsAsync();
                 }
-
-                await EnsureContentLanguageMigrationAsync();
 
                 _isInitialized = true;
             }
@@ -434,6 +433,19 @@ namespace MobilniKucharka.Services
             return await _db.Table<LocalProduct>().Where(p => p.Id == id).FirstOrDefaultAsync();
         }
 
+        public async Task<List<string>> GetAllProductNameSuggestionsAsync()
+        {
+            await EnsureInitializedAsync();
+            var products = await _db.Table<LocalProduct>().ToListAsync();
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var p in products)
+            {
+                if (!string.IsNullOrWhiteSpace(p.Name_CS)) names.Add(p.Name_CS);
+                if (!string.IsNullOrWhiteSpace(p.Name_EN)) names.Add(p.Name_EN);
+            }
+            return [.. names.OrderBy(n => n)];
+        }
+
         public async Task<List<LocalProduct>> GetAllLocalProductsAsync()
         {
             await EnsureInitializedAsync();
@@ -478,13 +490,15 @@ namespace MobilniKucharka.Services
             }
         }
 
-        public async Task<LocalProduct> GetOrCreateLocalProductByNameAsync(string name, string suggestedUnit = "g")
+        public async Task<LocalProduct> GetOrCreateLocalProductByNameAsync(string name, string suggestedUnit = "g", string? sourceLang = null)
         {
             await EnsureInitializedAsync();
             string trimmed = name.Trim();
+            string normalizedTyped = TextNormalizationHelper.NormalizeForComparison(trimmed);
+            string lang = string.IsNullOrWhiteSpace(sourceLang) ? Preferences.Default.Get("AppLanguageCode", "cs") : sourceLang;
 
             var allAliases = await _db.Table<LocalProductAlias>().ToListAsync();
-            var alias = allAliases.FirstOrDefault(a => string.Equals(a.Alias, trimmed, StringComparison.OrdinalIgnoreCase));
+            var alias = allAliases.FirstOrDefault(a => TextNormalizationHelper.NormalizeForComparison(a.Alias) == normalizedTyped);
 
             if (alias != null)
             {
@@ -494,15 +508,67 @@ namespace MobilniKucharka.Services
 
             var allProducts = await _db.Table<LocalProduct>().ToListAsync();
             var existing = allProducts.FirstOrDefault(p =>
-                string.Equals(p.Name_CS, trimmed, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(p.Name_EN, trimmed, StringComparison.OrdinalIgnoreCase));
+                TextNormalizationHelper.NormalizeForComparison(p.Name_CS) == normalizedTyped ||
+                TextNormalizationHelper.NormalizeForComparison(p.Name_EN) == normalizedTyped);
 
-            if (existing != null) return existing;
+            // Stejné slovo před závorkou ("Paprika (koření)" vs "Paprika (na koření)") - jen když
+            // OBĚ strany mají závorku, ať se holé "Paprika" (zelenina) neslije s "Paprika
+            // (koření)" (drť) - to jsou reálně různé suroviny.
+            if (existing == null)
+            {
+                var (typedBase, typedHasParen) = TextNormalizationHelper.SplitBaseAndParenthetical(trimmed);
+                if (typedHasParen && typedBase.Length > 0)
+                {
+                    existing = allProducts.FirstOrDefault(p =>
+                    {
+                        var (csBase, csHasParen) = TextNormalizationHelper.SplitBaseAndParenthetical(p.Name_CS);
+                        if (csHasParen && csBase == typedBase) return true;
+                        var (enBase, enHasParen) = TextNormalizationHelper.SplitBaseAndParenthetical(p.Name_EN);
+                        return enHasParen && enBase == typedBase;
+                    });
+                }
+            }
+
+            if (existing != null)
+            {
+                // Jiný zápis stejného slova (diakritika/velikost písmen) - uložit jako alias pro
+                // příště, ale jen pokud přesně tenhle zápis ještě není zaznamenaný.
+                bool exactMatchAlready = string.Equals(existing.Name_CS, trimmed, StringComparison.Ordinal) ||
+                                         string.Equals(existing.Name_EN, trimmed, StringComparison.Ordinal) ||
+                                         allAliases.Any(a => string.Equals(a.Alias, trimmed, StringComparison.Ordinal) && a.ProductId == existing.Id);
+                if (!exactMatchAlready)
+                    await _db.InsertAsync(new LocalProductAlias { Alias = trimmed, ProductId = existing.Id });
+
+                return existing;
+            }
+
+            // Nenalezeno - zkusit přeložit do druhého jazyka a najít stejnou surovinu tam (např.
+            // "Sugar" napsané poprvé anglicky, ale "Cukr" už existuje) - ať nevznikne duplicita jen
+            // proto, že recept je v jiném jazyce než existující záznam.
+            string otherLang = lang == "cs" ? "en" : "cs";
+            string capitalizedTyped = Capitalize(trimmed);
+            string? translated = IngredientTranslationOverrides.TryGet(trimmed, lang)
+                ?? await TranslationService.TranslateAsync(trimmed, otherLang, lang);
+            string capitalizedTranslated = string.IsNullOrWhiteSpace(translated) ? capitalizedTyped : Capitalize(translated);
+
+            if (!string.IsNullOrWhiteSpace(translated))
+            {
+                string normalizedTranslated = TextNormalizationHelper.NormalizeForComparison(translated);
+                var crossMatch = allProducts.FirstOrDefault(p =>
+                    TextNormalizationHelper.NormalizeForComparison(p.Name_CS) == normalizedTranslated ||
+                    TextNormalizationHelper.NormalizeForComparison(p.Name_EN) == normalizedTranslated);
+
+                if (crossMatch != null)
+                {
+                    await _db.InsertAsync(new LocalProductAlias { Alias = trimmed, ProductId = crossMatch.Id });
+                    return crossMatch;
+                }
+            }
 
             var newProduct = new LocalProduct
             {
-                Name_CS = trimmed,
-                Name_EN = trimmed,
+                Name_CS = lang == "cs" ? capitalizedTyped : capitalizedTranslated,
+                Name_EN = lang == "cs" ? capitalizedTranslated : capitalizedTyped,
                 Unit = suggestedUnit,
                 PriceAverage = 0
             };
@@ -510,6 +576,12 @@ namespace MobilniKucharka.Services
             await _db.InsertAsync(newProduct);
             _cachedProducts = null;
             return newProduct;
+        }
+
+        private static string Capitalize(string text)
+        {
+            text = text.Trim();
+            return text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
         }
 
         public async Task LinkIngredientNameToProductAsync(string ingredientName, int existingProductId)
@@ -893,9 +965,9 @@ namespace MobilniKucharka.Services
 
         private static LocalProduct? FindProductByNameReadOnly(string name, List<LocalProduct> allProducts, List<LocalProductAlias> allAliases)
         {
-            string trimmed = name.Trim();
+            string normalizedTyped = TextNormalizationHelper.NormalizeForComparison(name);
 
-            var alias = allAliases.FirstOrDefault(a => string.Equals(a.Alias, trimmed, StringComparison.OrdinalIgnoreCase));
+            var alias = allAliases.FirstOrDefault(a => TextNormalizationHelper.NormalizeForComparison(a.Alias) == normalizedTyped);
             if (alias != null)
             {
                 var aliasedProduct = allProducts.FirstOrDefault(p => p.Id == alias.ProductId);
@@ -903,8 +975,8 @@ namespace MobilniKucharka.Services
             }
 
             return allProducts.FirstOrDefault(p =>
-                string.Equals(p.Name_CS, trimmed, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(p.Name_EN, trimmed, StringComparison.OrdinalIgnoreCase));
+                TextNormalizationHelper.NormalizeForComparison(p.Name_CS) == normalizedTyped ||
+                TextNormalizationHelper.NormalizeForComparison(p.Name_EN) == normalizedTyped);
         }
 
         public async Task<int> ImportSharedRecipeAsync(Recipe recipe)

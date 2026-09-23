@@ -69,12 +69,12 @@ Aplikace pro plánování jídelníčku, správu receptů a odhad nákladů na n
 - Propojování různých názvů stejné suroviny na jednu cenu (aliasy)
 - Záložky pro organizaci receptů, včetně připínání, ručního řazení, volitelného popisu a vlastního obrázku složky
 - Hodnocení receptů — klepnutím na hvězdičku nebo tažením posuvníku
-- Záloha a obnova všech tvých dat mezi zařízeními — recepty, záložky, fotky i nastavení appky (počet lidí, rozpočet, dietní/spotřebičové filtry, jazyk a motiv)
+- Záloha a obnova všech tvých dat mezi zařízeními — recepty, záložky, fotky i nastavení aplikace (počet lidí, rozpočet, dietní/spotřebičové filtry, jazyk a motiv)
 - Sdílení jednotlivých receptů jako přenositelný soubor nebo odkaz
 - Automatický překlad receptů i rozhraní mezi češtinou a angličtinou
 - Světlý/tmavý motiv a čeština/angličtina
 - Kontrola nových verzí aplikace přímo v appce
-- Nahlášení chyby nebo návrh nového nápadu přímo vývojáři z appky, s možností nechat mu i svůj e-mail pro odpověď
+- Nahlášení chyby nebo návrh nového nápadu přímo vývojáři z aplikace, s možností nechat mu i svůj e-mail pro odpověď
 
 ## Jak aplikace funguje (pro vývojáře)
 
@@ -93,7 +93,7 @@ Recepty importované z externích zdrojů se ukládají do lokální databáze p
 
 **Sdílení receptů:** jednotlivé recepty lze exportovat jako obyčejný, čitelný soubor `.json` (nepotřebuje žádnou speciální appku k otevření) nebo sdílet přes dočasný odkaz uložený v samostatném GitHub repozitáři, který zároveň generuje skutečné Android App Links, takže otevření sdíleného odkazu na jiném zařízení rovnou skočí do aplikace.
 
-**Zpětná vazba:** hlášení chyb a nápady na vylepšení lze poslat přímo z appky, bez nutnosti ji opouštět. Protože appka nemá vlastní backend server, odeslání funguje spuštěním malého, izolovaného GitHub Actions workflow (uloženého ve vlastním, jinak prázdném repozitáři, záměrně odděleném od skutečného zdrojového kódu appky), který zprávu přepošle na e-mail vývojáře — včetně volitelné adresy pro odpověď, pokud ji uživatel zadá.
+**Zpětná vazba:** hlášení chyb a nápady na vylepšení lze poslat přímo z aplikace, bez nutnosti ji opouštět. Protože aplikace nemá vlastní backend server, odeslání funguje spuštěním malého, izolovaného GitHub Actions workflow (uloženého ve vlastním, jinak prázdném repozitáři, záměrně odděleném od skutečného zdrojového kódu aplikace), který zprávu přepošle na e-mail vývojáře — včetně volitelné adresy pro odpověď, pokud ji uživatel zadá.
 
 **API klíče** nastavte v `Services/Secrets.txt` a přejmenujte na `Services/Secrets.cs`.
 

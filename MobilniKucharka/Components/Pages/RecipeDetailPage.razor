@@ -183,7 +183,7 @@
                 <!-- Posuvník jako druhý způsob hodnocení vedle klepání na hvězdy - step 0.5 zachovává
                      stejnou přesnost na půl hvězdy. @oninput mění _recipe.Rating hned (živý posun
                      hvězd při tažení), skutečný zápis do DB (OnUserRatingChangedAsync, sdílené s
-                     klepáním na hvězdy výše) proběhne až @onchange (puštění posuvníku) - ať appka
+                     klepáním na hvězdy výše) proběhne až @onchange (puštění posuvníku) - ať aplikace
                      nezapisuje do SQLite při každém pixelu tažení. Hodnota vždy s InvariantCulture -
                      HTML range input vždy očekává/vrací desetinnou tečku bez ohledu na jazyk aplikace,
                      zatímco SettingsPage.OnLanguageChanged umí nastavit CurrentCulture na "cs", kde
@@ -322,6 +322,8 @@
         int effectiveServingSize = recipe.ServingSize > 0 ? recipe.ServingSize : 0;
         double scaleFactor = effectiveServingSize > 0 ? peopleCount / (double)effectiveServingSize : 1.0;
 
+        string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
+
         if (ingredients.Count == 0 && !string.IsNullOrWhiteSpace(recipe.IngredientsRaw))
         {
             var rawLines = recipe.IngredientsRaw.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -336,7 +338,7 @@
                 if (string.IsNullOrWhiteSpace(name)) continue;
 
                 string detectedUnit = NutritionEstimationService.DetectUnitFamily(amount);
-                var product = await App.Database.GetOrCreateLocalProductByNameAsync(name, detectedUnit);
+                var product = await App.Database.GetOrCreateLocalProductByNameAsync(name, detectedUnit, currentLang);
                 double pieceWeight = product.TypicalUnitWeightGrams > 0 ? product.TypicalUnitWeightGrams : 60;
                 double? parsedAmount = NutritionEstimationService.ConvertToProductUnit(amount, product.Unit, pieceWeight);
                 double? scaledAmount = parsedAmount != null ? parsedAmount.Value * scaleFactor : null;
@@ -380,12 +382,9 @@
 
         _ingredients = ingredients;
 
-        string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
         var rawSteps = currentLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
         _steps = rawSteps.Select((stepText, index) => new DisplayStep { StepNumber = index + 1, StepText = stepText }).ToList();
 
-        // Equipment je jednojazyčné pole jako IngredientsRaw, ale nepřekládá se přes DeepL napřímo -
-        // jde o pár krátkých opakujících se slov, takže se překládá přes sdílený slovník.
         _displayEquipment = recipe.Equipment.Count > 0 && !string.IsNullOrWhiteSpace(recipe.ContentLanguage) && recipe.ContentLanguage != currentLang
             ? await EquipmentTranslationService.TranslateEquipmentListAsync(recipe.Equipment, recipe.ContentLanguage, currentLang)
             : recipe.Equipment;
@@ -462,10 +461,23 @@
         else if (action == Tr("Propojit s existující surovinou"))
         {
             var allProducts = await App.Database.GetAllLocalProductsAsync();
-            string[] names = [.. allProducts.Select(p => p.Name_CS)];
+
+            // Podobné/pravděpodobné shody (jeden název je součástí druhého) nahoru seznamu - u
+            // víceslovných variant (např. "Voda" vs "voda podle potřeby") tak stačí jeden tap.
+            string normalizedTarget = TextNormalizationHelper.NormalizeForComparison(ingredient.Name);
+            var sortedProducts = allProducts
+                .OrderByDescending(p =>
+                {
+                    string normalizedName = TextNormalizationHelper.NormalizeForComparison(p.Name_CS);
+                    return normalizedName.Contains(normalizedTarget) || normalizedTarget.Contains(normalizedName);
+                })
+                .ThenBy(p => p.Name_CS)
+                .ToList();
+
+            string[] names = [.. sortedProducts.Select(p => p.Name_CS)];
 
             string? chosen = await DialogService.ShowActionSheetAsync(Tr("Propojit s..."), Tr("Zrušit"), null, names);
-            var match = allProducts.FirstOrDefault(p => p.Name_CS == chosen);
+            var match = sortedProducts.FirstOrDefault(p => p.Name_CS == chosen);
 
             if (match != null)
             {

@@ -167,24 +167,41 @@ namespace MobilniKucharka.Services
             return display;
         }
 
-        // Jednorázová migrace pro recepty založené před zavedením ContentLanguage - importované
-        // recepty (MealDB/Spoonacular) jsou VŽDY anglicky u zdroje, takže se jim pole nastaví na
-        // "en" napevno (ne prázdné - prázdné teď znamená "neznámé, nepřekládat", což by import
-        // navždy zamrzlo v původním jazyce zobrazení).
-        public async Task EnsureContentLanguageMigrationAsync()
+        // Vrací počet receptů, kterým se nastavil ContentLanguage - importované (jistota "en") a
+        // vlastní recepty bez ContentLanguage (odhad podle diakritiky v IngredientsRaw/
+        // DescriptionText, jediný dostupný signál u starých receptů z doby před tímhle polem).
+        // Jednorázové navždy - po prvním běhu už žádný recept nezůstane bez ContentLanguage.
+        public async Task<int> EnsureContentLanguageMigrationAsync()
         {
-            const string prefKey = "ContentLanguageMigrationDone_v2";
-            if (Preferences.Default.Get(prefKey, false)) return;
+            await EnsureInitializedAsync();
+
+            const string prefKey = "ContentLanguageMigrationDone_v3";
+            if (Preferences.Default.Get(prefKey, false)) return 0;
+
+            int fixedCount = 0;
 
             var imported = await _db.Table<Recipe>().Where(r => r.ExternalSourceId != "").ToListAsync();
-
             foreach (var recipe in imported)
             {
+                if (recipe.ContentLanguage == "en") continue;
                 recipe.ContentLanguage = "en";
                 await _db.UpdateAsync(recipe);
+                fixedCount++;
+            }
+
+            var ownRecipes = await _db.Table<Recipe>().Where(r => r.ExternalSourceId == "").ToListAsync();
+            foreach (var recipe in ownRecipes)
+            {
+                if (!string.IsNullOrWhiteSpace(recipe.ContentLanguage)) continue;
+
+                string combinedText = $"{recipe.IngredientsRaw} {recipe.DescriptionText}";
+                recipe.ContentLanguage = ContainsCzechDiacritics(combinedText) ? "cs" : "en";
+                await _db.UpdateAsync(recipe);
+                fixedCount++;
             }
 
             Preferences.Default.Set(prefKey, true);
+            return fixedCount;
         }
 
         // Automatická kontrola při každém zobrazení receptu. NIKDY nepřepisuje IngredientsRaw/
@@ -222,7 +239,9 @@ namespace MobilniKucharka.Services
             if (recipe == null) return null;
 
             string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
-            string sourceLang = string.IsNullOrWhiteSpace(recipe.ContentLanguage) ? currentLang : recipe.ContentLanguage;
+            string otherLang = currentLang == "cs" ? "en" : "cs";
+            bool contentLanguageWasUnknown = string.IsNullOrWhiteSpace(recipe.ContentLanguage);
+            string sourceLang = contentLanguageWasUnknown ? otherLang : recipe.ContentLanguage;
 
             if (sourceLang == currentLang)
                 return recipe;
@@ -238,6 +257,7 @@ namespace MobilniKucharka.Services
             string sourceName = sourceLang == "cs" ? recipe.Name_CS : recipe.Name_EN;
             var sourceSteps = sourceLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
 
+            bool needsSave = false;
             if (!string.IsNullOrWhiteSpace(sourceName))
             {
                 var batch = new List<string> { sourceName };
@@ -256,9 +276,20 @@ namespace MobilniKucharka.Services
                         recipe.Name_EN = translated[0];
                         recipe.Steps_EN = translated.Skip(1).ToList();
                     }
-                    await _db.UpdateAsync(recipe);
+                    needsSave = true;
                 }
             }
+
+            // Úspěšný ruční překlad je dost silný signál, že odhad zdrojového jazyka byl správný -
+            // uložit ho natrvalo, ať aplikace od teď u tohohle receptu přepíná automaticky sama.
+            if (contentLanguageWasUnknown)
+            {
+                recipe.ContentLanguage = sourceLang;
+                needsSave = true;
+            }
+
+            if (needsSave)
+                await _db.UpdateAsync(recipe);
 
             return await BuildDisplayRecipeAsync(recipe, currentLang);
         }

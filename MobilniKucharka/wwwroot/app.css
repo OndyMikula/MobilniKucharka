@@ -186,6 +186,10 @@ html, body {
     min-height: 0;
 }
 
+.page-shell.no-bottom-nav {
+    padding-bottom: var(--system-nav-inset, 0px);
+}
+
 .onboarding-shell {
     height: 100%;
     display: flex;
@@ -1002,6 +1006,36 @@ html, body {
     color: var(--color-success);
     font-weight: bold;
 }
+
+.ingredient-suggestions {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    overflow: hidden;
+    margin-bottom: 8px;
+    background-color: var(--color-surface);
+}
+
+.ingredient-suggestion-item {
+    text-align: left;
+    padding: 10px 12px;
+    border: none;
+    background: transparent;
+    color: var(--color-text);
+    font-size: 13px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+    .ingredient-suggestion-item + .ingredient-suggestion-item {
+        border-top: 1px solid var(--color-border-light);
+    }
+
+    .ingredient-suggestion-item:active {
+        background-color: var(--color-surface-hover);
+    }
 
 .price-source-note {
     font-size: 11px;

@@ -4,16 +4,20 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 
-<div class="page-shell">
+<div class="page-shell @(_hideBottomNav ? "no-bottom-nav" : "")">
     <main class="page-content">
         @Body
     </main>
 
-    <BottomNavBar ActiveTab="_activeTab" ActiveTabChanged="OnTabChanged" />
+    @if (!_hideBottomNav)
+    {
+        <BottomNavBar ActiveTab="_activeTab" ActiveTabChanged="OnTabChanged" />
+    }
 </div>
 
 @code {
     private AppTab _activeTab = AppTab.Recipes;
+    private bool _hideBottomNav;
 
     protected override void OnInitialized()
     {
@@ -28,15 +32,7 @@
         if (firstRender)
         {
             await ApplySystemInsetAsync();
-            await ApplyAppThemeAsync();
         }
-    }
-
-    private async Task ApplyAppThemeAsync()
-    {
-        string theme = Preferences.Default.Get("AppTheme", "Podle systému");
-        string jsTheme = theme switch { "Světlý" => "light", "Tmavý" => "dark", _ => "system" };
-        try { await JSRuntime.InvokeVoidAsync("setAppTheme", jsTheme); } catch { }
     }
 
     private async void OnSystemInsetChanged()
@@ -70,6 +66,12 @@
             relative = relative.Substring(0, queryIndex);
         }
         relative = relative.Trim('/');
+
+        // Vytváření/úprava receptu je celoobrazovkový editační pohled - dolní nav lišta tam nedává
+        // smysl (žádná ze záložek by stejně nebyla "aktivní").
+        _hideBottomNav = relative.StartsWith("recipe/create", StringComparison.OrdinalIgnoreCase) ||
+                         (relative.StartsWith("recipe/", StringComparison.OrdinalIgnoreCase) &&
+                          relative.EndsWith("/edit", StringComparison.OrdinalIgnoreCase));
 
         if (string.IsNullOrEmpty(relative) || relative.Equals("recipes", StringComparison.OrdinalIgnoreCase))
         {
