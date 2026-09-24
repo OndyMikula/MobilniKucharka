@@ -24,6 +24,18 @@
                    @bind="_searchText" @bind:event="oninput" />
         </div>
 
+        <div class="search-bar-row">
+            <select class="form-select" style="flex:1;" value="@_sortField" @onchange="OnSortFieldChangedAsync">
+                <option value="@SortField.NameCs">@Tr("Název (česky)")</option>
+                <option value="@SortField.NameEn">@Tr("Název (anglicky)")</option>
+                <option value="@SortField.Unit">@Tr("Jednotka")</option>
+                <option value="@SortField.Price">@Tr("Cena")</option>
+            </select>
+            <button type="button" class="btn-search-icon" style="width:44px;" @onclick="ToggleSortDirection">
+                @(_sortDescending ? "↓" : "↑")
+            </button>
+        </div>
+
         @if (_selectMode)
         {
             <span style="font-size:12px; color:var(--color-text-muted);">@Tr("Vyber 2 a více surovin ke sloučení.")</span>
@@ -212,12 +224,45 @@
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
-    private List<LocalProduct> FilteredProducts =>
-        string.IsNullOrWhiteSpace(_searchText)
-            ? _allProducts
-            : [.. _allProducts.Where(p =>
-                TextNormalizationHelper.NormalizeForComparison(p.Name_CS).Contains(TextNormalizationHelper.NormalizeForComparison(_searchText)) ||
-                TextNormalizationHelper.NormalizeForComparison(p.Name_EN).Contains(TextNormalizationHelper.NormalizeForComparison(_searchText)))];
+    private enum SortField { NameCs, NameEn, Unit, Price }
+
+    private SortField _sortField = SortField.NameCs;
+    private bool _sortDescending;
+
+    private List<LocalProduct> FilteredProducts
+    {
+        get
+        {
+            IEnumerable<LocalProduct> query = _allProducts;
+
+            if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                string normalizedSearch = TextNormalizationHelper.NormalizeForComparison(_searchText);
+                query = query.Where(p =>
+                    TextNormalizationHelper.NormalizeForComparison(p.Name_CS).Contains(normalizedSearch) ||
+                    TextNormalizationHelper.NormalizeForComparison(p.Name_EN).Contains(normalizedSearch));
+            }
+
+            query = _sortField switch
+            {
+                SortField.NameEn => _sortDescending ? query.OrderByDescending(p => p.Name_EN) : query.OrderBy(p => p.Name_EN),
+                SortField.Unit => _sortDescending ? query.OrderByDescending(p => p.Unit) : query.OrderBy(p => p.Unit),
+                SortField.Price => _sortDescending ? query.OrderByDescending(p => p.EffectivePrice) : query.OrderBy(p => p.EffectivePrice),
+                _ => _sortDescending ? query.OrderByDescending(p => p.Name_CS) : query.OrderBy(p => p.Name_CS),
+            };
+
+            return [.. query];
+        }
+    }
+
+    private Task OnSortFieldChangedAsync(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<SortField>(e.Value?.ToString(), out var field))
+            _sortField = field;
+        return Task.CompletedTask;
+    }
+
+    private void ToggleSortDirection() => _sortDescending = !_sortDescending;
 
     protected override async Task OnInitializedAsync()
     {

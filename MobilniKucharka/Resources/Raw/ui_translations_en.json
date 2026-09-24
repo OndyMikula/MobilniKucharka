@@ -227,6 +227,7 @@
   "Smazat surovinu": "Delete ingredient",
   "Nová surovina": "New ingredient",
   "Jednotka": "Unit",
+  "Cena": "Price",
   "Vytvořit": "Create",
   "Smazat surovinu?": "Delete ingredient?",
   "Tato surovina se používá v {0} receptech - v nich zmizí ze seznamu ingrediencí.": "This ingredient is used in {0} recipes - it will disappear from their ingredient lists.",
