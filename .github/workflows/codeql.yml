@@ -23,14 +23,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
-          cache: true             # <--- Zapne automatickou cache pro NuGet balíčky
+          cache-dependency-path: MobilniKucharka/MobilniKucharka.csproj 
 
       - name: Cache .NET MAUI Android Workload
         id: cache-maui
@@ -39,14 +36,13 @@ jobs:
           path: |
             C:\Program Files\dotnet\metadata\workloads
             C:\Program Files\dotnet\sdk-manifests
-          key: ${{ runner.os }}-maui-android-10.0-codeql-${{ hashFiles('**/*.csproj') }}
+          key: ${{ runner.os }}-maui-android-10.0-codeql-${{ hashFiles('MobilniKucharka/MobilniKucharka.csproj') }}
           restore-keys: |
             ${{ runner.os }}-maui-android-10.0-codeql-
 
       - name: Install MAUI workload
-        if: steps.cache-maui.outputs.cache-hit != 'true' # <--- Pokud je cache-hit, instalace se přeskočí
+        if: steps.cache-maui.outputs.cache-hit != 'true'
         run: dotnet workload install maui-android
-
 
       - name: Generate placeholder Secrets.cs (for compilation only, not real keys)
         shell: pwsh
