@@ -67,9 +67,24 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+          cache: true             # <--- Zapne automatickou cache pro NuGet balíčky
+
+      - name: Cache .NET MAUI Android Workload
+        if: steps.check.outputs.exists == 'false'
+        id: cache-maui
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\Program Files\dotnet\metadata\workloads
+            C:\Program Files\dotnet\sdk-manifests
+          # Klíč obsahuje verzi .NET a hash vašeho csproj souboru
+          key: ${{ runner.os }}-maui-android-10.0-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-maui-android-10.0-
 
       - name: Install MAUI Android workload
-        if: steps.check.outputs.exists == 'false'
+        # Tento krok se spustí POUZE, pokud verze neexistuje a ZÁROVEŇ se workload nenašel v cache
+        if: steps.check.outputs.exists == 'false' && steps.cache-maui.outputs.cache-hit != 'true'
         run: dotnet workload install maui-android
 
       - name: Generate Secrets.cs
