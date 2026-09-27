@@ -1104,6 +1104,54 @@ html, body {
     color: var(--color-text-muted);
 }
 
+/* Action Menu */
+.action-menu-card {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.action-menu-group {
+    background-color: var(--color-surface);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.action-menu-item {
+    padding: 14px;
+    border: none;
+    background: transparent;
+    color: var(--color-primary);
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+    .action-menu-item + .action-menu-item {
+        border-top: 1px solid var(--color-border-light);
+    }
+
+    .action-menu-item.destructive {
+        color: var(--color-danger);
+    }
+
+.action-menu-cancel {
+    background-color: var(--color-surface);
+    border-radius: var(--radius-md);
+    border: none;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--color-primary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
 /* Action Buttons Grid */
 .action-buttons-grid {
     display: grid;
