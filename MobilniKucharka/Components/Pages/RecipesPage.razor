@@ -44,7 +44,7 @@
         <div class="dev-tools-row">
             <button type="button" class="btn-dev" @onclick="OnResetDatabaseClicked">@Tr("🔄 Resetovat testovací databázi")</button>
             <button type="button" class="btn-dev" @onclick="OnRepairStepsClicked">@Tr("🔧 Opravit formátování kroků")</button>
-            <button type="button" class="btn-dev" @onclick='() => NavigationManager.NavigateTo("/dev-export")'>@Tr("📤 Export dat pro vývojáře")</button>
+            <button type="button" class="btn-dev" @onclick="OnCheckDeepLQuotaClickedAsync">@Tr("📊 Zkontrolovat DeepL kvótu")</button>
         </div>
     }
 
@@ -96,7 +96,7 @@
     private bool _isLoading = true;
     private bool _isGeneratingSurprise = false;
     private string _searchText = string.Empty;
-    private bool _filterByPreferences = false;
+    private bool _filterByPreferences = true;
     private bool _isDeveloperMode = false;
     private string SettingsSummaryText = string.Empty;
 
@@ -116,6 +116,7 @@
         CheckPendingImport();
         _ = RunProductCleanupAsync();
         _ = RunRecipeLanguageFixAsync();
+        _ = App.Database.EnsureRequiredEquipmentMigrationAsync();
     }
 
     // Jednorázově doplní ContentLanguage receptům založeným před zavedením tohohle pole - bez
@@ -347,6 +348,21 @@
                     await Launcher.Default.OpenAsync(urlToOpen);
             }
         }
+    }
+
+    private async Task OnCheckDeepLQuotaClickedAsync()
+    {
+        var status = await TranslationService.GetQuotaStatusAsync();
+        if (status == null)
+        {
+            await DialogService.ShowAlertAsync(Tr("Chyba"), Tr("Kvótu se nepodařilo zjistit."), "OK");
+            return;
+        }
+
+        var (used, limit) = status.Value;
+        long remaining = limit - used;
+        await DialogService.ShowAlertAsync(Tr("DeepL kvóta"),
+            $"{used:N0} / {limit:N0} znaků\n{Tr("Zbývá")}: {remaining:N0}", "OK");
     }
 
     public void Dispose()

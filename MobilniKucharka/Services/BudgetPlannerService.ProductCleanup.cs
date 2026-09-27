@@ -7,8 +7,8 @@ namespace MobilniKucharka.Services
     public partial class BudgetPlannerService
     {
         // Sloučí duplicitní/téměř duplicitní suroviny (jiná diakritika, velikost písmen, pomlčka
-        // vs mezera, nebo stejná surovina zapsaná zvlášť česky a anglicky). Bezpečné spustit
-        // opakovaně - co se nedá sloučit deterministicky nebo kvůli chybějící DeepL kvótě, zůstane
+        // vs mezera, nebo stejná surovina zapsaná zvlášť česky a anglicky). Spouští se jednou manuálně
+        // - co se nedá sloučit deterministicky nebo kvůli chybějící DeepL kvótě, zůstane
         // beze změny pro příští běh.
         public async Task<int> MergeDuplicateProductsAsync()
         {
@@ -17,11 +17,25 @@ namespace MobilniKucharka.Services
             int merged = await ApplyKnownTranslationCorrectionsAsync();
             merged += await NormalizeProductCapitalizationAsync();
             merged += await MergeByNormalizedNameOverlapAsync();
-            merged += await MergeUntranslatedDuplicatesAsync();
+            merged += await RunUntranslatedDuplicatesMigrationOnceAsync();
 
             _cachedProducts = null;
             _cachedAliases = null;
             return merged;
+        }
+
+        // DeepL-závislá fáze - na rozdíl od ostatních (zdarma, offline) spustit jen JEDNOU navždy,
+        // ať se nespotřebovává sdílená celoživotní kvóta při každém spuštění appky. Nově vytvořené
+        // duplicity už teď vznikat nemají (viz GetOrCreateLocalProductByNameAsync), takže jednou
+        // stačí; co se nedopřeloží kvůli kvótě, lze opravit ručně v Nastavení > Suroviny (zdarma).
+        private async Task<int> RunUntranslatedDuplicatesMigrationOnceAsync()
+        {
+            const string prefKey = "UntranslatedProductMergeDone_v1";
+            if (Preferences.Default.Get(prefKey, false)) return 0;
+
+            int count = await MergeUntranslatedDuplicatesAsync();
+            Preferences.Default.Set(prefKey, true);
+            return count;
         }
 
         // Opraví konkrétní known-bad DeepL překlady, které appka dřív mohla uložit (např.

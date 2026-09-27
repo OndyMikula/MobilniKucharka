@@ -90,7 +90,7 @@ namespace MobilniKucharka.Services
         // obsahuje text (ať už od uživatele, nebo z dřívějšího překladu). Vrací true, pokud se něco
         // změnilo (a je tedy potřeba _db.UpdateAsync). Tohle je jediné místo, kde se tahle dvě pole
         // pro AUTOMATICKOU kontrolu (EnsureRecipeLanguageAsync) vůbec mění.
-        private async Task<bool> EnsureNameAndStepsFilledAsync(Recipe recipe, string currentLang, string otherLang)
+        private static async Task<bool> EnsureNameAndStepsFilledAsync(Recipe recipe, string currentLang, string otherLang)
         {
             string currentName = currentLang == "cs" ? recipe.Name_CS : recipe.Name_EN;
             string otherName = otherLang == "cs" ? recipe.Name_CS : recipe.Name_EN;
@@ -113,7 +113,7 @@ namespace MobilniKucharka.Services
 
             int idx = 0;
             string? translatedName = nameMissing ? translated[idx++] : null;
-            List<string>? translatedSteps = stepsMissing ? translated.Skip(idx).ToList() : null;
+            List<string>? translatedSteps = stepsMissing ? [.. translated.Skip(idx)] : null;
 
             if (currentLang == "cs")
             {
@@ -146,36 +146,52 @@ namespace MobilniKucharka.Services
             return translated;
         }
 
-        // Vrátí recept se správným jazykem pro ZOBRAZENÍ. Pokud recipe.ContentLanguage == currentLang
-        // (nebo je prázdný - neznámý/starý recept), vrací recipe beze změny. Jinak vrátí MĚLKOU
-        // KOPII s přeloženým IngredientsRaw/DescriptionText (z cache, nebo čerstvě přeloženým a
-        // uloženým do cache) - originální řádek v DB se nikdy nezmění.
+        // Suroviny a popis se teď kontrolují a překládají NEZÁVISLE - recept může mít suroviny
+        // anglicky a popis česky zároveň, žádný z nich se nesmí nechat "svézt" na jazyku toho druhého.
         private async Task<Recipe> BuildDisplayRecipeAsync(Recipe recipe, string currentLang)
         {
-            if (string.IsNullOrWhiteSpace(recipe.ContentLanguage) || recipe.ContentLanguage == currentLang)
-                return recipe;
+            string? descText = null;
+            string? ingrText = null;
 
-            string? cachedDesc = await GetTranslationCacheAsync(recipe.Id, "DescriptionText", currentLang);
-            string? cachedIngr = await GetTranslationCacheAsync(recipe.Id, "IngredientsRaw", currentLang);
+            if (!string.IsNullOrWhiteSpace(recipe.DescriptionLanguage) && recipe.DescriptionLanguage != currentLang)
+            {
+                string? cachedDesc = await GetTranslationCacheAsync(recipe.Id, "DescriptionText", currentLang);
+                if (cachedDesc != null && IsEchoOfSource(cachedDesc, recipe.DescriptionText)) cachedDesc = null;
+                descText = cachedDesc ?? await TranslateFieldForDisplayAsync(recipe.Id, "DescriptionText", recipe.DescriptionText, recipe.DescriptionLanguage, currentLang);
+            }
 
-            string descText = cachedDesc ?? await TranslateFieldForDisplayAsync(recipe.Id, "DescriptionText", recipe.DescriptionText, recipe.ContentLanguage, currentLang);
-            string ingrText = cachedIngr ?? await TranslateFieldForDisplayAsync(recipe.Id, "IngredientsRaw", recipe.IngredientsRaw, recipe.ContentLanguage, currentLang);
+            if (!string.IsNullOrWhiteSpace(recipe.ContentLanguage) && recipe.ContentLanguage != currentLang)
+            {
+                string? cachedIngr = await GetTranslationCacheAsync(recipe.Id, "IngredientsRaw", currentLang);
+                if (cachedIngr != null && IsEchoOfSource(cachedIngr, recipe.IngredientsRaw)) cachedIngr = null;
+                ingrText = cachedIngr ?? await TranslateFieldForDisplayAsync(recipe.Id, "IngredientsRaw", recipe.IngredientsRaw, recipe.ContentLanguage, currentLang);
+            }
+
+            if (descText == null && ingrText == null) return recipe;
 
             var display = recipe.ShallowClone();
-            display.DescriptionText = descText;
-            display.IngredientsRaw = ingrText;
+            if (descText != null) display.DescriptionText = descText;
+            if (ingrText != null) display.IngredientsRaw = ingrText;
             return display;
+        }
+
+        private static bool IsEchoOfSource(string cachedText, string sourceText)
+        {
+            if (string.IsNullOrWhiteSpace(sourceText)) return false;
+            return TextNormalizationHelper.NormalizeForComparison(cachedText) == TextNormalizationHelper.NormalizeForComparison(sourceText);
         }
 
         // Vrací počet receptů, kterým se nastavil ContentLanguage - importované (jistota "en") a
         // vlastní recepty bez ContentLanguage (odhad podle diakritiky v IngredientsRaw/
         // DescriptionText, jediný dostupný signál u starých receptů z doby před tímhle polem).
         // Jednorázové navždy - po prvním běhu už žádný recept nezůstane bez ContentLanguage.
+        // Verze v4 - přidává DescriptionLanguage vedle ContentLanguage, takže se spustí ještě
+        // jednou i u receptů, které už v3 proběhly.
         public async Task<int> EnsureContentLanguageMigrationAsync()
         {
             await EnsureInitializedAsync();
 
-            const string prefKey = "ContentLanguageMigrationDone_v3";
+            const string prefKey = "ContentLanguageMigrationDone_v4";
             if (Preferences.Default.Get(prefKey, false)) return 0;
 
             int fixedCount = 0;
@@ -183,21 +199,32 @@ namespace MobilniKucharka.Services
             var imported = await _db.Table<Recipe>().Where(r => r.ExternalSourceId != "").ToListAsync();
             foreach (var recipe in imported)
             {
-                if (recipe.ContentLanguage == "en") continue;
-                recipe.ContentLanguage = "en";
-                await _db.UpdateAsync(recipe);
-                fixedCount++;
+                bool changed = false;
+                if (recipe.ContentLanguage != "en") { recipe.ContentLanguage = "en"; changed = true; }
+                if (recipe.DescriptionLanguage != "en") { recipe.DescriptionLanguage = "en"; changed = true; }
+                if (changed) { await _db.UpdateAsync(recipe); fixedCount++; }
             }
 
             var ownRecipes = await _db.Table<Recipe>().Where(r => r.ExternalSourceId == "").ToListAsync();
             foreach (var recipe in ownRecipes)
             {
-                if (!string.IsNullOrWhiteSpace(recipe.ContentLanguage)) continue;
+                bool changed = false;
 
-                string combinedText = $"{recipe.IngredientsRaw} {recipe.DescriptionText}";
-                recipe.ContentLanguage = ContainsCzechDiacritics(combinedText) ? "cs" : "en";
-                await _db.UpdateAsync(recipe);
-                fixedCount++;
+                if (string.IsNullOrWhiteSpace(recipe.ContentLanguage))
+                {
+                    recipe.ContentLanguage = ContainsCzechDiacritics(recipe.IngredientsRaw) ? "cs" : "en";
+                    changed = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(recipe.DescriptionLanguage))
+                {
+                    recipe.DescriptionLanguage = string.IsNullOrWhiteSpace(recipe.DescriptionText)
+                        ? recipe.ContentLanguage
+                        : (ContainsCzechDiacritics(recipe.DescriptionText) ? "cs" : "en");
+                    changed = true;
+                }
+
+                if (changed) { await _db.UpdateAsync(recipe); fixedCount++; }
             }
 
             Preferences.Default.Set(prefKey, true);
@@ -227,10 +254,9 @@ namespace MobilniKucharka.Services
             return await BuildDisplayRecipeAsync(recipe, currentLang);
         }
 
-        // Ruční vynucení překladu (Možnosti receptu > Přeložit recept znovu) - přegeneruje cache
-        // pro IngredientsRaw/DescriptionText a přepíše Name/Steps aktuálního jazyka (na explicitní
-        // žádost uživatele, jinak se to nestane automaticky). Zdrojem je VŽDY recipe.ContentLanguage
-        // (originál), nikdy dřívější překlad - takže opakované vynucení nikdy nedegraduje text.
+        // Přeloží suroviny a popis nezávisle, každé ze svého vlastního uloženého jazyka - žádné
+        // hádání, žádná ptaní se uživatele. "Opravit jazyk receptu" (SetRecipeLanguagesAsync níž)
+        // je jediné místo, kde se ty dva zdrojové jazyky ručně mění.
         public async Task<Recipe?> ForceRetranslateRecipeAsync(int recipeId)
         {
             await EnsureInitializedAsync();
@@ -240,58 +266,122 @@ namespace MobilniKucharka.Services
 
             string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
             string otherLang = currentLang == "cs" ? "en" : "cs";
-            bool contentLanguageWasUnknown = string.IsNullOrWhiteSpace(recipe.ContentLanguage);
-            string sourceLang = contentLanguageWasUnknown ? otherLang : recipe.ContentLanguage;
 
-            if (sourceLang == currentLang)
-                return recipe;
+            string ingredientsSourceLang = string.IsNullOrWhiteSpace(recipe.ContentLanguage) ? otherLang : recipe.ContentLanguage;
+            string descriptionSourceLang = string.IsNullOrWhiteSpace(recipe.DescriptionLanguage) ? otherLang : recipe.DescriptionLanguage;
 
-            string? translatedDesc = await TranslationService.TranslateAsync(recipe.DescriptionText, currentLang, sourceLang);
-            if (!string.IsNullOrWhiteSpace(translatedDesc))
-                await SaveTranslationCacheAsync(recipeId, "DescriptionText", currentLang, translatedDesc);
+            if (ingredientsSourceLang != currentLang)
+            {
+                string? translatedIngr = await TranslationService.TranslateAsync(recipe.IngredientsRaw, currentLang, ingredientsSourceLang);
+                if (!string.IsNullOrWhiteSpace(translatedIngr))
+                    await SaveTranslationCacheAsync(recipeId, "IngredientsRaw", currentLang, translatedIngr);
+            }
 
-            string? translatedIngr = await TranslationService.TranslateAsync(recipe.IngredientsRaw, currentLang, sourceLang);
-            if (!string.IsNullOrWhiteSpace(translatedIngr))
-                await SaveTranslationCacheAsync(recipeId, "IngredientsRaw", currentLang, translatedIngr);
+            if (descriptionSourceLang != currentLang)
+            {
+                string? translatedDesc = await TranslationService.TranslateAsync(recipe.DescriptionText, currentLang, descriptionSourceLang);
+                if (!string.IsNullOrWhiteSpace(translatedDesc))
+                    await SaveTranslationCacheAsync(recipeId, "DescriptionText", currentLang, translatedDesc);
+            }
 
-            string sourceName = sourceLang == "cs" ? recipe.Name_CS : recipe.Name_EN;
-            var sourceSteps = sourceLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
+            string nameSourceLang = otherLang;
+            string sourceName = nameSourceLang == "cs" ? recipe.Name_CS : recipe.Name_EN;
+            var sourceSteps = nameSourceLang == "cs" ? recipe.Steps_CS : recipe.Steps_EN;
 
-            bool needsSave = false;
             if (!string.IsNullOrWhiteSpace(sourceName))
             {
                 var batch = new List<string> { sourceName };
                 batch.AddRange(sourceSteps);
 
-                var translated = await TranslationService.TranslateBatchAsync(batch, currentLang, sourceLang);
+                var translated = await TranslationService.TranslateBatchAsync(batch, currentLang, nameSourceLang);
                 if (translated != null && translated.Count == batch.Count)
                 {
                     if (currentLang == "cs")
                     {
                         recipe.Name_CS = translated[0];
-                        recipe.Steps_CS = translated.Skip(1).ToList();
+                        recipe.Steps_CS = [.. translated.Skip(1)];
                     }
                     else
                     {
                         recipe.Name_EN = translated[0];
-                        recipe.Steps_EN = translated.Skip(1).ToList();
+                        recipe.Steps_EN = [.. translated.Skip(1)];
                     }
-                    needsSave = true;
+                    await _db.UpdateAsync(recipe);
                 }
             }
 
-            // Úspěšný ruční překlad je dost silný signál, že odhad zdrojového jazyka byl správný -
-            // uložit ho natrvalo, ať aplikace od teď u tohohle receptu přepíná automaticky sama.
-            if (contentLanguageWasUnknown)
+            return await BuildDisplayRecipeAsync(recipe, currentLang);
+        }
+
+        // Ruční oprava obou jazykových značek nezávisle. Zahodí i příslušnou cache překladu -
+        // ta mohla vzniknout z chybného předpokladu a nesmí přežít opravu.
+        public async Task<Recipe?> SetRecipeLanguagesAsync(int recipeId, string ingredientsLanguage, string descriptionLanguage)
+        {
+            await EnsureInitializedAsync();
+
+            var recipe = await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
+            if (recipe == null) return null;
+
+            await EnsureTranslationCacheReadyAsync();
+
+            recipe.ContentLanguage = ingredientsLanguage;
+            var ingrCache = await _db.Table<RecipeTranslationCache>().Where(c => c.RecipeId == recipeId && c.FieldName == "IngredientsRaw").ToListAsync();
+            foreach (var entry in ingrCache) await _db.DeleteAsync(entry);
+
+            recipe.DescriptionLanguage = descriptionLanguage;
+            var descCache = await _db.Table<RecipeTranslationCache>().Where(c => c.RecipeId == recipeId && c.FieldName == "DescriptionText").ToListAsync();
+            foreach (var entry in descCache) await _db.DeleteAsync(entry);
+
+            await _db.UpdateAsync(recipe);
+            return recipe;
+        }
+
+        public async Task<int> EnsureRequiredEquipmentMigrationAsync()
+        {
+            await EnsureInitializedAsync();
+
+            const string prefKey = "RequiredEquipmentMigrationDone_v1";
+            if (Preferences.Default.Get(prefKey, false)) return 0;
+
+            var recipes = await _db.Table<Recipe>().ToListAsync();
+            int fixedCount = 0;
+
+            foreach (var recipe in recipes)
             {
-                recipe.ContentLanguage = sourceLang;
-                needsSave = true;
+                if (recipe.RequiredEquipmentJson != "[]") continue;
+
+                string combined = string.Join(" ", recipe.Steps_CS.Concat(recipe.Steps_EN));
+                var inferred = RequiredEquipmentAnalysisService.InferRequiredEquipment(combined);
+                if (inferred.Count == 0) continue;
+
+                recipe.RequiredEquipment = inferred;
+                await _db.UpdateAsync(recipe);
+                fixedCount++;
             }
 
-            if (needsSave)
-                await _db.UpdateAsync(recipe);
+            Preferences.Default.Set(prefKey, true);
+            return fixedCount;
+        }
 
-            return await BuildDisplayRecipeAsync(recipe, currentLang);
+        // Ruční oprava, když appka špatně uhodla ContentLanguage (typicky: recept napsaný v jiném
+        // jazyce, než v jakém byla zrovna UI appky při ukládání). Zahodí i starou cache překladu -
+        // ta mohla vzniknout z chybného předpokladu a nesmí přežít opravu.
+        public async Task<Recipe?> SetRecipeContentLanguageAsync(int recipeId, string newContentLanguage)
+        {
+            await EnsureInitializedAsync();
+
+            var recipe = await _db.Table<Recipe>().Where(r => r.Id == recipeId).FirstOrDefaultAsync();
+            if (recipe == null) return null;
+
+            recipe.ContentLanguage = newContentLanguage;
+            await _db.UpdateAsync(recipe);
+
+            await EnsureTranslationCacheReadyAsync();
+            var cacheEntries = await _db.Table<RecipeTranslationCache>().Where(c => c.RecipeId == recipeId).ToListAsync();
+            foreach (var entry in cacheEntries)
+                await _db.DeleteAsync(entry);
+
+            return recipe;
         }
     }
 }

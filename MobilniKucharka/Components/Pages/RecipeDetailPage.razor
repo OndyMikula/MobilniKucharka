@@ -232,6 +232,40 @@
     </div>
 }
 
+<!-- OVERLAY: OPRAVIT JAZYK RECEPTU -->
+@if (_showLanguageFixOverlay)
+{
+    <div class="modal-overlay" @onclick="() => _showLanguageFixOverlay = false">
+        <div class="modal-card" @onclick:stopPropagation="true">
+            <h2 class="modal-title">@Tr("Opravit jazyk receptu")</h2>
+            <p style="font-size:13px; color:var(--color-text-muted); margin:0;">
+                @Tr("Název a postup se doplňují automaticky do obou jazyků. Tady oprav jen jazyk, ve kterém jsou opravdu napsané suroviny a popis.")
+            </p>
+
+            <div class="form-group">
+                <label class="form-label">@Tr("Popis je napsaný:")</label>
+                <select class="form-select" @bind="_fixDescriptionLang">
+                    <option value="cs">Čeština</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">@Tr("Suroviny jsou napsané:")</label>
+                <select class="form-select" @bind="_fixIngredientsLang">
+                    <option value="cs">Čeština</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button type="button" class="btn-action" style="background-color:#9E9E9E; flex:1;" @onclick="() => _showLanguageFixOverlay = false">@Tr("Zrušit")</button>
+                <button type="button" class="btn-action btn-primary" style="flex:1;" @onclick="OnSaveLanguageFixAsync">@Tr("Uložit")</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter] public int Id { get; set; }
 
@@ -247,6 +281,11 @@
     private string _peopleCountBadgeText = string.Empty;
     private bool _showBookmarkOverlay;
     private List<BookmarkSelectionModel> _bookmarkSelection = [];
+
+    private bool _showLanguageFixOverlay;
+    private string _fixIngredientsLang = "cs";
+    private string _fixDescriptionLang = "cs";
+
     private bool _showDeleteOverlay;
     private bool _isDeveloperMode;
 
@@ -556,8 +595,8 @@
         if (_recipe == null) return;
 
         string[] options = _isDeveloperMode
-            ? [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Přeložit recept znovu"), Tr("Smazat recept"), "🔧 " + Tr("Zobrazit syrová data kroků")]
-            : [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Přeložit recept znovu"), Tr("Smazat recept")];
+            ? [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Přeložit recept znovu"), Tr("Opravit jazyk receptu"), Tr("Smazat recept"), "🔧 " + Tr("Zobrazit syrová data kroků")]
+            : [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Přeložit recept znovu"), Tr("Opravit jazyk receptu"), Tr("Smazat recept")];
 
         string? action = await DialogService.ShowActionSheetAsync(Tr("Možnosti receptu"), Tr("Zrušit"), null, options);
 
@@ -571,6 +610,8 @@
             await OnEditRecipeClickedAsync();
         else if (action == Tr("Přeložit recept znovu"))
             await OnForceRetranslateClickedAsync();
+        else if (action == Tr("Opravit jazyk receptu"))
+            OnFixRecipeLanguageClicked();
         else if (action == Tr("Smazat recept"))
             _showDeleteOverlay = true;
         else if (action == "🔧 " + Tr("Zobrazit syrová data kroků"))
@@ -583,6 +624,31 @@
         await PromoteFromSearchTempAsync();
 
         var updated = await App.Database.ForceRetranslateRecipeAsync(_recipe.Id);
+        if (updated != null)
+        {
+            _recipe = updated;
+            await LoadIngredientsAndStepsAsync();
+        }
+    }
+
+    private void OnFixRecipeLanguageClicked()
+    {
+        if (_recipe == null) return;
+        string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
+        _fixIngredientsLang = string.IsNullOrWhiteSpace(_recipe.ContentLanguage) ? currentLang : _recipe.ContentLanguage;
+        _fixDescriptionLang = string.IsNullOrWhiteSpace(_recipe.DescriptionLanguage) ? currentLang : _recipe.DescriptionLanguage;
+        _showLanguageFixOverlay = true;
+    }
+
+    private async Task OnSaveLanguageFixAsync()
+    {
+        if (_recipe == null) return;
+        await PromoteFromSearchTempAsync();
+
+        _showLanguageFixOverlay = false;
+        await App.Database.SetRecipeLanguagesAsync(_recipe.Id, _fixIngredientsLang, _fixDescriptionLang);
+
+        var updated = await App.Database.EnsureRecipeLanguageAsync(_recipe.Id);
         if (updated != null)
         {
             _recipe = updated;

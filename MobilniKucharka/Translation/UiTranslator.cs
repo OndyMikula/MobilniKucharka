@@ -65,6 +65,15 @@ namespace MobilniKucharka.Translation
             return csText;
         }
 
+        // Vrátí anglický ekvivalent bez ohledu na aktuální jazyk appky (na rozdíl od Tr(), který
+        // překládá jen v anglickém režimu) - pro interní použití (např. DietaryAnalysisService),
+        // ne pro zobrazovaný text.
+        public static string TranslateToEnglishAlways(string csText)
+        {
+            if (string.IsNullOrWhiteSpace(csText)) return csText;
+            return _aliases.TryGetValue(csText, out var alias) && !string.IsNullOrWhiteSpace(alias) ? alias : csText;
+        }
+
         // Počtem řízené skloňování (1 / 2-4 / 5+ pro CS, 1 / ostatní pro EN).
         // Nejde přes DeepL - gramatická shoda s číslovkou je pravidlo, ne "překlad věty",
         // takže slova pro obě jazykové varianty i obě skloňovací kategorie zadáváš explicitně.

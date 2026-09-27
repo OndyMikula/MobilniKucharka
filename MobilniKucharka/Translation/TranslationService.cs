@@ -64,6 +64,33 @@ namespace MobilniKucharka.Translation
             }
         }
 
+        // Zobrazí skutečné číslo z DeepL API - na rozdíl od HasQuotaAvailableAsync (jen ano/ne pro
+        // interní rozhodování) tohle je pro vývojáře, aby viděl přesně kolik zbývá.
+        public static async Task<(long Used, long Limit)?> GetQuotaStatusAsync()
+        {
+            if (string.IsNullOrWhiteSpace(Secrets.DeepLApiKey)) return null;
+
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, UsageEndpoint);
+                request.Headers.Add("Authorization", $"DeepL-Auth-Key {Secrets.DeepLApiKey}");
+
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode) return null;
+
+                string json = await response.Content.ReadAsStringAsync();
+                var data = JsonSerializer.Deserialize<JsonElement>(json);
+
+                long used = data.TryGetProperty("character_count", out var u) ? u.GetInt64() : 0;
+                long limit = data.TryGetProperty("character_limit", out var l) ? l.GetInt64() : 0;
+                return (used, limit);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         public static async Task<List<string>?> TranslateBatchAsync(List<string> texts, string targetAppLang, string? sourceAppLang = null)
         {
             if (texts == null || texts.Count == 0) return [];

@@ -277,6 +277,30 @@ namespace MobilniKucharka.Services
             return [.. raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
         }
 
+        private static bool MatchesUserDiets(Recipe recipe, List<string> userDiets)
+        {
+            if (userDiets.Count == 0) return true;
+
+            foreach (var diet in userDiets)
+            {
+                bool compatible = diet switch
+                {
+                    "Vegetarian" => DietaryAnalysisService.IsVegetarianCompatible(recipe.IngredientsRaw),
+                    "Vegan" => DietaryAnalysisService.IsVeganCompatible(recipe.IngredientsRaw),
+                    "LactoseFree" => DietaryAnalysisService.IsLactoseFreeCompatible(recipe.IngredientsRaw),
+                    _ => true
+                };
+                if (!compatible) return false;
+            }
+            return true;
+        }
+
+        private static bool MatchesUserEquipment(Recipe recipe, List<string> userEquipment)
+        {
+            if (userEquipment.Count == 0) return true;
+            return recipe.RequiredEquipment.All(a => userEquipment.Contains(a));
+        }
+
         public async Task<List<RecipeWithCost>> GetPlanAsync()
         {
             try
@@ -298,10 +322,10 @@ namespace MobilniKucharka.Services
 
                 foreach (var recipe in recipes)
                 {
-                    if (userDiets.Count != 0 && !recipe.DietaryFlags.Any(d => userDiets.Contains(d)))
+                    if (!MatchesUserDiets(recipe, userDiets))
                         continue;
 
-                    if (userEquipment.Count != 0 && !recipe.Equipment.All(e => userEquipment.Contains(e)))
+                    if (!MatchesUserEquipment(recipe, userEquipment))
                         continue;
 
                     // Doplní jméno (a kroky) do aktuálního jazyka aplikace, pokud ještě chybí - díky cache uvnitř
@@ -353,8 +377,8 @@ namespace MobilniKucharka.Services
                     var userEquipment = ParseCommaList(Preferences.Default.Get("UserAppliances", ""));
 
                     matches = [.. matches.Where(r =>
-                        (userDiets.Count == 0 || r.DietaryFlags.Any(d => userDiets.Contains(d))) &&
-                        (userEquipment.Count == 0 || r.Equipment.All(e => userEquipment.Contains(e)))
+                        MatchesUserDiets(r, userDiets) &&
+                        MatchesUserEquipment(r, userEquipment)
                     )];
                 }
 
@@ -983,8 +1007,10 @@ namespace MobilniKucharka.Services
                 DietaryFlagsJson = JsonSerializer.Serialize(GuessDietFlags(mealDbRecipe.Category)),
                 IngredientsRaw = string.Join("\n", mealDbRecipe.Ingredients.Select(i => $"{i.Name}|{i.Measure}")),
                 ContentLanguage = "en",
+                DescriptionLanguage = "en",
                 SourceUrl = mealDbRecipe.SourceUrl,
-                ServingSize = 0
+                ServingSize = 0,
+                RequiredEquipment = RequiredEquipmentAnalysisService.InferRequiredEquipment(mealDbRecipe.Instructions)
             };
             await _db.InsertAsync(recipe);
             return recipe;
@@ -1274,7 +1300,7 @@ namespace MobilniKucharka.Services
             return merged;
         }
     }
-}
+
 
     public class RecipeWithCost
     {
@@ -1297,3 +1323,4 @@ namespace MobilniKucharka.Services
         public double RawAmount { get; set; }
         public double CostValue { get; set; }
     }
+}
