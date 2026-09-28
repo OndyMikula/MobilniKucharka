@@ -99,6 +99,7 @@
     private bool _filterByPreferences = true;
     private bool _isDeveloperMode = false;
     private string SettingsSummaryText = string.Empty;
+    private static bool _startupTasksStarted;
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
@@ -110,13 +111,22 @@
             return;
         }
 
+        _searchText = RecipeListCache.CachedSearchText;
+        _filterByPreferences = RecipeListCache.CachedFilterByPreferences;
+
         BlazorShellPage.ShellAppeared += OnShellAppeared;
         await LoadPageDataAsync();
-        _ = CheckForUpdatesAsync();
         CheckPendingImport();
-        _ = RunProductCleanupAsync();
-        _ = RunRecipeLanguageFixAsync();
-        _ = App.Database.EnsureRequiredEquipmentMigrationAsync();
+
+        // Údržba jen jednou za spuštění appky, ne při každé navigaci na stránku.
+        if (!_startupTasksStarted)
+        {
+            _startupTasksStarted = true;
+            _ = CheckForUpdatesAsync();
+            _ = RunProductCleanupAsync();
+            _ = RunRecipeLanguageFixAsync();
+            _ = App.Database.EnsureRequiredEquipmentMigrationAsync();
+        }
     }
 
     // Jednorázově doplní ContentLanguage receptům založeným před zavedením tohohle pole - bez
@@ -134,7 +144,8 @@
                     string.Format(Tr("U {0} starších receptů aplikace teď poprvé pozná, ve kterém jazyce jsou napsané suroviny a popis - při dalším otevření se ti zobrazí přeložené do aktuálního jazyka, pokud je potřeba."), fixedCount),
                     "OK");
 
-                await LoadPageDataAsync();
+                await LoadPageDataAsync(forceReload: true);
+                await InvokeAsync(StateHasChanged);
             }
         }
         catch (Exception ex)
@@ -162,7 +173,8 @@
                     string.Format(Tr("Některé suroviny byly v appce zapsané vícekrát (např. jednou česky, jednou anglicky, nebo s jiným velkým písmenem). Sloučili jsme {0} takových duplicit - tvoje recepty ani ceny se tím nezměnily, jen se sjednotily záznamy surovin."), mergedCount),
                     "OK");
 
-                await LoadPageDataAsync();
+                await LoadPageDataAsync(forceReload: true);
+                await InvokeAsync(StateHasChanged);
             }
         }
         catch (Exception ex)
@@ -181,18 +193,31 @@
         });
     }
 
-    private async Task LoadPageDataAsync()
+    private async Task LoadPageDataAsync(bool forceReload = false)
     {
         _isDeveloperMode = Preferences.Default.Get("IsDeveloperMode", false);
         UpdateSummaryText();
 
-        if (string.IsNullOrWhiteSpace(_searchText))
+        string trimmed = _searchText?.Trim() ?? string.Empty;
+        string key = trimmed.Length == 0 ? string.Empty : $"{trimmed}|{_filterByPreferences}";
+
+        if (!forceReload && RecipeListCache.CachedPlan != null && RecipeListCache.CachedKey == key)
         {
-            _recipes = await App.Database.GetPlanAsync();
+            _recipes = RecipeListCache.CachedPlan;
         }
         else
         {
-            _recipes = await App.Database.SearchRecipesAsync(_searchText.Trim(), _filterByPreferences);
+            int versionAtStart = RecipeListCache.Version;
+
+            _recipes = trimmed.Length == 0
+                ? await App.Database.GetPlanAsync()
+                : await App.Database.SearchRecipesAsync(trimmed, _filterByPreferences);
+
+            if (versionAtStart == RecipeListCache.Version)
+            {
+                RecipeListCache.CachedPlan = _recipes;
+                RecipeListCache.CachedKey = key;
+            }
         }
 
         _isLoading = false;
@@ -213,15 +238,9 @@
 
     private async Task PerformSearchAsync()
     {
-        string text = _searchText?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            _recipes = await App.Database.GetPlanAsync();
-        }
-        else
-        {
-            _recipes = await App.Database.SearchRecipesAsync(text, _filterByPreferences);
-        }
+        RecipeListCache.CachedSearchText = _searchText ?? string.Empty;
+        RecipeListCache.CachedFilterByPreferences = _filterByPreferences;
+        await LoadPageDataAsync();
     }
 
     private async Task OnSurpriseMeClicked()
@@ -241,6 +260,7 @@
             }
 
             var savedRecipe = await App.Database.SaveExternalRecipeAsync(found);
+            RecipeListCache.Invalidate();
 
             if (savedRecipe.ServingSize <= 0)
             {
@@ -293,6 +313,7 @@
         if (!confirm) return;
 
         await App.Database.ResetDatabaseAsync();
+        RecipeListCache.Invalidate();
         await LoadPageDataAsync();
         await DialogService.ShowAlertAsync(Tr("Hotovo"), Tr("Databáze byla resetována na testovací data."), "OK");
     }
@@ -320,8 +341,9 @@
         {
             int newId = await App.Database.ImportSharedRecipeAsync(recipe);
             await App.Database.AddRecipeToCategoryAsync(newId, "Vytvořené recepty");
+            RecipeListCache.Invalidate();
             await DialogService.ShowAlertAsync(Tr("Recept naimportován"), string.Format(Tr("\"{0}\" byl přidán do tvých receptů."), recipe.Name), "OK");
-            await LoadPageDataAsync();
+            await LoadPageDataAsync(forceReload: true);
         }
         else
         {

@@ -310,6 +310,7 @@ namespace MobilniKucharka.Services
                 }
             }
 
+            RecipeListCache.Invalidate();
             return await BuildDisplayRecipeAsync(recipe, currentLang);
         }
 
@@ -333,6 +334,7 @@ namespace MobilniKucharka.Services
             foreach (var entry in descCache) await _db.DeleteAsync(entry);
 
             await _db.UpdateAsync(recipe);
+            RecipeListCache.Invalidate();
             return recipe;
         }
 
@@ -359,6 +361,7 @@ namespace MobilniKucharka.Services
                 fixedCount++;
             }
 
+            if (fixedCount > 0) RecipeListCache.Invalidate();
             Preferences.Default.Set(prefKey, true);
             return fixedCount;
         }

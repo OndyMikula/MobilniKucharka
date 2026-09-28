@@ -108,6 +108,11 @@
     {
         string dbPath = Path.Combine(FileSystem.AppDataDirectory, "kucharka.db3");
         _searchService = new RecipeSearchService(dbPath);
+
+        _query = SearchPageState.LastQuery;
+        _filterByPreferences = SearchPageState.LastFilterByPreferences;
+        _results = SearchPageState.LastResults;
+        _hasSearched = SearchPageState.HasSearched;
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
@@ -139,6 +144,12 @@
             if (_searchService != null)
             {
                 _results = await _searchService.SearchAsync(query, _filterByPreferences, _searchCts.Token);
+
+                SearchPageState.LastQuery = query;
+                SearchPageState.LastFilterByPreferences = _filterByPreferences;
+                SearchPageState.LastResults = _results;
+                SearchPageState.HasSearched = true;
+
                 if (_results.Count == 0)
                 {
                     await DialogService.ShowAlertAsync(Tr("Nic se nenašlo"), Tr("Nepodařilo se najít žádný recept odpovídající zadání."), "OK");

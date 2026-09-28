@@ -10,7 +10,10 @@ namespace MobilniKucharka.Services
         // vs mezera, nebo stejná surovina zapsaná zvlášť česky a anglicky). Spouští se jednou manuálně
         // - co se nedá sloučit deterministicky nebo kvůli chybějící DeepL kvótě, zůstane
         // beze změny pro příští běh.
-        public async Task<int> MergeDuplicateProductsAsync()
+        // Na vlákně z thread poolu - nesmí blokovat UI vlákno Blazoru.
+        public Task<int> MergeDuplicateProductsAsync() => Task.Run(MergeDuplicateProductsCoreAsync);
+
+        private async Task<int> MergeDuplicateProductsCoreAsync()
         {
             await EnsureInitializedAsync();
 
@@ -21,6 +24,7 @@ namespace MobilniKucharka.Services
 
             _cachedProducts = null;
             _cachedAliases = null;
+            if (merged > 0) RecipeListCache.Invalidate();
             return merged;
         }
 
@@ -94,32 +98,36 @@ namespace MobilniKucharka.Services
                 .GroupBy(ri => ri.ProductId)
                 .ToDictionary(g => g.Key, g => g.Count());
 
+            var keys = products.Select(p => (
+                Cs: TextNormalizationHelper.NormalizeForComparison(p.Name_CS),
+                En: TextNormalizationHelper.NormalizeForComparison(p.Name_EN),
+                Bases: GetParenthesizedBases(p))).ToList();
+
             int merged = 0;
 
             for (int i = 0; i < products.Count; i++)
             {
                 var a = products[i];
-                if (a.Id == 0) continue; // už sloučeno a smazáno v tomto běhu
+                if (a.Id == 0) continue;
 
                 for (int j = i + 1; j < products.Count; j++)
                 {
                     var b = products[j];
                     if (b.Id == 0) continue;
 
+                    var ka = keys[i];
+                    var kb = keys[j];
+
                     bool sameWord =
-                    TextNormalizationHelper.NormalizeForComparison(a.Name_CS) == TextNormalizationHelper.NormalizeForComparison(b.Name_CS) ||
-                    TextNormalizationHelper.NormalizeForComparison(a.Name_EN) == TextNormalizationHelper.NormalizeForComparison(b.Name_EN) ||
-                    TextNormalizationHelper.NormalizeForComparison(a.Name_CS) == TextNormalizationHelper.NormalizeForComparison(b.Name_EN) ||
-                    TextNormalizationHelper.NormalizeForComparison(a.Name_EN) == TextNormalizationHelper.NormalizeForComparison(b.Name_CS) ||
-                    HasMatchingParenthesizedBase(a, b);
+                        (ka.Cs.Length > 0 && (ka.Cs == kb.Cs || ka.Cs == kb.En)) ||
+                        (ka.En.Length > 0 && (ka.En == kb.En || ka.En == kb.Cs)) ||
+                        ka.Bases.Intersect(kb.Bases).Any();
 
                     if (!sameWord) continue;
 
                     int usageA = ingredientCounts.GetValueOrDefault(a.Id, 0);
                     int usageB = ingredientCounts.GetValueOrDefault(b.Id, 0);
 
-                    // Kanonický = ten používanější (méně receptů se dotkne případného rozdílu
-                    // v jednotce) - při shodě vyhrává nižší Id.
                     var (canonical, duplicate) = usageB > usageA ? (b, a) : (a, b);
 
                     await MergeProductPairAsync(canonical, duplicate);
@@ -220,18 +228,6 @@ namespace MobilniKucharka.Services
             bool exists = existingAliases.Any(a => TextNormalizationHelper.NormalizeForComparison(a.Alias) == TextNormalizationHelper.NormalizeForComparison(trimmed));
             if (!exists)
                 await _db.InsertAsync(new LocalProductAlias { Alias = trimmed, ProductId = productId });
-        }
-
-        // "Paprika (koření)" / "Paprika (na koření)" / "Paprika (to koření)" - stejné slovo PŘED
-        // závorkou, obsah se ignoruje. Vyžaduje závorku na OBOU stranách - viz komentář u
-        // stejné kontroly v GetOrCreateLocalProductByNameAsync.
-        private static bool HasMatchingParenthesizedBase(LocalProduct a, LocalProduct b)
-        {
-            var basesA = GetParenthesizedBases(a);
-            if (basesA.Count == 0) return false;
-
-            var basesB = GetParenthesizedBases(b);
-            return basesA.Intersect(basesB).Any();
         }
 
         private static List<string> GetParenthesizedBases(LocalProduct p)

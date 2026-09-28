@@ -634,6 +634,7 @@ namespace MobilniKucharka.Services
                 product.ManualPrice = price;
                 await _db.UpdateAsync(product);
                 _cachedProducts = null;
+                RecipeListCache.Invalidate();
             }
         }
 
@@ -646,6 +647,7 @@ namespace MobilniKucharka.Services
                 product.HasManualPrice = false;
                 await _db.UpdateAsync(product);
                 _cachedProducts = null;
+                RecipeListCache.Invalidate();
             }
         }
 
@@ -658,6 +660,7 @@ namespace MobilniKucharka.Services
                 product.TypicalUnitWeightGrams = gramsPerPiece;
                 await _db.UpdateAsync(product);
                 _cachedProducts = null;
+                RecipeListCache.Invalidate();
             }
         }
 
@@ -774,6 +777,7 @@ namespace MobilniKucharka.Services
             }
 
             _cachedProducts = null;
+            RecipeListCache.Invalidate();
         }
 
         public async Task<List<string>> GetDistinctCategoriesAsync()
@@ -969,6 +973,8 @@ namespace MobilniKucharka.Services
             var links = await _db.Table<RecipeBookmark>().Where(rb => rb.RecipeId == recipeId).ToListAsync();
             foreach (var link in links)
                 await _db.DeleteAsync(link);
+
+            RecipeListCache.Invalidate();
         }
 
         public async Task<Recipe?> GetRecipeByIdAsync(int recipeId)
@@ -1013,6 +1019,7 @@ namespace MobilniKucharka.Services
                 RequiredEquipment = RequiredEquipmentAnalysisService.InferRequiredEquipment(mealDbRecipe.Instructions)
             };
             await _db.InsertAsync(recipe);
+            RecipeListCache.Invalidate();
             return recipe;
         }
 
@@ -1156,6 +1163,7 @@ namespace MobilniKucharka.Services
         {
             await EnsureInitializedAsync();
             await _db.InsertAsync(recipe);
+            RecipeListCache.Invalidate();
             return recipe.Id;
         }
 
@@ -1171,6 +1179,7 @@ namespace MobilniKucharka.Services
             _cachedIngredients = null;
             _isInitialized = false;
             await EnsureInitializedAsync();
+            RecipeListCache.Invalidate();
         }
 
         public async Task UpdateRecipeServingSizeAsync(int recipeId, int servingSize)
@@ -1181,6 +1190,7 @@ namespace MobilniKucharka.Services
             {
                 recipe.ServingSize = servingSize;
                 await _db.UpdateAsync(recipe);
+                RecipeListCache.Invalidate();
             }
         }
 
@@ -1216,6 +1226,7 @@ namespace MobilniKucharka.Services
                 product.Unit = unit;
                 await _db.UpdateAsync(product);
                 _cachedProducts = null;
+                RecipeListCache.Invalidate();
             }
         }
 
@@ -1229,6 +1240,7 @@ namespace MobilniKucharka.Services
             product.Name_EN = newNameEn.Trim();
             await _db.UpdateAsync(product);
             _cachedProducts = null;
+            RecipeListCache.Invalidate();
             return true;
         }
 
@@ -1255,6 +1267,7 @@ namespace MobilniKucharka.Services
             foreach (var alias in aliases) await _db.DeleteAsync(alias);
 
             _cachedProducts = null;
+            RecipeListCache.Invalidate();
         }
 
         public async Task<LocalProduct> CreateProductAsync(string nameCs, string nameEn, string unit)
@@ -1297,6 +1310,7 @@ namespace MobilniKucharka.Services
 
             _cachedProducts = null;
             _cachedAliases = null;
+            RecipeListCache.Invalidate();
             return merged;
         }
     }
