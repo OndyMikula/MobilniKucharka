@@ -5,7 +5,9 @@ namespace MobilniKucharka.Services
     public static class ImageHelper
     {
         private static readonly Dictionary<string, string> Base64Cache = [];
-        private const int MaxCacheEntries = 50;
+        // Vyšší limit je bezpečný teď, když RecipeCard prochází přes malé náhledy (ThumbnailService),
+        // ne plné 800px obrázky - stovky malých base64 řetězců v paměti jsou levné.
+        private const int MaxCacheEntries = 300;
 
         public static string ResolveImageSrc(string? pathOrUrl)
         {

@@ -115,13 +115,13 @@ namespace MobilniKucharka.Services
                     var b = products[j];
                     if (b.Id == 0) continue;
 
-                    var ka = keys[i];
-                    var kb = keys[j];
+                    var (csA, enA, basesA) = keys[i];
+                    var (csB, enB, basesB) = keys[j];
 
                     bool sameWord =
-                        (ka.Cs.Length > 0 && (ka.Cs == kb.Cs || ka.Cs == kb.En)) ||
-                        (ka.En.Length > 0 && (ka.En == kb.En || ka.En == kb.Cs)) ||
-                        ka.Bases.Intersect(kb.Bases).Any();
+                        (csA.Length > 0 && (csA == csB || csA == enB)) ||
+                        (enA.Length > 0 && (enA == enB || enA == csB)) ||
+                        basesA.Intersect(basesB).Any();
 
                     if (!sameWord) continue;
 
