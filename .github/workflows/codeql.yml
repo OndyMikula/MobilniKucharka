@@ -29,16 +29,18 @@ jobs:
           dotnet-version: '10.0.x'
           cache-dependency-path: MobilniKucharka/MobilniKucharka.csproj 
 
-      - name: Cache .NET MAUI Android Workload
+            - name: Cache .NET MAUI Android Workload
         id: cache-maui
         uses: actions/cache@v4
         with:
           path: |
-            C:\Program Files\dotnet\metadata\workloads
+            C:\Program Files\dotnet\packs
             C:\Program Files\dotnet\sdk-manifests
-          key: ${{ runner.os }}-maui-android-10.0-codeql-${{ hashFiles('MobilniKucharka/MobilniKucharka.csproj') }}
+            C:\Program Files\dotnet\metadata\workloads
+            C:\Program Files\dotnet\library-packs
+          key: ${{ runner.os }}-maui-android-10.0-codeql-v2-${{ hashFiles('MobilniKucharka/MobilniKucharka.csproj') }}
           restore-keys: |
-            ${{ runner.os }}-maui-android-10.0-codeql-
+            ${{ runner.os }}-maui-android-10.0-codeql-v2-
 
       - name: Install MAUI workload
         if: steps.cache-maui.outputs.cache-hit != 'true'
