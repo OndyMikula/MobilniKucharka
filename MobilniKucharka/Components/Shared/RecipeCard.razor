@@ -1,17 +1,21 @@
-@namespace MobilniKucharka.Components
+@namespace MobilniKucharka.Components.Shared
 @inject NavigationManager NavigationManager
 
 <div class="recipe-card" @onclick="OnClick">
     <div class="recipe-card-img-wrap">
-        @if (!string.IsNullOrWhiteSpace(Item.Recipe.ImageUrl))
+        @if (!string.IsNullOrWhiteSpace(_resolvedImageSrc))
         {
-            <img src="@ResolvedImageSrc" alt="@Item.Recipe.Name" class="recipe-card-img" loading="lazy" />
+            <img src="@_resolvedImageSrc" alt="@Item.Recipe.Name" class="recipe-card-img" loading="lazy" />
         }
-        else
+        else if (string.IsNullOrWhiteSpace(Item.Recipe.ImageUrl))
         {
             <div class="recipe-card-img-placeholder">
                 <span>🍲</span>
             </div>
+        }
+        else
+        {
+            <div class="recipe-card-img-placeholder"></div>
         }
     </div>
 
@@ -39,9 +43,27 @@
     [Parameter, EditorRequired] public RecipeWithCost Item { get; set; } = default!;
     [Parameter] public EventCallback<RecipeWithCost> CardClicked { get; set; }
 
+    private string? _resolvedImageSrc;
+    private string? _loadedForPath;
+
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
-    private string ResolvedImageSrc => ImageHelper.ResolveImageSrc(Item.Recipe.ImageUrl);
+    protected override async Task OnParametersSetAsync()
+    {
+        string path = Item.Recipe.ImageUrl;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            _resolvedImageSrc = null;
+            _loadedForPath = null;
+            return;
+        }
+
+        if (path == _loadedForPath) return;
+        _loadedForPath = path;
+
+        string thumbPath = await ThumbnailService.GetOrCreateThumbnailAsync(path);
+        _resolvedImageSrc = ImageHelper.ResolveImageSrc(thumbPath);
+    }
 
     private string CostColorHex => !string.IsNullOrWhiteSpace(Item.CostColor)
         ? Item.CostColor

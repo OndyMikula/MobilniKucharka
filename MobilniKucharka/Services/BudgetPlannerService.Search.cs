@@ -46,6 +46,7 @@ namespace MobilniKucharka.Services
             {
                 recipe.IsSearchTemp = isTemp;
                 await _db.UpdateAsync(recipe);
+                RecipeListCache.Invalidate();
             }
         }
     }

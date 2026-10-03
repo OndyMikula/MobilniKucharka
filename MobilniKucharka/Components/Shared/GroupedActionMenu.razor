@@ -1,0 +1,40 @@
+﻿@namespace MobilniKucharka.Components.Shared
+
+@if (IsOpen)
+{
+    <div class="modal-overlay" @onclick="CloseAsync">
+        <div class="action-menu-card" @onclick:stopPropagation="true">
+            @foreach (var group in Groups)
+            {
+                <div class="action-menu-group">
+                    @foreach (var item in group.Items)
+                    {
+                        <button type="button" class="action-menu-item @(item.IsDestructive ? "destructive" : "")" @onclick="() => OnItemClickedAsync(item)">
+                            @item.Label
+                        </button>
+                    }
+                </div>
+            }
+            <button type="button" class="action-menu-cancel" @onclick="CloseAsync">@CancelLabel</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public string CancelLabel { get; set; } = "Zrušit";
+    [Parameter] public List<ActionMenuGroup> Groups { get; set; } = [];
+
+    private async Task OnItemClickedAsync(ActionMenuItem item)
+    {
+        await CloseAsync();
+        await item.OnClick.InvokeAsync();
+    }
+
+    private async Task CloseAsync()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+}

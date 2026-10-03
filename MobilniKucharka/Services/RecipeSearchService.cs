@@ -34,6 +34,10 @@ namespace MobilniKucharka.Services
             cancellationToken.ThrowIfCancellationRequested();
 
             List<string> userDiets = applyDietFilter ? ParseUserDiets() : [];
+            string cacheKey = $"{englishQuery.ToLowerInvariant()}|{string.Join(",", userDiets.OrderBy(d => d))}";
+
+            var cached = await App.Database.GetCachedSearchResultsAsync(cacheKey);
+            if (cached != null) return cached;
 
             var mealDbTask = SearchMealDbAsync(englishQuery, userDiets, cancellationToken);
             var spoonacularTask = SearchSpoonacularAsync(englishQuery, userDiets, cancellationToken);
@@ -46,10 +50,12 @@ namespace MobilniKucharka.Services
 
             await TranslateResultNamesForDisplayAsync(combined);
 
+            await App.Database.SaveSearchResultsToCacheAsync(cacheKey, combined);
+
             return combined;
         }
 
-        public async Task<MealDbRecipe?> CompleteMealDbResultAsync(ExternalRecipeSearchResult result)
+        public static async Task<MealDbRecipe?> CompleteMealDbResultAsync(ExternalRecipeSearchResult result)
         {
             if (result.Source != ExternalRecipeSource.MealDb || result.MealDbData == null) return null;
             return await TheMealDbService.CompleteRecipeWithNutritionAsync(result.MealDbData);
@@ -60,7 +66,7 @@ namespace MobilniKucharka.Services
             return await _spoonacularService.GetRecipeWithCacheAsync(spoonacularId, translatedNameCs);
         }
 
-        private async Task<string> TranslateQueryToEnglishAsync(string query)
+        private static async Task<string> TranslateQueryToEnglishAsync(string query)
         {
             string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
             if (currentLang != "cs") return query;
@@ -75,7 +81,7 @@ namespace MobilniKucharka.Services
             return translated;
         }
 
-        private async Task TranslateResultNamesForDisplayAsync(List<ExternalRecipeSearchResult> results)
+        private static async Task TranslateResultNamesForDisplayAsync(List<ExternalRecipeSearchResult> results)
         {
             string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
             if (currentLang != "cs" || results.Count == 0) return;
@@ -126,7 +132,7 @@ namespace MobilniKucharka.Services
             })];
         }
 
-        private async Task<List<ExternalRecipeSearchResult>> SearchSpoonacularAsync(string query, List<string> userDiets, CancellationToken cancellationToken)
+        private static async Task<List<ExternalRecipeSearchResult>> SearchSpoonacularAsync(string query, List<string> userDiets, CancellationToken cancellationToken)
         {
             string? diet = userDiets.Contains("Vegan") ? "vegan" : userDiets.Contains("Vegetarian") ? "vegetarian" : null;
             return await SpoonacularService.SearchRecipesAsync(query, diet, cancellationToken);

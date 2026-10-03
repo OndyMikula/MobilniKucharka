@@ -70,8 +70,9 @@
         // Vytváření/úprava receptu je celoobrazovkový editační pohled - dolní nav lišta tam nedává
         // smysl (žádná ze záložek by stejně nebyla "aktivní").
         _hideBottomNav = relative.StartsWith("recipe/create", StringComparison.OrdinalIgnoreCase) ||
-                         (relative.StartsWith("recipe/", StringComparison.OrdinalIgnoreCase) &&
-                          relative.EndsWith("/edit", StringComparison.OrdinalIgnoreCase));
+                 (relative.StartsWith("recipe/", StringComparison.OrdinalIgnoreCase) &&
+                  relative.EndsWith("/edit", StringComparison.OrdinalIgnoreCase)) ||
+                 relative.Equals("settings/ingredients", StringComparison.OrdinalIgnoreCase);
 
         if (string.IsNullOrEmpty(relative) || relative.Equals("recipes", StringComparison.OrdinalIgnoreCase))
         {

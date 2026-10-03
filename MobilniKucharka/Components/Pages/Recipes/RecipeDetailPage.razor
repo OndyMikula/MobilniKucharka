@@ -1,5 +1,5 @@
 ﻿@page "/recipe/{Id:int}"
-@namespace MobilniKucharka.Components.Pages
+@namespace MobilniKucharka.Components.Pages.Recipes
 @implements IDisposable
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
@@ -40,7 +40,7 @@
             <button type="button" class="hero-circle-btn favorite @(_isFavorite ? "favorited" : "")" @onclick="OnFavoriteToggledAsync">
                 @(_isFavorite ? "♥" : "♡")
             </button>
-            <button type="button" class="hero-circle-btn options" @onclick="OnOptionsMenuClickedAsync">⋮</button>
+            <button type="button" class="hero-circle-btn options" @onclick="OnOptionsMenuClicked">⋮</button>
 
             <div class="recipe-detail-hero-info">
                 <h1 class="recipe-detail-title">@_recipe.Name</h1>
@@ -232,6 +232,43 @@
     </div>
 }
 
+<!-- OVERLAY: OPRAVIT JAZYK RECEPTU -->
+@if (_showLanguageFixOverlay)
+{
+    <div class="modal-overlay" @onclick="() => _showLanguageFixOverlay = false">
+        <div class="modal-card" @onclick:stopPropagation="true">
+            <h2 class="modal-title">@Tr("Opravit jazyk receptu")</h2>
+            <p style="font-size:13px; color:var(--color-text-muted); margin:0;">
+                @Tr("Název a postup se doplňují automaticky do obou jazyků. Tady oprav jen jazyk, ve kterém jsou opravdu napsané suroviny a popis.")
+            </p>
+
+            <div class="form-group">
+                <label class="form-label">@Tr("Popis je napsaný:")</label>
+                <select class="form-select" @bind="_fixDescriptionLang">
+                    <option value="cs">Čeština</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">@Tr("Suroviny jsou napsané:")</label>
+                <select class="form-select" @bind="_fixIngredientsLang">
+                    <option value="cs">Čeština</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button type="button" class="btn-action" style="background-color:#9E9E9E; flex:1;" @onclick="() => _showLanguageFixOverlay = false">@Tr("Zrušit")</button>
+                <button type="button" class="btn-action btn-primary" style="flex:1;" @onclick="OnSaveLanguageFixAsync">@Tr("Uložit")</button>
+            </div>
+        </div>
+    </div>
+}
+
+
+<GroupedActionMenu @bind-IsOpen="_showOptionsMenu" Groups="_optionsMenuGroups" CancelLabel="@Tr("Zrušit")" />
+
 @code {
     [Parameter] public int Id { get; set; }
 
@@ -247,6 +284,11 @@
     private string _peopleCountBadgeText = string.Empty;
     private bool _showBookmarkOverlay;
     private List<BookmarkSelectionModel> _bookmarkSelection = [];
+
+    private bool _showLanguageFixOverlay;
+    private string _fixIngredientsLang = "cs";
+    private string _fixDescriptionLang = "cs";
+
     private bool _showDeleteOverlay;
     private bool _isDeveloperMode;
 
@@ -426,9 +468,16 @@
                 if (manualResult == null) return;
 
                 if (string.IsNullOrWhiteSpace(manualResult))
+                {
                     await App.Database.ClearManualPriceAsync(ingredient.ProductId);
+                    RecipeListCache.Invalidate();
+                }
                 else if (double.TryParse(manualResult.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture, out var unitPrice))
+                {
                     await App.Database.SetManualPriceAsync(ingredient.ProductId, unitPrice);
+                    RecipeListCache.Invalidate();
+                }
+                
 
                 await LoadIngredientsAndStepsAsync();
                 return;
@@ -540,9 +589,13 @@
         await PromoteFromSearchTempAsync();
 
         if (isChecked)
+        {
             await App.Database.AddRecipeToCategoryAsync(_recipe.Id, model.CategoryName);
+        }
         else
+        {
             await App.Database.RemoveRecipeFromCategoryAsync(_recipe.Id, model.CategoryName);
+        }
     }
 
     private async Task CloseBookmarkOverlayAsync()
@@ -551,30 +604,56 @@
         await InitializeFavoriteStateAsync();
     }
 
-    private async Task OnOptionsMenuClickedAsync()
+    private bool _showOptionsMenu;
+    private List<ActionMenuGroup> _optionsMenuGroups = [];
+
+    private void OnOptionsMenuClicked()
     {
         if (_recipe == null) return;
 
-        string[] options = _isDeveloperMode
-            ? [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Přeložit recept znovu"), Tr("Smazat recept"), "🔧 " + Tr("Zobrazit syrová data kroků")]
-            : [Tr("Sdílet recept"), Tr("Sdílet přes odkaz"), Tr("Přidat do záložky"), Tr("Upravit recept"), Tr("Přeložit recept znovu"), Tr("Smazat recept")];
+        var shareGroup = new ActionMenuGroup
+        {
+            Items =
+            [
+                new() { Label = Tr("Sdílet recept"), OnClick = EventCallback.Factory.Create(this, ShareRecipeAsync) },
+                new() { Label = Tr("Sdílet přes odkaz"), OnClick = EventCallback.Factory.Create(this, ShareRecipeViaLinkAsync) },
+            ]
+        };
 
-        string? action = await DialogService.ShowActionSheetAsync(Tr("Možnosti receptu"), Tr("Zrušit"), null, options);
+        var languageGroup = new ActionMenuGroup
+        {
+            Items =
+            [
+                new() { Label = Tr("Přeložit recept znovu"), OnClick = EventCallback.Factory.Create(this, OnForceRetranslateClickedAsync) },
+                new() { Label = Tr("Opravit jazyk receptu"), OnClick = EventCallback.Factory.Create(this, OnFixRecipeLanguageClicked) },
+            ]
+        };
 
-        if (action == Tr("Sdílet recept"))
-            await ShareRecipeAsync();
-        else if (action == Tr("Sdílet přes odkaz"))
-            await ShareRecipeViaLinkAsync();
-        else if (action == Tr("Přidat do záložky"))
-            await OpenBookmarksOverlayAsync();
-        else if (action == Tr("Upravit recept"))
-            await OnEditRecipeClickedAsync();
-        else if (action == Tr("Přeložit recept znovu"))
-            await OnForceRetranslateClickedAsync();
-        else if (action == Tr("Smazat recept"))
-            _showDeleteOverlay = true;
-        else if (action == "🔧 " + Tr("Zobrazit syrová data kroků"))
-            await ShowRawStepsDiagnosticAsync();
+        var manageGroup = new ActionMenuGroup
+        {
+            Items =
+            [
+                new() { Label = Tr("Přidat do záložky"), OnClick = EventCallback.Factory.Create(this, OpenBookmarksOverlayAsync) },
+                new() { Label = Tr("Upravit recept"), OnClick = EventCallback.Factory.Create(this, OnEditRecipeClickedAsync) },
+            ]
+        };
+
+        var deleteGroup = new ActionMenuGroup
+        {
+            Items = [new() { Label = Tr("Smazat recept"), IsDestructive = true, OnClick = EventCallback.Factory.Create(this, () => _showDeleteOverlay = true) }]
+        };
+
+        _optionsMenuGroups = [shareGroup, languageGroup, manageGroup, deleteGroup];
+
+        if (_isDeveloperMode)
+        {
+            _optionsMenuGroups.Add(new ActionMenuGroup
+            {
+                Items = [new() { Label = "🔧 " + Tr("Zobrazit syrová data kroků"), OnClick = EventCallback.Factory.Create(this, ShowRawStepsDiagnosticAsync) }]
+            });
+        }
+
+        _showOptionsMenu = true;
     }
 
     private async Task OnForceRetranslateClickedAsync()
@@ -583,6 +662,31 @@
         await PromoteFromSearchTempAsync();
 
         var updated = await App.Database.ForceRetranslateRecipeAsync(_recipe.Id);
+        if (updated != null)
+        {
+            _recipe = updated;
+            await LoadIngredientsAndStepsAsync();
+        }
+    }
+
+    private void OnFixRecipeLanguageClicked()
+    {
+        if (_recipe == null) return;
+        string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
+        _fixIngredientsLang = string.IsNullOrWhiteSpace(_recipe.ContentLanguage) ? currentLang : _recipe.ContentLanguage;
+        _fixDescriptionLang = string.IsNullOrWhiteSpace(_recipe.DescriptionLanguage) ? currentLang : _recipe.DescriptionLanguage;
+        _showLanguageFixOverlay = true;
+    }
+
+    private async Task OnSaveLanguageFixAsync()
+    {
+        if (_recipe == null) return;
+        await PromoteFromSearchTempAsync();
+
+        _showLanguageFixOverlay = false;
+        await App.Database.SetRecipeLanguagesAsync(_recipe.Id, _fixIngredientsLang, _fixDescriptionLang);
+
+        var updated = await App.Database.EnsureRecipeLanguageAsync(_recipe.Id);
         if (updated != null)
         {
             _recipe = updated;
@@ -667,6 +771,7 @@
         if (_recipe == null) return;
         _showDeleteOverlay = false;
         await App.Database.DeleteRecipeAsync(_recipe.Id);
+        RecipeListCache.Invalidate();
         NavigationManager.NavigateTo("/recipes");
     }
 
@@ -781,6 +886,7 @@
         if (_recipe == null) return;
         await PromoteFromSearchTempAsync();
         await App.Database.AddRecipeToCategoryAsync(_recipe.Id, "Vyhledané recepty");
+        RecipeListCache.Invalidate();
     }
 
     private async Task OnSourceLinkClickedAsync()

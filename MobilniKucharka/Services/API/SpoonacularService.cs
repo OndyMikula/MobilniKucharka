@@ -1,6 +1,7 @@
 ﻿using MobilniKucharka.Classes.Recipe;
 using SQLite;
 using System.Text.Json;
+using static Android.App.DownloadManager;
 
 namespace MobilniKucharka.Services.Api
 {
@@ -22,10 +23,13 @@ namespace MobilniKucharka.Services.Api
                 return cached;
             }
 
+            if (!SpoonacularQuotaService.HasSearchQuota()) return null;
+
             string url = $"https://api.spoonacular.com/recipes/{spoonacularId}/information?apiKey={ApiKey}&includeNutrition=true";
             try
             {
                 var response = await _httpClient.GetAsync(url);
+                SpoonacularQuotaService.UpdateFromResponseHeaders(response);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -41,6 +45,9 @@ namespace MobilniKucharka.Services.Api
 
                 var data = JsonSerializer.Deserialize<JsonElement>(contentString);
 
+                var stepsJson = ExtractSteps(data);
+                var spoonacularEquipment = ExtractRequiredEquipment(data);
+
                 var recipe = new Recipe
                 {
                     ExternalSourceId = $"spoon_{spoonacularId}",
@@ -55,15 +62,21 @@ namespace MobilniKucharka.Services.Api
                     Fat = ExtractNutrient(data, "Fat"),
                     Sugar = ExtractNutrient(data, "Sugar"),
 
-                    StepsJson_EN = ExtractSteps(data),
+                    StepsJson_EN = stepsJson,
                     IngredientsRaw = ExtractIngredientsRaw(data),
                     ContentLanguage = "en",
+                    DescriptionLanguage = "en",
 
                     ServingSize = data.TryGetProperty("servings", out var servingsProp) && servingsProp.GetInt32() > 0
                         ? servingsProp.GetInt32()
                         : 0,
                     EquipmentJson = "[]",
-                    DietaryFlagsJson = ExtractDiets(data)
+                    DietaryFlagsJson = ExtractDiets(data),
+                    // Spoonacular dává skutečné vybavení podle kroku (přesnější než hádání z textu) -
+                    // heuristika z textu jen jako záložní varianta, kdyby data chyběla.
+                    RequiredEquipment = spoonacularEquipment.Count > 0
+                        ? spoonacularEquipment
+                        : RequiredEquipmentAnalysisService.InferRequiredEquipment(string.Join(" ", JsonSerializer.Deserialize<List<string>>(stepsJson) ?? []))
                 };
 
                 await _db.InsertAsync(recipe);
@@ -84,12 +97,15 @@ namespace MobilniKucharka.Services.Api
         // dotáhnou (a rovnou uloží do DB, viz GetRecipeWithCacheAsync) až po výběru receptu.
         public static async Task<List<ExternalRecipeSearchResult>> SearchRecipesAsync(string query, string? diet, CancellationToken cancellationToken)
         {
+            if (!SpoonacularQuotaService.HasSearchQuota()) return [];
+
             string dietParam = string.IsNullOrWhiteSpace(diet) ? "" : $"&diet={Uri.EscapeDataString(diet)}";
-            string url = $"https://api.spoonacular.com/recipes/complexSearch?apiKey={ApiKey}&query={Uri.EscapeDataString(query)}&number=10{dietParam}";
+            string url = $"https://api.spoonacular.com/recipes/complexSearch?apiKey={ApiKey}&query={Uri.EscapeDataString(query)}&number=100{dietParam}";
 
             try
             {
                 var response = await _httpClient.GetAsync(url, cancellationToken);
+                SpoonacularQuotaService.UpdateFromResponseHeaders(response);
                 if (!response.IsSuccessStatusCode) return [];
 
                 var contentString = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -155,6 +171,50 @@ namespace MobilniKucharka.Services.Api
             }
             catch { }
             return JsonSerializer.Serialize(stepsList);
+        }
+
+        private static readonly Dictionary<string, string> SpoonacularEquipmentMap = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["oven"] = "Trouba",
+            ["frying pan"] = "Sporák",
+            ["pan"] = "Sporák",
+            ["sauce pan"] = "Sporák",
+            ["saucepan"] = "Sporák",
+            ["pot"] = "Sporák",
+            ["stove"] = "Sporák",
+            ["skillet"] = "Sporák",
+            ["wok"] = "Sporák",
+            ["kettle"] = "Konvice",
+            ["microwave"] = "Mikrovlnka",
+        };
+
+        // Spoonacular vrací u každého kroku pole "equipment" (reálné, ne odhadované) - mapuje se na
+        // stejné čtyři kategorie jako v onboardingu, cokoliv jiného (mísa, metla...) se ignoruje.
+        private static List<string> ExtractRequiredEquipment(JsonElement root)
+        {
+            var found = new HashSet<string>();
+            try
+            {
+                var analyzedInstructions = root.GetProperty("analyzedInstructions");
+                if (analyzedInstructions.GetArrayLength() > 0)
+                {
+                    var steps = analyzedInstructions[0].GetProperty("steps");
+                    foreach (var s in steps.EnumerateArray())
+                    {
+                        if (s.TryGetProperty("equipment", out var equipmentArray) && equipmentArray.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var eq in equipmentArray.EnumerateArray())
+                            {
+                                string name = eq.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "" : "";
+                                if (SpoonacularEquipmentMap.TryGetValue(name.Trim(), out var mapped))
+                                    found.Add(mapped);
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+            return [.. found];
         }
 
         // Sestaví IngredientsRaw ve stejném formátu "Název|Množství", jaký používá MealDB import

@@ -18,20 +18,20 @@
 
         if (route.StartsWith("/legal/", StringComparison.Ordinal))
         {
-            _componentType = typeof(Pages.LegalDocumentPage);
+            _componentType = typeof(Pages.Legal.LegalDocumentPage);
             _parameters = new Dictionary<string, object> { ["DocType"] = route["/legal/".Length..] };
         }
         else if (route == "/license")
         {
-            _componentType = typeof(Pages.LicensePage);
+            _componentType = typeof(Pages.Legal.LicensePage);
         }
         else if (route == "/bug-report")
         {
-            _componentType = typeof(Pages.BugReportPage);
+            _componentType = typeof(Pages.Feedback.BugReportPage);
         }
         else if (route == "/idea")
         {
-            _componentType = typeof(Pages.IdeaPage);
+            _componentType = typeof(Pages.Feedback.IdeaPage);
         }
 
         // @layout na jednotlivých stránkách (BugReportPage/IdeaPage/LegalDocumentPage/LicensePage)

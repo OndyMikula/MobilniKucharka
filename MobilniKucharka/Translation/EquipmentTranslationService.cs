@@ -1,4 +1,5 @@
 ﻿using MobilniKucharka.Classes;
+using MobilniKucharka.Services;
 using System.Text.Json;
 
 namespace MobilniKucharka.Translation
@@ -73,13 +74,36 @@ namespace MobilniKucharka.Translation
 
             if (existing != null)
             {
-                existing.UsageCount++;
-                await SaveAsync(entries);
-                return fromLang == "cs" ? existing.Name_EN : existing.Name_CS;
+                string cachedResult = fromLang == "cs" ? existing.Name_EN : existing.Name_CS;
+                bool isEcho = string.Equals(
+                    TextNormalizationHelper.NormalizeForComparison(cachedResult),
+                    TextNormalizationHelper.NormalizeForComparison(trimmed),
+                    StringComparison.Ordinal);
+
+                if (!isEcho)
+                {
+                    existing.UsageCount++;
+                    await SaveAsync(entries);
+                    return cachedResult;
+                }
+                // Poškozený/echo záznam - pokračuje níž na nový pokus o překlad.
             }
 
             string? translated = await TranslationService.TranslateAsync(trimmed, toLang, fromLang);
             if (string.IsNullOrWhiteSpace(translated)) return name;
+
+            // Skutečné echo z DeepL (nepřeložil, jen vrátil totéž) - neukládat, ať se příště zkusí znovu.
+            if (TextNormalizationHelper.NormalizeForComparison(translated) == TextNormalizationHelper.NormalizeForComparison(trimmed))
+                return name;
+
+            if (existing != null)
+            {
+                if (fromLang == "cs") existing.Name_EN = Capitalize(translated);
+                else existing.Name_CS = Capitalize(translated);
+                existing.UsageCount++;
+                await SaveAsync(entries);
+                return translated;
+            }
 
             entries.Add(new EquipmentTranslationEntry
             {
@@ -87,9 +111,6 @@ namespace MobilniKucharka.Translation
                 Name_EN = Capitalize(fromLang == "cs" ? translated : trimmed),
                 UsageCount = 1
             });
-
-            if (entries.Count > MaxEntries)
-                entries = [.. entries.OrderByDescending(e => e.UsageCount).Take(MaxEntries)];
 
             await SaveAsync(entries);
             return translated;
