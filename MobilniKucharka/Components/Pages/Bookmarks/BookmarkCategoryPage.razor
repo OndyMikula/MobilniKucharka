@@ -2,10 +2,13 @@
 @namespace MobilniKucharka.Components.Pages.Bookmarks
 @implements IDisposable
 @inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
 
 <div class="hub-page">
-    <div class="hub-header">
-        <div style="display:flex; flex-direction:column; gap:2px;">
+    <div class="hub-header" style="justify-content:flex-start; gap:8px;">
+        <button type="button" class="icon-btn" @onclick="OnBackClickedAsync">←</button>
+        <div style="display:flex; flex-direction:column; gap:2px; flex:1; min-width:0;">
             <h1 class="hub-title" style="font-size:22px;">@_displayName</h1>
             @if (!string.IsNullOrWhiteSpace(_description))
             {
@@ -109,6 +112,18 @@
         }
 
         _isLoading = false;
+    }
+
+    private async Task OnBackClickedAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("mkNavigateBack");
+        }
+        catch
+        {
+            NavigationManager.NavigateTo("/bookmarks");
+        }
     }
 
     public void Dispose()
