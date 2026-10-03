@@ -12,6 +12,7 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
         public string DescriptionText { get; set; } = "";
         public string IngredientsRaw { get; set; } = "";
         public string ContentLanguage { get; set; } = "cs";
+        public string DescriptionLanguage { get; set; } = "cs";
         public string StepsJson_CS { get; set; } = "";
         public string StepsJson_EN { get; set; } = "";
         public string EquipmentJson { get; set; } = "";
@@ -50,6 +51,7 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
                 DescriptionText = recipe.DescriptionText,
                 IngredientsRaw = recipe.IngredientsRaw,
                 ContentLanguage = recipe.ContentLanguage,
+                DescriptionLanguage = recipe.DescriptionLanguage,
                 StepsJson_CS = recipe.StepsJson_CS,
                 StepsJson_EN = recipe.StepsJson_EN,
                 EquipmentJson = recipe.EquipmentJson,
@@ -118,6 +120,7 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
                 DescriptionText = shared.DescriptionText,
                 IngredientsRaw = shared.IngredientsRaw,
                 ContentLanguage = string.IsNullOrWhiteSpace(shared.ContentLanguage) ? "cs" : shared.ContentLanguage,
+                DescriptionLanguage = string.IsNullOrWhiteSpace(shared.DescriptionLanguage) ? "cs" : shared.DescriptionLanguage,
                 StepsJson_CS = SanitizeNestedJson(shared.StepsJson_CS),
                 StepsJson_EN = SanitizeNestedJson(shared.StepsJson_EN),
                 EquipmentJson = SanitizeNestedJson(shared.EquipmentJson),

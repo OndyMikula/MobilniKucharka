@@ -7,21 +7,39 @@ namespace MobilniKucharka.Services
     public partial class BudgetPlannerService
     {
         // Sloučí duplicitní/téměř duplicitní suroviny (jiná diakritika, velikost písmen, pomlčka
-        // vs mezera, nebo stejná surovina zapsaná zvlášť česky a anglicky). Bezpečné spustit
-        // opakovaně - co se nedá sloučit deterministicky nebo kvůli chybějící DeepL kvótě, zůstane
+        // vs mezera, nebo stejná surovina zapsaná zvlášť česky a anglicky). Spouští se jednou manuálně
+        // - co se nedá sloučit deterministicky nebo kvůli chybějící DeepL kvótě, zůstane
         // beze změny pro příští běh.
-        public async Task<int> MergeDuplicateProductsAsync()
+        // Na vlákně z thread poolu - nesmí blokovat UI vlákno Blazoru.
+        public Task<int> MergeDuplicateProductsAsync() => Task.Run(MergeDuplicateProductsCoreAsync);
+
+        private async Task<int> MergeDuplicateProductsCoreAsync()
         {
             await EnsureInitializedAsync();
 
             int merged = await ApplyKnownTranslationCorrectionsAsync();
             merged += await NormalizeProductCapitalizationAsync();
             merged += await MergeByNormalizedNameOverlapAsync();
-            merged += await MergeUntranslatedDuplicatesAsync();
+            merged += await RunUntranslatedDuplicatesMigrationOnceAsync();
 
             _cachedProducts = null;
             _cachedAliases = null;
+            if (merged > 0) RecipeListCache.Invalidate();
             return merged;
+        }
+
+        // DeepL-závislá fáze - na rozdíl od ostatních (zdarma, offline) spustit jen JEDNOU navždy,
+        // ať se nespotřebovává sdílená celoživotní kvóta při každém spuštění appky. Nově vytvořené
+        // duplicity už teď vznikat nemají (viz GetOrCreateLocalProductByNameAsync), takže jednou
+        // stačí; co se nedopřeloží kvůli kvótě, lze opravit ručně v Nastavení > Suroviny (zdarma).
+        private async Task<int> RunUntranslatedDuplicatesMigrationOnceAsync()
+        {
+            const string prefKey = "UntranslatedProductMergeDone_v1";
+            if (Preferences.Default.Get(prefKey, false)) return 0;
+
+            int count = await MergeUntranslatedDuplicatesAsync();
+            Preferences.Default.Set(prefKey, true);
+            return count;
         }
 
         // Opraví konkrétní known-bad DeepL překlady, které appka dřív mohla uložit (např.
@@ -80,32 +98,36 @@ namespace MobilniKucharka.Services
                 .GroupBy(ri => ri.ProductId)
                 .ToDictionary(g => g.Key, g => g.Count());
 
+            var keys = products.Select(p => (
+                Cs: TextNormalizationHelper.NormalizeForComparison(p.Name_CS),
+                En: TextNormalizationHelper.NormalizeForComparison(p.Name_EN),
+                Bases: GetParenthesizedBases(p))).ToList();
+
             int merged = 0;
 
             for (int i = 0; i < products.Count; i++)
             {
                 var a = products[i];
-                if (a.Id == 0) continue; // už sloučeno a smazáno v tomto běhu
+                if (a.Id == 0) continue;
 
                 for (int j = i + 1; j < products.Count; j++)
                 {
                     var b = products[j];
                     if (b.Id == 0) continue;
 
+                    var (csA, enA, basesA) = keys[i];
+                    var (csB, enB, basesB) = keys[j];
+
                     bool sameWord =
-                    TextNormalizationHelper.NormalizeForComparison(a.Name_CS) == TextNormalizationHelper.NormalizeForComparison(b.Name_CS) ||
-                    TextNormalizationHelper.NormalizeForComparison(a.Name_EN) == TextNormalizationHelper.NormalizeForComparison(b.Name_EN) ||
-                    TextNormalizationHelper.NormalizeForComparison(a.Name_CS) == TextNormalizationHelper.NormalizeForComparison(b.Name_EN) ||
-                    TextNormalizationHelper.NormalizeForComparison(a.Name_EN) == TextNormalizationHelper.NormalizeForComparison(b.Name_CS) ||
-                    HasMatchingParenthesizedBase(a, b);
+                        (csA.Length > 0 && (csA == csB || csA == enB)) ||
+                        (enA.Length > 0 && (enA == enB || enA == csB)) ||
+                        basesA.Intersect(basesB).Any();
 
                     if (!sameWord) continue;
 
                     int usageA = ingredientCounts.GetValueOrDefault(a.Id, 0);
                     int usageB = ingredientCounts.GetValueOrDefault(b.Id, 0);
 
-                    // Kanonický = ten používanější (méně receptů se dotkne případného rozdílu
-                    // v jednotce) - při shodě vyhrává nižší Id.
                     var (canonical, duplicate) = usageB > usageA ? (b, a) : (a, b);
 
                     await MergeProductPairAsync(canonical, duplicate);
@@ -206,18 +228,6 @@ namespace MobilniKucharka.Services
             bool exists = existingAliases.Any(a => TextNormalizationHelper.NormalizeForComparison(a.Alias) == TextNormalizationHelper.NormalizeForComparison(trimmed));
             if (!exists)
                 await _db.InsertAsync(new LocalProductAlias { Alias = trimmed, ProductId = productId });
-        }
-
-        // "Paprika (koření)" / "Paprika (na koření)" / "Paprika (to koření)" - stejné slovo PŘED
-        // závorkou, obsah se ignoruje. Vyžaduje závorku na OBOU stranách - viz komentář u
-        // stejné kontroly v GetOrCreateLocalProductByNameAsync.
-        private static bool HasMatchingParenthesizedBase(LocalProduct a, LocalProduct b)
-        {
-            var basesA = GetParenthesizedBases(a);
-            if (basesA.Count == 0) return false;
-
-            var basesB = GetParenthesizedBases(b);
-            return basesA.Intersect(basesB).Any();
         }
 
         private static List<string> GetParenthesizedBases(LocalProduct p)

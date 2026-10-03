@@ -33,11 +33,14 @@ namespace MobilniKucharka.Classes.Recipe
         public int ServingSize { get; set; }
         public string IngredientsRaw { get; set; } = string.Empty; // Suroviny (např. "1 vejce|1 ks\nMouka|200 g")
 
-        // Jazyk, ve kterém jsou NAPSANÉ (nikdy nepřekládané) DescriptionText/IngredientsRaw -
-        // nastavuje se JEDNOU při vytvoření/importu a NIKDY se nemění. Zobrazení v jiném jazyce jde
-        // vždy přes RecipeTranslationCache (viz EnsureRecipeLanguageAsync/BuildDisplayRecipeAsync) -
-        // tahle dvě pole samotná se překladem už nikdy nepřepisují, aby se originál nikdy neztratil.
+        // Jazyk NAPSANÉHO (nikdy nepřekládaného) IngredientsRaw - historický název pole ("Content")
+        // zůstává kvůli existujícím datům, ale od zavedení DescriptionLanguage níž pokrývá JEN
+        // suroviny, ne popis. Recept může mít suroviny a popis každé v jiném jazyce - proto dvě
+        // oddělená pole, ne jedno společné.
         public string ContentLanguage { get; set; } = string.Empty;
+
+        // Jazyk NAPSANÉHO DescriptionText - nezávislé na ContentLanguage (surovinách), viz výše.
+        public string DescriptionLanguage { get; set; } = string.Empty;
         public string StepsRaw { get; set; } = string.Empty; // Postup (např. "1. Smíchejte ingredience.\n2. Pečte 20 minut.")
 
         // UKLÁDÁNÍ DO DB: JSON řetězce pro češtinu i angličtinu
@@ -130,6 +133,24 @@ namespace MobilniKucharka.Classes.Recipe
         }
 
         private List<string>? _dietaryFlags;
+        public string RequiredEquipmentJson { get; set; } = "[]";
+
+        private List<string>? _requiredEquipment;
+        [Ignore]
+        public List<string> RequiredEquipment
+        {
+            get
+            {
+                _requiredEquipment ??= string.IsNullOrEmpty(RequiredEquipmentJson) ? [] : JsonSerializer.Deserialize<List<string>>(RequiredEquipmentJson) ?? [];
+                return _requiredEquipment;
+            }
+            set
+            {
+                _requiredEquipment = value;
+                RequiredEquipmentJson = JsonSerializer.Serialize(value);
+            }
+        }
+
         [Ignore]
         public List<string> DietaryFlags
         {

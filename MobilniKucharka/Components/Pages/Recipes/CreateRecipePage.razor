@@ -1,6 +1,6 @@
 ﻿@page "/recipe/create"
 @page "/recipe/{Id:int}/edit"
-@namespace MobilniKucharka.Components.Pages
+@namespace MobilniKucharka.Components.Pages.Recipes
 @implements IDisposable
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
@@ -586,7 +586,9 @@
         _recipe.DescriptionText = _descriptionText ?? string.Empty;
         _recipe.IngredientsRaw = string.Join("\n", ingredientPairs.Select(i => $"{i.Name}|{i.Amount}"));
         _recipe.ContentLanguage = currentLang;
+        _recipe.DescriptionLanguage = currentLang;
         _recipe.EquipmentJson = JsonSerializer.Serialize(_selectedTags);
+        _recipe.RequiredEquipment = RequiredEquipmentAnalysisService.InferRequiredEquipment(string.Join(" ", stepList));
         _recipe.PrepTime = int.TryParse(_prepTimeText, out var draftPrepTime) ? draftPrepTime : 0;
         _recipe.Protein = _cachedProtein;
         _recipe.Carbs = _cachedCarbs;
@@ -618,6 +620,7 @@
             await _db.UpdateAsync(_recipe);
         }
 
+        RecipeListCache.Invalidate();
         ShowSavedIndicator();
     }
 
@@ -721,8 +724,10 @@
             _recipe.ServingSize = int.TryParse(_servingSizeText, out var servings) && servings > 0 ? servings : 0;
             _recipe.IngredientsRaw = string.Join("\n", ingredientPairs.Select(i => $"{i.Name}|{i.Amount}"));
             _recipe.ContentLanguage = currentLang;
+            _recipe.DescriptionLanguage = currentLang;
             _recipe.EquipmentJson = JsonSerializer.Serialize(_selectedTags);
-            _recipe.PrepTime = int.TryParse(_prepTimeText, out var prepTime) ? prepTime : 0;
+            _recipe.RequiredEquipment = RequiredEquipmentAnalysisService.InferRequiredEquipment(string.Join(" ", stepList));
+            _recipe.PrepTime = int.TryParse(_prepTimeText, out var draftPrepTime) ? draftPrepTime : 0;
             _recipe.Protein = protein;
             _recipe.Carbs = carbs;
             _recipe.Fat = fat;
@@ -754,6 +759,7 @@
             await App.Database.AddRecipeToCategoryAsync(_currentRecipeId.Value, "Vytvořené recepty");
             await App.Database.RemoveRecipeFromCategoryAsync(_currentRecipeId.Value, "Koncepty");
 
+            RecipeListCache.Invalidate();
             await NavigateBackAsync();
         }
         catch (Exception ex)
