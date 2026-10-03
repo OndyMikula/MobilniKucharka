@@ -29,8 +29,10 @@ public partial class App : Application
 
         Task.Run(() => UiTranslator.InitializeAsync()).GetAwaiter().GetResult();
 
-        bool isOnboardingComplete = Preferences.Default.Get("IsOnboardingComplete", false);
-        MainPage = isOnboardingComplete ? new AppShell() : new OnboardingPage();
+        // Onboarding je teď Blazor route (/onboarding) - RecipesPage.OnInitializedAsync přesměruje
+        // tam sám, pokud IsOnboardingComplete ještě není nastavené. AppShell (BlazorShellPage) se
+        // tedy startuje vždy, ne jen po dokončeném onboardingu.
+        MainPage = new AppShell();
     }
 
     public static void ResetDatabase()

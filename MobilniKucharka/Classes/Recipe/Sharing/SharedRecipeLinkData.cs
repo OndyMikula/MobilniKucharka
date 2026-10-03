@@ -6,6 +6,7 @@
         public string Name_EN { get; set; } = "";
         public string DescriptionText { get; set; } = "";
         public string IngredientsRaw { get; set; } = "";
+        public string ContentLanguage { get; set; } = "cs";
         public string StepsJson_CS { get; set; } = "";
         public string StepsJson_EN { get; set; } = "";
         public string EquipmentJson { get; set; } = "";

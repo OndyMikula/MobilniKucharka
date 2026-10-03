@@ -2,6 +2,7 @@ using MobilniKucharka.Classes;
 using MobilniKucharka.Classes.Recipe;
 using MobilniKucharka.Classes.UserData.Bookmark;
 using MobilniKucharka.Services.Api;
+using MobilniKucharka.Translation;
 using SQLite;
 using System.Diagnostics;
 using System.Text.Json;
@@ -44,10 +45,6 @@ namespace MobilniKucharka.Services
                 }
                 else
                 {
-                    // Doplňková migrace pro aplikace, které už měly záložky nasazené z dřívějška -
-                    // seed výše se spustí jen na úplně prázdné tabulce, takže existující instalace
-                    // (včetně vývojového zařízení) by jinak "Vyhledané recepty" nikdy nedostaly,
-                    // aniž by se jim smazala data.
                     await EnsureSearchedRecipesBookmarkExistsAsync();
                 }
 
@@ -163,7 +160,7 @@ namespace MobilniKucharka.Services
                     // Doplní jméno (a kroky) do aktuálního jazyka aplikace, pokud ještě chybí - díky cache uvnitř
                     // EnsureRecipeLanguageAsync se DeepL zavolá jen jednou za (recept, jazyk) navždy; další
                     // zobrazení seznamu je pak jen levná kontrola v DB, ne nové volání API.
-                    var displayRecipe = await EnsureRecipeLanguageAsync(recipe.Id) ?? recipe;
+                    var displayRecipe = await EnsureRecipeLanguageAsync(recipe.Id, recipe) ?? recipe;
 
                     var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(displayRecipe, peopleCount, allProducts, allIngredients, allAliases);
 
@@ -226,7 +223,7 @@ namespace MobilniKucharka.Services
                 {
                     // Stejná logika jako v GetPlanAsync - doplní překlad jména/kroků, pokud ještě chybí
                     // (např. čerstvě naimportovaný recept ze SearchPage), s cache proti opakovaným DeepL voláním.
-                    var displayRecipe = await EnsureRecipeLanguageAsync(match.Id) ?? match;
+                    var displayRecipe = await EnsureRecipeLanguageAsync(match.Id, match) ?? match;
 
                     var (cost, allPriced, anyPriced) = CalculateFullRecipeCost(displayRecipe, peopleCount, allProducts, allIngredients, allAliases);
 
@@ -274,7 +271,7 @@ namespace MobilniKucharka.Services
                 var displayRecipes = new List<Recipe>();
                 foreach (var recipe in matchedRecipes)
                 {
-                    displayRecipes.Add(await EnsureRecipeLanguageAsync(recipe.Id) ?? recipe);
+                    displayRecipes.Add(await EnsureRecipeLanguageAsync(recipe.Id, recipe) ?? recipe);
                 }
 
                 return displayRecipes;
@@ -436,6 +433,19 @@ namespace MobilniKucharka.Services
             return await _db.Table<LocalProduct>().Where(p => p.Id == id).FirstOrDefaultAsync();
         }
 
+        public async Task<List<string>> GetAllProductNameSuggestionsAsync()
+        {
+            await EnsureInitializedAsync();
+            var products = await _db.Table<LocalProduct>().ToListAsync();
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var p in products)
+            {
+                if (!string.IsNullOrWhiteSpace(p.Name_CS)) names.Add(p.Name_CS);
+                if (!string.IsNullOrWhiteSpace(p.Name_EN)) names.Add(p.Name_EN);
+            }
+            return [.. names.OrderBy(n => n)];
+        }
+
         public async Task<List<LocalProduct>> GetAllLocalProductsAsync()
         {
             await EnsureInitializedAsync();
@@ -480,13 +490,15 @@ namespace MobilniKucharka.Services
             }
         }
 
-        public async Task<LocalProduct> GetOrCreateLocalProductByNameAsync(string name, string suggestedUnit = "g")
+        public async Task<LocalProduct> GetOrCreateLocalProductByNameAsync(string name, string suggestedUnit = "g", string? sourceLang = null)
         {
             await EnsureInitializedAsync();
             string trimmed = name.Trim();
+            string normalizedTyped = TextNormalizationHelper.NormalizeForComparison(trimmed);
+            string lang = string.IsNullOrWhiteSpace(sourceLang) ? Preferences.Default.Get("AppLanguageCode", "cs") : sourceLang;
 
             var allAliases = await _db.Table<LocalProductAlias>().ToListAsync();
-            var alias = allAliases.FirstOrDefault(a => string.Equals(a.Alias, trimmed, StringComparison.OrdinalIgnoreCase));
+            var alias = allAliases.FirstOrDefault(a => TextNormalizationHelper.NormalizeForComparison(a.Alias) == normalizedTyped);
 
             if (alias != null)
             {
@@ -496,15 +508,67 @@ namespace MobilniKucharka.Services
 
             var allProducts = await _db.Table<LocalProduct>().ToListAsync();
             var existing = allProducts.FirstOrDefault(p =>
-                string.Equals(p.Name_CS, trimmed, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(p.Name_EN, trimmed, StringComparison.OrdinalIgnoreCase));
+                TextNormalizationHelper.NormalizeForComparison(p.Name_CS) == normalizedTyped ||
+                TextNormalizationHelper.NormalizeForComparison(p.Name_EN) == normalizedTyped);
 
-            if (existing != null) return existing;
+            // Stejné slovo před závorkou ("Paprika (koření)" vs "Paprika (na koření)") - jen když
+            // OBĚ strany mají závorku, ať se holé "Paprika" (zelenina) neslije s "Paprika
+            // (koření)" (drť) - to jsou reálně různé suroviny.
+            if (existing == null)
+            {
+                var (typedBase, typedHasParen) = TextNormalizationHelper.SplitBaseAndParenthetical(trimmed);
+                if (typedHasParen && typedBase.Length > 0)
+                {
+                    existing = allProducts.FirstOrDefault(p =>
+                    {
+                        var (csBase, csHasParen) = TextNormalizationHelper.SplitBaseAndParenthetical(p.Name_CS);
+                        if (csHasParen && csBase == typedBase) return true;
+                        var (enBase, enHasParen) = TextNormalizationHelper.SplitBaseAndParenthetical(p.Name_EN);
+                        return enHasParen && enBase == typedBase;
+                    });
+                }
+            }
+
+            if (existing != null)
+            {
+                // Jiný zápis stejného slova (diakritika/velikost písmen) - uložit jako alias pro
+                // příště, ale jen pokud přesně tenhle zápis ještě není zaznamenaný.
+                bool exactMatchAlready = string.Equals(existing.Name_CS, trimmed, StringComparison.Ordinal) ||
+                                         string.Equals(existing.Name_EN, trimmed, StringComparison.Ordinal) ||
+                                         allAliases.Any(a => string.Equals(a.Alias, trimmed, StringComparison.Ordinal) && a.ProductId == existing.Id);
+                if (!exactMatchAlready)
+                    await _db.InsertAsync(new LocalProductAlias { Alias = trimmed, ProductId = existing.Id });
+
+                return existing;
+            }
+
+            // Nenalezeno - zkusit přeložit do druhého jazyka a najít stejnou surovinu tam (např.
+            // "Sugar" napsané poprvé anglicky, ale "Cukr" už existuje) - ať nevznikne duplicita jen
+            // proto, že recept je v jiném jazyce než existující záznam.
+            string otherLang = lang == "cs" ? "en" : "cs";
+            string capitalizedTyped = Capitalize(trimmed);
+            string? translated = IngredientTranslationOverrides.TryGet(trimmed, lang)
+                ?? await TranslationService.TranslateAsync(trimmed, otherLang, lang);
+            string capitalizedTranslated = string.IsNullOrWhiteSpace(translated) ? capitalizedTyped : Capitalize(translated);
+
+            if (!string.IsNullOrWhiteSpace(translated))
+            {
+                string normalizedTranslated = TextNormalizationHelper.NormalizeForComparison(translated);
+                var crossMatch = allProducts.FirstOrDefault(p =>
+                    TextNormalizationHelper.NormalizeForComparison(p.Name_CS) == normalizedTranslated ||
+                    TextNormalizationHelper.NormalizeForComparison(p.Name_EN) == normalizedTranslated);
+
+                if (crossMatch != null)
+                {
+                    await _db.InsertAsync(new LocalProductAlias { Alias = trimmed, ProductId = crossMatch.Id });
+                    return crossMatch;
+                }
+            }
 
             var newProduct = new LocalProduct
             {
-                Name_CS = trimmed,
-                Name_EN = trimmed,
+                Name_CS = lang == "cs" ? capitalizedTyped : capitalizedTranslated,
+                Name_EN = lang == "cs" ? capitalizedTranslated : capitalizedTyped,
                 Unit = suggestedUnit,
                 PriceAverage = 0
             };
@@ -512,6 +576,12 @@ namespace MobilniKucharka.Services
             await _db.InsertAsync(newProduct);
             _cachedProducts = null;
             return newProduct;
+        }
+
+        private static string Capitalize(string text)
+        {
+            text = text.Trim();
+            return text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
         }
 
         public async Task LinkIngredientNameToProductAsync(string ingredientName, int existingProductId)
@@ -590,7 +660,7 @@ namespace MobilniKucharka.Services
         // Výchozí čtyři záložky - jejich Name je použitý jako doslovný srovnávací klíč napříč kódem
         // (AddRecipeToCategoryAsync, GetRecipesByCategoryAsync, BookmarksPage.razor.TranslateCategoryName...),
         // takže se nikdy nesmí přejmenovat. Obrázek/popis u nich ale klidně editovatelné jsou.
-        private static readonly string[] ProtectedBookmarkNames = ["Oblíbené", "Vytvořené recepty", "Vyhledané recepty", "Koncepty"];
+        public static readonly string[] ProtectedBookmarkNames = ["Oblíbené", "Vytvořené recepty", "Vyhledané recepty", "Koncepty"];
 
         public async Task InsertNewCategoryAsync(string category, string imagePath, string description = "")
         {
@@ -752,11 +822,6 @@ namespace MobilniKucharka.Services
             var recipe = new Recipe
             {
                 Name_EN = mealDbRecipe.Name,
-                // Pokud appka recept už jednou přeložila pro zobrazení v seznamu výsledků hledání
-                // (viz RecipeSearchService.TranslateResultNamesForDisplayAsync), použijeme ten
-                // překlad rovnou - ať se za tutéž větu neplatí DeepL kvóta podruhé jen proto, že
-                // recept mezitím "přešel" ze seznamu do uloženého receptu. Bez něj zůstane prázdné
-                // a doplní ho EnsureRecipeLanguageAsync při prvním zobrazení, stejně jako dřív.
                 Name_CS = translatedNameCs ?? string.Empty,
                 ExternalSourceId = externalId,
                 ImageUrl = mealDbRecipe.ImageUrl,
@@ -767,11 +832,10 @@ namespace MobilniKucharka.Services
                 Sugar = mealDbRecipe.Sugar,
                 IsNutritionEstimated = mealDbRecipe.IsNutritionEstimated,
                 StepsJson_EN = JsonSerializer.Serialize(SplitInstructions(mealDbRecipe.Instructions)),
-                // StepsJson_CS necháváme prázdné ze stejného důvodu jako dřív - hledání nikdy
-                // nepřekládá kroky, jen zobrazované názvy v seznamu.
                 EquipmentJson = "[]",
                 DietaryFlagsJson = JsonSerializer.Serialize(GuessDietFlags(mealDbRecipe.Category)),
                 IngredientsRaw = string.Join("\n", mealDbRecipe.Ingredients.Select(i => $"{i.Name}|{i.Measure}")),
+                ContentLanguage = "en",
                 SourceUrl = mealDbRecipe.SourceUrl,
                 ServingSize = 0
             };
@@ -901,9 +965,9 @@ namespace MobilniKucharka.Services
 
         private static LocalProduct? FindProductByNameReadOnly(string name, List<LocalProduct> allProducts, List<LocalProductAlias> allAliases)
         {
-            string trimmed = name.Trim();
+            string normalizedTyped = TextNormalizationHelper.NormalizeForComparison(name);
 
-            var alias = allAliases.FirstOrDefault(a => string.Equals(a.Alias, trimmed, StringComparison.OrdinalIgnoreCase));
+            var alias = allAliases.FirstOrDefault(a => TextNormalizationHelper.NormalizeForComparison(a.Alias) == normalizedTyped);
             if (alias != null)
             {
                 var aliasedProduct = allProducts.FirstOrDefault(p => p.Id == alias.ProductId);
@@ -911,8 +975,8 @@ namespace MobilniKucharka.Services
             }
 
             return allProducts.FirstOrDefault(p =>
-                string.Equals(p.Name_CS, trimmed, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(p.Name_EN, trimmed, StringComparison.OrdinalIgnoreCase));
+                TextNormalizationHelper.NormalizeForComparison(p.Name_CS) == normalizedTyped ||
+                TextNormalizationHelper.NormalizeForComparison(p.Name_EN) == normalizedTyped);
         }
 
         public async Task<int> ImportSharedRecipeAsync(Recipe recipe)
@@ -921,7 +985,6 @@ namespace MobilniKucharka.Services
             await _db.InsertAsync(recipe);
             return recipe.Id;
         }
-
 
         public async Task ResetDatabaseAsync()
         {
@@ -982,7 +1045,89 @@ namespace MobilniKucharka.Services
                 _cachedProducts = null;
             }
         }
+
+        public async Task<bool> RenameProductAsync(int productId, string newNameCs, string newNameEn)
+        {
+            await EnsureInitializedAsync();
+            var product = await _db.Table<LocalProduct>().Where(p => p.Id == productId).FirstOrDefaultAsync();
+            if (product == null) return false;
+
+            product.Name_CS = newNameCs.Trim();
+            product.Name_EN = newNameEn.Trim();
+            await _db.UpdateAsync(product);
+            _cachedProducts = null;
+            return true;
+        }
+
+        // Vrátí počet receptů, které surovinu používají - ať uživatel před smazáním ví, co se
+        // dotkne (stejný princip jako u DeleteBookmarkAsync, jen tady se smazání týká i receptů).
+        public async Task<int> CountRecipesUsingProductAsync(int productId)
+        {
+            await EnsureInitializedAsync();
+            var links = await _db.Table<RecipeIngredient>().Where(ri => ri.ProductId == productId).ToListAsync();
+            return links.Select(ri => ri.RecipeId).Distinct().Count();
+        }
+
+        public async Task DeleteProductAsync(int productId)
+        {
+            await EnsureInitializedAsync();
+
+            var product = await _db.Table<LocalProduct>().Where(p => p.Id == productId).FirstOrDefaultAsync();
+            if (product != null) await _db.DeleteAsync(product);
+
+            var links = await _db.Table<RecipeIngredient>().Where(ri => ri.ProductId == productId).ToListAsync();
+            foreach (var link in links) await _db.DeleteAsync(link);
+
+            var aliases = await _db.Table<LocalProductAlias>().Where(a => a.ProductId == productId).ToListAsync();
+            foreach (var alias in aliases) await _db.DeleteAsync(alias);
+
+            _cachedProducts = null;
+        }
+
+        public async Task<LocalProduct> CreateProductAsync(string nameCs, string nameEn, string unit)
+        {
+            await EnsureInitializedAsync();
+
+            var product = new LocalProduct
+            {
+                Name_CS = nameCs.Trim(),
+                Name_EN = string.IsNullOrWhiteSpace(nameEn) ? nameCs.Trim() : nameEn.Trim(),
+                Unit = unit,
+                PriceAverage = 0
+            };
+
+            await _db.InsertAsync(product);
+            _cachedProducts = null;
+            return product;
+        }
+
+        // Ruční sloučení 2+ vybraných surovin do jedné (Nastavení > Suroviny) - kanonický je vždy
+        // první v seznamu (uživatel ho vybírá explicitně, na rozdíl od automatického MergeDuplicate-
+        // ProductsAsync, kde se kanonický odhaduje podle počtu použití).
+        public async Task<int> MergeSelectedProductsAsync(int canonicalId, List<int> duplicateIds)
+        {
+            await EnsureInitializedAsync();
+
+            var canonical = await _db.Table<LocalProduct>().Where(p => p.Id == canonicalId).FirstOrDefaultAsync();
+            if (canonical == null) return 0;
+
+            int merged = 0;
+            foreach (var dupId in duplicateIds)
+            {
+                if (dupId == canonicalId) continue;
+                var duplicate = await _db.Table<LocalProduct>().Where(p => p.Id == dupId).FirstOrDefaultAsync();
+                if (duplicate == null) continue;
+
+                await MergeProductPairAsync(canonical, duplicate);
+                merged++;
+            }
+
+            _cachedProducts = null;
+            _cachedAliases = null;
+            return merged;
+        }
     }
+}
 
     public class RecipeWithCost
     {
@@ -1005,4 +1150,3 @@ namespace MobilniKucharka.Services
         public double RawAmount { get; set; }
         public double CostValue { get; set; }
     }
-}

@@ -1,0 +1,32 @@
+﻿@namespace MobilniKucharka.Components
+
+<div class="segmented-control">
+    <div class="segmented-pill" style="@PillStyle"></div>
+    @foreach (var option in Options)
+    {
+        <button type="button" class="segmented-option @(option.Value == SelectedValue ? "selected" : "")"
+                @onclick="() => OnOptionClicked(option.Value)">
+            @option.Label
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<(string Value, string Label)> Options { get; set; } = [];
+    [Parameter] public string SelectedValue { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> SelectedValueChanged { get; set; }
+
+    private int SelectedIndex => Math.Max(0, Options.FindIndex(o => o.Value == SelectedValue));
+
+    // Šířka pilulky = (celý kontejner minus 4px+4px padding) / počet možností. CSS transform
+    // procenta se počítají vůči VLASTNÍ šířce prvku (ne rodiče), takže posun o index*100%
+    // vždy přesně odpovídá počtu sloupců - stejný princip jako u .nav-pill v dolní navigaci.
+    private string PillStyle =>
+        $"width: calc((100% - 8px) / {Math.Max(Options.Count, 1)}); transform: translateX({SelectedIndex * 100}%);";
+
+    private async Task OnOptionClicked(string value)
+    {
+        if (value == SelectedValue) return;
+        await SelectedValueChanged.InvokeAsync(value);
+    }
+}

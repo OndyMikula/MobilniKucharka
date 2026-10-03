@@ -9,7 +9,7 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
         private const string RepoOwner = "OndyMikula";
         private const string RepoName = "MobilniKucharka-SharedRecipes";
         private const string BranchName = "main";
-        private static readonly HttpClient _httpClient = new();
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
 
         public static async Task<string?> ShareViaLinkAsync(Recipe recipe)
         {
@@ -30,6 +30,7 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
                     Name_EN = recipe.Name_EN,
                     DescriptionText = recipe.DescriptionText,
                     IngredientsRaw = recipe.IngredientsRaw,
+                    ContentLanguage = recipe.ContentLanguage,
                     StepsJson_CS = recipe.StepsJson_CS,
                     StepsJson_EN = recipe.StepsJson_EN,
                     EquipmentJson = recipe.EquipmentJson,
@@ -104,6 +105,7 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
                     Name_EN = shared.Name_EN,
                     DescriptionText = shared.DescriptionText,
                     IngredientsRaw = shared.IngredientsRaw,
+                    ContentLanguage = string.IsNullOrWhiteSpace(shared.ContentLanguage) ? "cs" : shared.ContentLanguage,
                     StepsJson_CS = shared.StepsJson_CS,
                     StepsJson_EN = shared.StepsJson_EN,
                     EquipmentJson = shared.EquipmentJson,

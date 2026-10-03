@@ -204,7 +204,7 @@
 
     private async Task OnBookmarkOptionsClicked(Bookmark bookmark)
     {
-        bool isProtected = bookmark.Name is "Oblíbené" or "Koncepty";
+        bool isProtected = BudgetPlannerService.ProtectedBookmarkNames.Contains(bookmark.Name);
         string pinLabel = bookmark.IsPinned ? Tr("Odepnout") : Tr("Připnout");
         string editBookmarkLabel = Tr("Upravit záložku");
 

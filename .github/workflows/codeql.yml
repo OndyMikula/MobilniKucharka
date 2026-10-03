@@ -27,8 +27,21 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
+          cache-dependency-path: MobilniKucharka/MobilniKucharka.csproj 
+
+      - name: Cache .NET MAUI Android Workload
+        id: cache-maui
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\Program Files\dotnet\metadata\workloads
+            C:\Program Files\dotnet\sdk-manifests
+          key: ${{ runner.os }}-maui-android-10.0-codeql-${{ hashFiles('MobilniKucharka/MobilniKucharka.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-maui-android-10.0-codeql-
 
       - name: Install MAUI workload
+        if: steps.cache-maui.outputs.cache-hit != 'true'
         run: dotnet workload install maui-android
 
       - name: Generate placeholder Secrets.cs (for compilation only, not real keys)
@@ -41,6 +54,8 @@ jobs:
               public static class Secrets
               {
                   public const string SpoonacularApiKey = "placeholder";
+                  public const string OpenFoodFactsUserId = "placeholder";
+                  public const string OpenFoodFactsPassword = "placeholder";
                   public const string NutritionixAppId = "placeholder";
                   public const string NutritionixApiKey = "placeholder";
                   public const string GitHubShareToken = "placeholder";

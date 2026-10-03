@@ -53,17 +53,35 @@
             <label class="form-label">@Tr("Ingredience")</label>
             @foreach (var row in _ingredientRows)
             {
-                <div class="ingredient-edit-row" @key="row">
-                    <input type="text" class="form-input" placeholder="@Tr("Název ingredience")"
-                           value="@row.Name" @oninput="(e) => OnIngredientFieldChanged(row, name: e.Value?.ToString())" />
-                    <input type="text" inputmode="decimal" class="form-input" placeholder="@GetAmountPlaceholder(row.Unit)"
-                           value="@row.Amount" @oninput="(e) => OnIngredientFieldChanged(row, amount: e.Value?.ToString())" />
-                    <select class="form-select" value="@row.Unit" @onchange="(e) => OnIngredientUnitChanged(row, e.Value?.ToString())">
-                        @foreach (var unit in UnitOptions)
+                <div @key="row">
+                    <div class="ingredient-edit-row">
+                        <input type="text" class="form-input" placeholder="@Tr("Název ingredience")"
+                               value="@row.Name" @oninput="(e) => OnIngredientFieldChanged(row, name: e.Value?.ToString())"
+                               @onfocus="() => OnIngredientNameFocused(row)" @onblur="OnIngredientNameBlurredAsync" />
+                        <input type="text" inputmode="@(row.Unit == CustomUnitKey ? "text" : "decimal")" class="form-input" placeholder="@GetAmountPlaceholder(row.Unit)"
+                               value="@row.Amount" @oninput="(e) => OnIngredientFieldChanged(row, amount: e.Value?.ToString())" />
+                        <select class="form-select" value="@row.Unit" @onchange="(e) => OnIngredientUnitChanged(row, e.Value?.ToString())">
+                            @foreach (var unit in UnitOptions)
+                            {
+                                <option value="@unit">@Tr(unit)</option>
+                            }
+                        </select>
+                    </div>
+                    @if (_activeSuggestionRow == row)
+                    {
+                        var suggestions = GetFilteredSuggestions(row);
+                        if (suggestions.Count > 0)
                         {
-                            <option value="@unit">@Tr(unit)</option>
+                            <div class="ingredient-suggestions">
+                                @foreach (var suggestion in suggestions)
+                                {
+                                    <button type="button" class="ingredient-suggestion-item" @onclick="() => OnSuggestionPicked(row, suggestion)">
+                                        @suggestion
+                                    </button>
+                                }
+                            </div>
                         }
-                    </select>
+                    }
                 </div>
             }
             <button type="button" class="btn-action" style="background-color:#888888; align-self:flex-start; padding:8px 16px; height:auto;" @onclick="OnAddIngredientRow">
@@ -138,6 +156,11 @@
         </div>
 
         <!-- ULOZENI -->
+        @if (_isDraftSaved)
+        {
+            <span class="recipe-source-link" style="text-decoration:none; color:var(--color-success);">✓ @Tr("Uloženo")</span>
+        }
+
         <button type="button" class="btn-action btn-success" style="height:55px; margin-top:10px;" @onclick="OnSaveClickedAsync">
             @Tr("Uložit recept")
         </button>
@@ -168,11 +191,12 @@
     [Parameter] public int? Id { get; set; }
 
     private bool _hasInitialized = false;
+    private List<string> _ingredientNameSuggestions = [];
+    private IngredientRowModel? _activeSuggestionRow;
     private bool _isEditingExisting = false;
     private int? _currentRecipeId;
     private SQLiteAsyncConnection _db = null!;
     private bool _isLoadingRecipe = false;
-    private readonly NutritionixService _nutritionixService = new();
 
     // Perzistentní objekt receptu - stejný důvod jako v původním XAML code-behind: autosave do něj
     // MUTUJE, místo aby pokaždé vytvářel nový Recipe() a přes UpdateAsync smazal pole, která tahle
@@ -205,9 +229,14 @@
     private double _cachedSugar;
     private bool _cachedIsNutritionEstimated;
 
+    private bool _isDraftSaved = false;
+    private CancellationTokenSource? _savedIndicatorCts;
+
     private static readonly Regex AmountSplitRegex = new(@"^(\d+(?:[.,]\d+)?)\s*(.*)$", RegexOptions.Compiled);
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    private CancellationTokenSource? _autoSaveDebounceCts;
 
     private class IngredientRowModel
     {
@@ -233,6 +262,18 @@
     {
         if (_hasInitialized) return;
         _hasInitialized = true;
+
+        try
+        {
+            _ingredientNameSuggestions = await App.Database.GetAllProductNameSuggestionsAsync();
+        }
+        catch (Exception ex)
+        {
+            // Návrhy jsou jen pomůcka - selhání nesmí zablokovat zbytek stránky (ingredience/
+            // kroky), takže se bez nich prostě pokračuje dál.
+            System.Diagnostics.Debug.WriteLine($"Chyba při načítání návrhů ingrediencí: {ex.Message}");
+            _ingredientNameSuggestions = [];
+        }
 
         _isEditingExisting = Id.HasValue;
 
@@ -356,13 +397,13 @@
     {
         if (name != null) row.Name = name;
         if (amount != null) row.Amount = amount;
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     private void OnIngredientUnitChanged(IngredientRowModel row, string? unit)
     {
         row.Unit = unit ?? "g";
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     private void OnAddIngredientRow() => _ingredientRows.Add(new IngredientRowModel { Unit = "g" });
@@ -370,7 +411,7 @@
     private void OnStepTextChanged(StepRowModel row, string? text)
     {
         row.Text = text ?? string.Empty;
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     private void MoveStepRow(int index, int direction)
@@ -382,7 +423,7 @@
         _stepRows.RemoveAt(index);
         _stepRows.Insert(newIndex, item);
 
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     private void OnAddStepRow() => _stepRows.Add(new StepRowModel());
@@ -392,7 +433,7 @@
         if (!_selectedTags.Add(tag))
             _selectedTags.Remove(tag);
 
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     private void OnCreateTag()
@@ -409,7 +450,7 @@
     private void OnDescriptionInput(ChangeEventArgs e)
     {
         _descriptionText = e.Value?.ToString() ?? string.Empty;
-        _ = TriggerAutoSaveAsync();
+        QueueAutoSave();
     }
 
     // Filtruje jen na číslice, stejně jako původní OnManualCostTextChanged/OnPrepTimeTextChanged -
@@ -512,7 +553,7 @@
         string queryText = string.Join(", ", ingredientRows.Select(i =>
             string.IsNullOrWhiteSpace(i.Amount) ? i.Name : $"{i.Amount} {i.Name}"));
 
-        var parsed = await _nutritionixService.ParseNaturalTextAsync(queryText);
+        var parsed = await NutritionixService.ParseNaturalTextAsync(queryText);
 
         if (parsed != null && parsed.Count > 0)
         {
@@ -544,6 +585,7 @@
         _recipe.ServingSize = int.TryParse(_servingSizeText, out var draftServings) && draftServings > 0 ? draftServings : 0;
         _recipe.DescriptionText = _descriptionText ?? string.Empty;
         _recipe.IngredientsRaw = string.Join("\n", ingredientPairs.Select(i => $"{i.Name}|{i.Amount}"));
+        _recipe.ContentLanguage = currentLang;
         _recipe.EquipmentJson = JsonSerializer.Serialize(_selectedTags);
         _recipe.PrepTime = int.TryParse(_prepTimeText, out var draftPrepTime) ? draftPrepTime : 0;
         _recipe.Protein = _cachedProtein;
@@ -575,6 +617,46 @@
             _recipe.Id = _currentRecipeId.Value;
             await _db.UpdateAsync(_recipe);
         }
+
+        ShowSavedIndicator();
+    }
+
+    // Briefly shows "Uloženo" after an autosave, then hides it again.
+    private void ShowSavedIndicator()
+    {
+        _isDraftSaved = true;
+        StateHasChanged();
+
+        _savedIndicatorCts?.Cancel();
+        _savedIndicatorCts = new CancellationTokenSource();
+        var token = _savedIndicatorCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(1500, token);
+                await InvokeAsync(() => { _isDraftSaved = false; StateHasChanged(); });
+            }
+            catch (TaskCanceledException) { }
+        });
+    }
+
+    private void QueueAutoSave()
+    {
+        _autoSaveDebounceCts?.Cancel();
+        _autoSaveDebounceCts = new CancellationTokenSource();
+        var token = _autoSaveDebounceCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(400, token);
+                await InvokeAsync(TriggerAutoSaveAsync);
+            }
+            catch (TaskCanceledException) { }
+        });
     }
 
     private static string NormalizeToBaseUnit(string pickerUnit) => pickerUnit switch
@@ -587,13 +669,15 @@
 
     private static async Task SyncIngredientUnitsAsync(List<(string Name, string Amount)> ingredientRows)
     {
+        string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
+
         foreach (var (Name, Amount) in ingredientRows)
         {
             var parts = Amount.Split(' ', 2);
             if (parts.Length < 2) continue;
 
             string baseUnit = NormalizeToBaseUnit(parts[1].Trim());
-            var product = await App.Database.GetOrCreateLocalProductByNameAsync(Name, baseUnit);
+            var product = await App.Database.GetOrCreateLocalProductByNameAsync(Name, baseUnit, currentLang);
 
             if (product.Unit != baseUnit)
             {
@@ -636,6 +720,7 @@
             _recipe.IsNutritionEstimated = _cachedIsNutritionEstimated;
             _recipe.ServingSize = int.TryParse(_servingSizeText, out var servings) && servings > 0 ? servings : 0;
             _recipe.IngredientsRaw = string.Join("\n", ingredientPairs.Select(i => $"{i.Name}|{i.Amount}"));
+            _recipe.ContentLanguage = currentLang;
             _recipe.EquipmentJson = JsonSerializer.Serialize(_selectedTags);
             _recipe.PrepTime = int.TryParse(_prepTimeText, out var prepTime) ? prepTime : 0;
             _recipe.Protein = protein;
@@ -716,6 +801,42 @@
         return false;
     }
 
+    private List<string> GetFilteredSuggestions(IngredientRowModel row)
+    {
+        string typed = row.Name?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(typed)) return [];
+
+        string normalizedTyped = TextNormalizationHelper.NormalizeForComparison(typed);
+
+        return _ingredientNameSuggestions
+            .Where(s => TextNormalizationHelper.NormalizeForComparison(s).Contains(normalizedTyped)
+                        && !string.Equals(TextNormalizationHelper.NormalizeForComparison(s), normalizedTyped, StringComparison.Ordinal))
+            .OrderByDescending(s => TextNormalizationHelper.NormalizeForComparison(s).StartsWith(normalizedTyped))
+            .ThenBy(s => s)
+            .Take(8)
+            .ToList();
+    }
+
+    private void OnIngredientNameFocused(IngredientRowModel row)
+    {
+        _activeSuggestionRow = row;
+    }
+
+    private async Task OnIngredientNameBlurredAsync()
+    {
+        // Krátké zpoždění, ať klik na návrh stihne proběhnout dřív, než se seznam skryje - blur
+        // nastane dřív než click, jinak by tap na návrh nikdy nezaregistroval.
+        await Task.Delay(150);
+        _activeSuggestionRow = null;
+    }
+
+    private void OnSuggestionPicked(IngredientRowModel row, string suggestion)
+    {
+        row.Name = suggestion;
+        _activeSuggestionRow = null;
+        _ = TriggerAutoSaveAsync();
+    }
+
     private async void OnNavigatingAway(object? sender, LocationChangedEventArgs e)
     {
         // Jen u NOVÉHO receptu (_isEditingExisting == false) - u editace existujícího konceptu se
@@ -729,5 +850,6 @@
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnNavigatingAway;
+        _savedIndicatorCts?.Cancel();
     }
 }

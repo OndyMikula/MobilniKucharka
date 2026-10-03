@@ -13,7 +13,7 @@ namespace MobilniKucharka.Services
 
     // Odesílá hlášení chyb a nápady na vylepšení tiše na pozadí přes GitHub repository_dispatch,
     // který spustí .github/workflows/send-feedback-email.yml (v samostatném repozitáři
-    // MobilniKucharka-Feedback - NE tady, v hlavním kódu appky). Repository_dispatch endpoint
+    // MobilniKucharka-Feedback - NE tady, v hlavním kódu aplikace). Repository_dispatch endpoint
     // vyžaduje token se scope "Contents: Read and write" - mnohem širší oprávnění, než mělo dřívější
     // GitHub Discussions řešení (jen "Discussions: write"), takže token míří na prázdný, oddělený
     // repozitář (stejný princip jako MobilniKucharka-SharedRecipes u RecipeLinkShareService) - i po

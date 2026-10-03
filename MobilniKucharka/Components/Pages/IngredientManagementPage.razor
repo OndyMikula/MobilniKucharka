@@ -1,0 +1,345 @@
+﻿@page "/settings/ingredients"
+@namespace MobilniKucharka.Components.Pages
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<div class="create-recipe-page">
+    <div class="create-recipe-header">
+        <button type="button" class="icon-btn" @onclick="OnBackClicked">←</button>
+        <h1 class="hub-title" style="font-size: 20px; flex:1;">@Tr("Suroviny")</h1>
+        @if (_selectMode)
+        {
+            <button type="button" class="icon-btn" @onclick="CancelSelectMode">@Tr("Zrušit")</button>
+        }
+        else
+        {
+            <button type="button" class="icon-btn" @onclick="() => _selectMode = true">@Tr("Sloučit")</button>
+        }
+    </div>
+
+    <div class="create-recipe-body">
+
+        <div class="search-bar-row">
+            <input type="text" class="search-input" placeholder="@Tr("Hledat surovinu...")"
+                   @bind="_searchText" @bind:event="oninput" />
+        </div>
+
+        @if (_selectMode)
+        {
+            <span style="font-size:12px; color:var(--color-text-muted);">@Tr("Vyber 2 a více surovin ke sloučení.")</span>
+        }
+
+        @if (_isLoading)
+        {
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+        }
+        else
+        {
+            <div class="detail-card" style="padding:0;">
+                @foreach (var product in FilteredProducts)
+                {
+                    <div class="ingredient-row" @key="product.Id" @onclick="() => OnRowClicked(product)">
+                        @if (_selectMode)
+                        {
+                            <input type="checkbox" checked="@_selectedIds.Contains(product.Id)" @onclick:stopPropagation="true" @onclick="() => ToggleSelected(product.Id)" style="width:20px; height:20px; accent-color:var(--color-primary); margin-right:8px;" />
+                        }
+                        <span class="ingredient-name">@product.Name_CS</span>
+                        <span class="ingredient-amount">@product.Name_EN</span>
+                        @if (product.HasManualPrice)
+                        {
+                            <span class="ingredient-cost">@($"{product.ManualPrice:0.###} Kč/{product.Unit}")</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (FilteredProducts.Count == 0)
+            {
+                <p class="empty-text">@Tr("Žádná surovina neodpovídá hledání.")</p>
+            }
+        }
+
+        @if (_selectMode && _selectedIds.Count >= 2)
+        {
+            <button type="button" class="btn-action btn-primary" style="height:55px;" @onclick="OnMergeSelectedClickedAsync">
+                @string.Format(Tr("Sloučit vybrané ({0})"), _selectedIds.Count)
+            </button>
+        }
+
+        <button type="button" class="btn-action btn-success" style="height:55px;" @onclick="() => _showCreateOverlay = true">
+            @Tr("➕ Přidat surovinu")
+        </button>
+    </div>
+</div>
+
+@if (_editingProduct != null)
+{
+    <div class="modal-overlay" @onclick="CloseEditOverlay">
+        <div class="modal-card modal-large" @onclick:stopPropagation="true">
+            <h2 class="modal-title">@Tr("Upravit surovinu")</h2>
+
+            <div class="modal-content-scroll">
+                <div class="form-group">
+                    <label class="form-label">@Tr("Název (česky)")</label>
+                    <input type="text" class="form-input" @bind="_editNameCs" @bind:event="oninput" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">@Tr("Název (anglicky)")</label>
+                    <input type="text" class="form-input" @bind="_editNameEn" @bind:event="oninput" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">@Tr("Jednotka")</label>
+                    <select class="form-select" @bind="_editUnit">
+                        <option value="g">g</option>
+                        <option value="ml">ml</option>
+                        <option value="ks">ks</option>
+                    </select>
+                </div>
+
+                <label class="checkbox-row">
+                    <input type="checkbox" @bind="_editHasManualPrice" />
+                    <span>@Tr("Vlastní cena")</span>
+                </label>
+
+                @if (_editHasManualPrice)
+                {
+                    <div class="form-group">
+                        <label class="form-label">@string.Format(Tr("Cena za jednotku ({0}, Kč)"), _editUnit)</label>
+                        <input type="text" inputmode="decimal" class="form-input" @bind="_editManualPriceText" @bind:event="oninput" />
+                    </div>
+                }
+                else
+                {
+                    <span style="font-size:12px; color:var(--color-text-muted);">
+                        @string.Format(Tr("Průměrná cena (ČSÚ): {0:0.###} Kč/{1}"), _editingProduct.PriceAverage, _editingProduct.Unit)
+                    </span>
+                }
+
+                @if (_editUnit == "ks")
+                {
+                    <div class="form-group">
+                        <label class="form-label">@Tr("Typická hmotnost 1 kusu (g)")</label>
+                        <input type="text" inputmode="decimal" class="form-input" @bind="_editTypicalWeightText" @bind:event="oninput" />
+                    </div>
+                }
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button type="button" class="btn-action" style="background-color:#9E9E9E; flex:1;" @onclick="CloseEditOverlay">@Tr("Zrušit")</button>
+                <button type="button" class="btn-action btn-primary" style="flex:1;" @onclick="OnSaveEditAsync">@Tr("Uložit")</button>
+            </div>
+
+            <button type="button" class="recipe-source-link" style="color:var(--color-danger);" @onclick="OnDeleteClickedAsync">
+                @Tr("Smazat surovinu")
+            </button>
+        </div>
+    </div>
+}
+
+@if (_showCreateOverlay)
+{
+    <div class="modal-overlay" @onclick="() => _showCreateOverlay = false">
+        <div class="modal-card" @onclick:stopPropagation="true">
+            <h2 class="modal-title">@Tr("Nová surovina")</h2>
+
+            <div class="form-group">
+                <label class="form-label">@Tr("Název (česky)")</label>
+                <input type="text" class="form-input" @bind="_newNameCs" @bind:event="oninput" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">@Tr("Název (anglicky, volitelné)")</label>
+                <input type="text" class="form-input" @bind="_newNameEn" @bind:event="oninput" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">@Tr("Jednotka")</label>
+                <select class="form-select" @bind="_newUnit">
+                    <option value="g">g</option>
+                    <option value="ml">ml</option>
+                    <option value="ks">ks</option>
+                </select>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button type="button" class="btn-action" style="background-color:#9E9E9E; flex:1;" @onclick="() => _showCreateOverlay = false">@Tr("Zrušit")</button>
+                <button type="button" class="btn-action btn-success" style="flex:1;" @onclick="OnCreateProductAsync">@Tr("Vytvořit")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showDeleteConfirm)
+{
+    <div class="modal-overlay" @onclick="() => _showDeleteConfirm = false">
+        <div class="modal-card" @onclick:stopPropagation="true">
+            <h2 class="modal-title">@Tr("Smazat surovinu?")</h2>
+            <p style="text-align:center; color:var(--color-text-muted); margin:0;">
+                @(_deleteRecipeCount > 0
+                    ? string.Format(Tr("Tato surovina se používá v {0} receptech - v nich zmizí ze seznamu ingrediencí."), _deleteRecipeCount)
+                    : Tr("Tato akce je nevratná."))
+            </p>
+            <div style="display:flex; gap:10px;">
+                <button type="button" class="btn-action" style="background-color:#9E9E9E; flex:1;" @onclick="() => _showDeleteConfirm = false">@Tr("Zrušit")</button>
+                <button type="button" class="btn-action" style="background-color:var(--color-danger); flex:1;" @onclick="OnConfirmDeleteAsync">@Tr("Smazat")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<LocalProduct> _allProducts = [];
+    private bool _isLoading = true;
+    private string _searchText = string.Empty;
+
+    private bool _selectMode;
+    private HashSet<int> _selectedIds = [];
+
+    private LocalProduct? _editingProduct;
+    private string _editNameCs = string.Empty;
+    private string _editNameEn = string.Empty;
+    private string _editUnit = "g";
+    private bool _editHasManualPrice;
+    private string _editManualPriceText = string.Empty;
+    private string _editTypicalWeightText = string.Empty;
+
+    private bool _showCreateOverlay;
+    private string _newNameCs = string.Empty;
+    private string _newNameEn = string.Empty;
+    private string _newUnit = "g";
+
+    private bool _showDeleteConfirm;
+    private int _deleteRecipeCount;
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    private List<LocalProduct> FilteredProducts =>
+        string.IsNullOrWhiteSpace(_searchText)
+            ? _allProducts
+            : [.. _allProducts.Where(p =>
+                TextNormalizationHelper.NormalizeForComparison(p.Name_CS).Contains(TextNormalizationHelper.NormalizeForComparison(_searchText)) ||
+                TextNormalizationHelper.NormalizeForComparison(p.Name_EN).Contains(TextNormalizationHelper.NormalizeForComparison(_searchText)))];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProductsAsync();
+    }
+
+    private async Task LoadProductsAsync()
+    {
+        _isLoading = true;
+        _allProducts = await App.Database.GetAllLocalProductsAsync();
+        _isLoading = false;
+    }
+
+    private void OnRowClicked(LocalProduct product)
+    {
+        if (_selectMode)
+        {
+            ToggleSelected(product.Id);
+        }
+        else
+        {
+            _editingProduct = product;
+            _editNameCs = product.Name_CS;
+            _editNameEn = product.Name_EN;
+            _editUnit = product.Unit;
+            _editHasManualPrice = product.HasManualPrice;
+            _editManualPriceText = product.ManualPrice > 0 ? product.ManualPrice.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "";
+            _editTypicalWeightText = product.TypicalUnitWeightGrams > 0 ? product.TypicalUnitWeightGrams.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) : "";
+        }
+    }
+
+    private void ToggleSelected(int id)
+    {
+        if (!_selectedIds.Add(id))
+            _selectedIds.Remove(id);
+    }
+
+    private void CancelSelectMode()
+    {
+        _selectMode = false;
+        _selectedIds.Clear();
+    }
+
+    private void CloseEditOverlay()
+    {
+        _editingProduct = null;
+    }
+
+    private async Task OnSaveEditAsync()
+    {
+        if (_editingProduct == null) return;
+        if (string.IsNullOrWhiteSpace(_editNameCs)) return;
+
+        await App.Database.RenameProductAsync(_editingProduct.Id, _editNameCs, _editNameEn);
+        await App.Database.SetProductUnitAsync(_editingProduct.Id, _editUnit);
+
+        if (_editHasManualPrice && double.TryParse(_editManualPriceText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var manualPrice))
+            await App.Database.SetManualPriceAsync(_editingProduct.Id, manualPrice);
+        else if (!_editHasManualPrice)
+            await App.Database.ClearManualPriceAsync(_editingProduct.Id);
+
+        if (_editUnit == "ks" && double.TryParse(_editTypicalWeightText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var typicalWeight) && typicalWeight > 0)
+            await App.Database.SetTypicalUnitWeightAsync(_editingProduct.Id, typicalWeight);
+
+        _editingProduct = null;
+        await LoadProductsAsync();
+    }
+
+    private async Task OnDeleteClickedAsync()
+    {
+        if (_editingProduct == null) return;
+        _deleteRecipeCount = await App.Database.CountRecipesUsingProductAsync(_editingProduct.Id);
+        _showDeleteConfirm = true;
+    }
+
+    private async Task OnConfirmDeleteAsync()
+    {
+        if (_editingProduct == null) return;
+
+        await App.Database.DeleteProductAsync(_editingProduct.Id);
+        _showDeleteConfirm = false;
+        _editingProduct = null;
+        await LoadProductsAsync();
+    }
+
+    private async Task OnCreateProductAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newNameCs)) return;
+
+        await App.Database.CreateProductAsync(_newNameCs, _newNameEn, _newUnit);
+        _newNameCs = string.Empty;
+        _newNameEn = string.Empty;
+        _newUnit = "g";
+        _showCreateOverlay = false;
+        await LoadProductsAsync();
+    }
+
+    private async Task OnMergeSelectedClickedAsync()
+    {
+        var selected = _allProducts.Where(p => _selectedIds.Contains(p.Id)).ToList();
+        if (selected.Count < 2) return;
+
+        string[] names = [.. selected.Select(p => p.Name_CS)];
+        string? chosenCanonical = await DialogService.ShowActionSheetAsync(
+            Tr("Který název zůstane?"), Tr("Zrušit"), null, names);
+
+        if (string.IsNullOrEmpty(chosenCanonical) || chosenCanonical == Tr("Zrušit")) return;
+
+        var canonical = selected.FirstOrDefault(p => p.Name_CS == chosenCanonical);
+        if (canonical == null) return;
+
+        var duplicateIds = selected.Where(p => p.Id != canonical.Id).Select(p => p.Id).ToList();
+        int mergedCount = await App.Database.MergeSelectedProductsAsync(canonical.Id, duplicateIds);
+
+        await DialogService.ShowAlertAsync(Tr("Hotovo"), string.Format(Tr("Sloučeno surovin: {0}"), mergedCount), "OK");
+
+        CancelSelectMode();
+        await LoadProductsAsync();
+    }
+
+    private void OnBackClicked()
+    {
+        NavigationManager.NavigateTo("/settings");
+    }
+}

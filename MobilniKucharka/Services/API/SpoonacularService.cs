@@ -7,7 +7,7 @@ namespace MobilniKucharka.Services.Api
     //spoonacular - "stahovat si recepty ze Spoonacularu
     public class SpoonacularService(string dbPath)
     {
-        private readonly HttpClient _httpClient = new();
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
         private readonly SQLiteAsyncConnection _db = new(dbPath);
         private static readonly string ApiKey = Secrets.SpoonacularApiKey;
 
@@ -45,8 +45,6 @@ namespace MobilniKucharka.Services.Api
                 {
                     ExternalSourceId = $"spoon_{spoonacularId}",
                     Name_EN = data.GetProperty("title").GetString() ?? "",
-                    // Stejná logika jako v BudgetPlannerService.SaveExternalRecipeAsync - pokud appka
-                    // recept už přeložila pro zobrazení v seznamu hledání, použije se to rovnou.
                     Name_CS = translatedNameCs ?? string.Empty,
                     PrepTime = data.GetProperty("readyInMinutes").GetInt32(),
                     ImageUrl = data.GetProperty("image").GetString() ?? "",
@@ -59,6 +57,7 @@ namespace MobilniKucharka.Services.Api
 
                     StepsJson_EN = ExtractSteps(data),
                     IngredientsRaw = ExtractIngredientsRaw(data),
+                    ContentLanguage = "en",
 
                     ServingSize = data.TryGetProperty("servings", out var servingsProp) && servingsProp.GetInt32() > 0
                         ? servingsProp.GetInt32()
@@ -83,7 +82,7 @@ namespace MobilniKucharka.Services.Api
         // Hledání receptů podle textového dotazu (dotaz už bývá anglicky - viz RecipeSearchService,
         // který ho před voláním přeloží). Vrací jen lehká data (id/název/obrázek) - plné detaily se
         // dotáhnou (a rovnou uloží do DB, viz GetRecipeWithCacheAsync) až po výběru receptu.
-        public async Task<List<ExternalRecipeSearchResult>> SearchRecipesAsync(string query, string? diet, CancellationToken cancellationToken)
+        public static async Task<List<ExternalRecipeSearchResult>> SearchRecipesAsync(string query, string? diet, CancellationToken cancellationToken)
         {
             string dietParam = string.IsNullOrWhiteSpace(diet) ? "" : $"&diet={Uri.EscapeDataString(diet)}";
             string url = $"https://api.spoonacular.com/recipes/complexSearch?apiKey={ApiKey}&query={Uri.EscapeDataString(query)}&number=10{dietParam}";
@@ -161,7 +160,7 @@ namespace MobilniKucharka.Services.Api
         // Sestaví IngredientsRaw ve stejném formátu "Název|Množství", jaký používá MealDB import
         // i ruční tvorba receptu (viz CreateRecipePage.TriggerAutoSaveAsync) - tedy jméno a
         // množství oddělené "|", jedna surovina na řádek. Množství bereme z "measures.metric" (ne
-        // "measures.us"), aby jednotky (g/ml/kg/l) odpovídaly tomu, co appka jinde umí parsovat
+        // "measures.us"), aby jednotky (g/ml/kg/l) odpovídaly tomu, co aplikace jinde umí parsovat
         // (viz NutritionEstimationService.ConvertToProductUnit/DetectUnitFamily).
         private static string ExtractIngredientsRaw(JsonElement root)
         {
@@ -205,7 +204,7 @@ namespace MobilniKucharka.Services.Api
             return string.Join("\n", lines);
         }
 
-        // Sjednotí Spoonacularovy metrické jednotky na tvar, který appka jinde rozpoznává
+        // Sjednotí Spoonacularovy metrické jednotky na tvar, který aplikace jinde rozpoznává
         // (g/kg/ml/l). Prázdná jednotka (kusové suroviny jako "1 vejce") se bere jako "ks".
         private static string NormalizeMetricUnit(string unit)
         {

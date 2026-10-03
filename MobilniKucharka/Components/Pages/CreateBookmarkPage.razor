@@ -57,9 +57,6 @@
     private string _selectedImagePath = string.Empty;
     private bool _imageWasRemoved;
 
-    // Musí odpovídat BudgetPlannerService.ProtectedBookmarkNames - vynucené na obou stranách
-    // (UI i DB vrstva), ať se to nikdy nerozejde.
-    private static readonly string[] ProtectedBookmarkNames = ["Oblíbené", "Vytvořené recepty", "Vyhledané recepty", "Koncepty"];
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
@@ -72,7 +69,7 @@
         {
             _isEditingExisting = true;
             _originalCategoryName = Name;
-            _isProtectedBookmark = ProtectedBookmarkNames.Contains(Name);
+            _isProtectedBookmark = BudgetPlannerService.ProtectedBookmarkNames.Contains(Name);
             await LoadExistingBookmarkAsync(Name);
         }
     }

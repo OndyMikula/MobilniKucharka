@@ -32,6 +32,12 @@ namespace MobilniKucharka.Classes.Recipe
         public bool IsNutritionEstimated { get; set; } // TRUE = Nutriční hodnoty jsou odhadnuté, FALSE = Nutriční hodnoty jsou přesné (např. z API)
         public int ServingSize { get; set; }
         public string IngredientsRaw { get; set; } = string.Empty; // Suroviny (např. "1 vejce|1 ks\nMouka|200 g")
+
+        // Jazyk, ve kterém jsou NAPSANÉ (nikdy nepřekládané) DescriptionText/IngredientsRaw -
+        // nastavuje se JEDNOU při vytvoření/importu a NIKDY se nemění. Zobrazení v jiném jazyce jde
+        // vždy přes RecipeTranslationCache (viz EnsureRecipeLanguageAsync/BuildDisplayRecipeAsync) -
+        // tahle dvě pole samotná se překladem už nikdy nepřepisují, aby se originál nikdy neztratil.
+        public string ContentLanguage { get; set; } = string.Empty;
         public string StepsRaw { get; set; } = string.Empty; // Postup (např. "1. Smíchejte ingredience.\n2. Pečte 20 minut.")
 
         // UKLÁDÁNÍ DO DB: JSON řetězce pro češtinu i angličtinu
@@ -138,5 +144,9 @@ namespace MobilniKucharka.Classes.Recipe
                 DietaryFlagsJson = JsonSerializer.Serialize(value);
             }
         }
+
+        // Mělká kopie pro DISPLAY účely - EnsureRecipeLanguageAsync ji používá k vrácení přeložené
+        // verze IngredientsRaw/DescriptionText, aniž by se cokoliv zapsalo zpět do DB.
+        public Recipe ShallowClone() => (Recipe)MemberwiseClone();
     }
 }

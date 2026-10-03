@@ -133,14 +133,16 @@ namespace MobilniKucharka.Services
                 rest = text[match.Length..].Trim();
             }
 
+            // Lžíce/lžička nejdřív - obě začínají na 'l' a jinak by je pohltila obecná kontrola
+            // na "litr" o dva řádky níž.
+            if (rest.Contains("tbsp") || rest.Contains("lžíce") || rest.Contains("polévkov")) return quantity * 15;
+            if (rest.Contains("tsp") || rest.Contains("lžička") || rest.Contains("čajov")) return quantity * 5;
+            if (rest.Contains("cup") || rest.Contains("hrnek") || rest.Contains("šálek")) return quantity * 240;
+
             if (rest.Contains("kg")) return quantity * 1000;
             if (rest.Contains('g') && !rest.Contains("gal")) return quantity;
             if (rest.Contains("ml")) return quantity;
             if (rest.Contains('l') && !rest.Contains("small") && !rest.Contains("large")) return quantity * 1000;
-
-            if (rest.Contains("tbsp") || rest.Contains("lžíce") || rest.Contains("polévkov")) return quantity * 15;
-            if (rest.Contains("tsp") || rest.Contains("lžička") || rest.Contains("čajov")) return quantity * 5;
-            if (rest.Contains("cup") || rest.Contains("hrnek") || rest.Contains("šálek")) return quantity * 240;
 
             if (rest.Contains("small") || rest.Contains("malý") || rest.Contains("malá")) return quantity * 50;
             if (rest.Contains("medium") || rest.Contains("střední")) return quantity * 100;
@@ -174,13 +176,14 @@ namespace MobilniKucharka.Services
             double? volumeMl = null;
             bool isPiece = false;
 
-            if (rest.Contains("kg")) weightGrams = quantity * 1000;
+            // Stejné pořadí jako ParseAmountToGrams - lžíce/lžička/hrnek nejdřív.
+            if (rest.Contains("tbsp") || rest.Contains("lžíce") || rest.Contains("polévkov")) volumeMl = quantity * 15;
+            else if (rest.Contains("tsp") || rest.Contains("lžička") || rest.Contains("čajov")) volumeMl = quantity * 5;
+            else if (rest.Contains("cup") || rest.Contains("hrnek") || rest.Contains("šálek")) volumeMl = quantity * 240;
+            else if (rest.Contains("kg")) weightGrams = quantity * 1000;
             else if (rest.Contains('g') && !rest.Contains("gal")) weightGrams = quantity;
             else if (rest.Contains('l') && !rest.Contains("ml")) volumeMl = quantity * 1000;
             else if (rest.Contains("ml")) volumeMl = quantity;
-            else if (rest.Contains("tbsp") || rest.Contains("lžíce") || rest.Contains("polévkov")) volumeMl = quantity * 15;
-            else if (rest.Contains("tsp") || rest.Contains("lžička") || rest.Contains("čajov")) volumeMl = quantity * 5;
-            else if (rest.Contains("cup") || rest.Contains("hrnek") || rest.Contains("šálek")) volumeMl = quantity * 240;
             else if (rest.Contains("ks") || rest.Contains("kus") || rest.Contains("can") || rest.Contains("plechovk") || rest == "x" || string.IsNullOrWhiteSpace(rest)) isPiece = true;
             else return null;
 
@@ -201,11 +204,13 @@ namespace MobilniKucharka.Services
             var match = LeadingNumberRegexGen().Match(text);
             string rest = match.Success ? text[match.Length..].Trim() : text;
 
-            if (rest.Contains("kg") || (rest.Contains('g') && !rest.Contains("gal"))) return "g";
-            if (rest.Contains("ml") || (rest.Contains('l') && !rest.Contains("small") && !rest.Contains("large"))) return "ml";
             if (rest.Contains("tbsp") || rest.Contains("lžíce") || rest.Contains("polévkov")) return "ml";
             if (rest.Contains("tsp") || rest.Contains("lžička") || rest.Contains("čajov")) return "ml";
             if (rest.Contains("cup") || rest.Contains("hrnek") || rest.Contains("šálek")) return "ml";
+
+            if (rest.Contains("kg") || (rest.Contains('g') && !rest.Contains("gal"))) return "g";
+            if (rest.Contains("ml") || (rest.Contains('l') && !rest.Contains("small") && !rest.Contains("large"))) return "ml";
+
             if (rest.Contains("ks") || rest.Contains("kus") || rest.Contains("can") || rest.Contains("plechovk") || rest == "x" || string.IsNullOrWhiteSpace(rest)) return "ks";
 
             return "g";

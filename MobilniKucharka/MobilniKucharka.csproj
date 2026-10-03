@@ -26,8 +26,8 @@
 		<ApplicationId>com.ondymikula.mobilnikucharka</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.6.2</ApplicationDisplayVersion> <!-- Co vidí user (1.6.2), "- beta" pro oznaceni beta verze -->
-		<ApplicationVersion>17</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(17) -->
+		<ApplicationDisplayVersion>1.6.5.1</ApplicationDisplayVersion> <!-- Co vidí user (1.6.5.1), "- beta" pro oznaceni beta verze -->
+		<ApplicationVersion>19</ApplicationVersion> <!-- +1 KDYZ CHCES VYDAT NOVOU VERZI	(19) -->
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
 
@@ -46,6 +46,10 @@
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
 	  <Optimize>True</Optimize>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|AnyCPU'">
+	  <EmbedAssembliesIntoApk>False</EmbedAssembliesIntoApk>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -81,12 +85,6 @@
 
 	<ItemGroup>
 	  <MauiXaml Update="Classes\Navigation\BlazorModalPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Classes\UserData\OnBoardingPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Classes\UserData\SettingsPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	  <MauiXaml Update="Classes\Navigation\BlazorShellPage.xaml">

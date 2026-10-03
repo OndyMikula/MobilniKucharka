@@ -51,9 +51,10 @@
                      samostatné tlačítko s @onclick:stopPropagation, ať nespustí i klik karty pod sebou. -->
                 <div class="search-result-card" @key="result.ExternalId ?? result.Name" @onclick="() => OnCardClicked(result)">
                     <div class="search-result-img-wrap">
-                        @if (!string.IsNullOrWhiteSpace(result.ImageUrl))
+                        @if (!string.IsNullOrWhiteSpace(result.ImageUrl) && !_failedImages.Contains(result.ExternalId ?? result.Name))
                         {
-                            <img src="@ImageHelper.ResolveImageSrc(result.ImageUrl)" alt="@result.Name" class="search-result-img" loading="lazy" />
+                            <img src="@ImageHelper.ResolveImageSrc(result.ImageUrl)" alt="@result.Name" class="search-result-img" loading="lazy"
+                                 @onerror="() => OnImageLoadError(result.ExternalId ?? result.Name)" />
                         }
                         else
                         {
@@ -90,6 +91,9 @@
 
 @code {
     private RecipeSearchService? _searchService;
+    private readonly HashSet<string> _failedImages = [];
+
+    private void OnImageLoadError(string externalId) => _failedImages.Add(externalId);
     private string _query = string.Empty;
     private bool _filterByPreferences = false;
     private List<ExternalRecipeSearchResult>? _results;

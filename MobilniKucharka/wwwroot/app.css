@@ -67,6 +67,84 @@
         --color-skeleton: #2C2C2C;
     }
 }
+/* Explicit override for a user-chosen theme (set via window.setAppTheme) - wins over the OS
+   media-query above regardless of system setting. No attribute present = follow system. */
+:root[data-theme="light"] {
+    --color-bg: #F5F5F5;
+    --color-surface: #FFFFFF;
+    --color-surface-card: #FFFFFF;
+    --color-surface-hover: #F8F9FA;
+    --color-surface-active: #EEEEEE;
+    --color-border: #E0E0E0;
+    --color-border-light: #EEEEEE;
+    --color-text: #111111;
+    --color-text-secondary: #666666;
+    --color-text-muted: #888888;
+    --color-nav-bg: #E0E0E0;
+    --color-nav-text: #111111;
+    --color-pill-bg: #2196F3;
+    --color-pill-text: #FFFFFF;
+    --color-skeleton: #E0E0E0;
+}
+
+:root[data-theme="dark"] {
+    --color-bg: #121212;
+    --color-surface: #1E1E1E;
+    --color-surface-card: #1E1E1E;
+    --color-surface-hover: #262626;
+    --color-surface-active: #303030;
+    --color-border: #2C2C2C;
+    --color-border-light: #222222;
+    --color-text: #FFFFFF;
+    --color-text-secondary: #BBBBBB;
+    --color-text-muted: #888888;
+    --color-nav-bg: #1F1F1F;
+    --color-nav-text: #FFFFFF;
+    --color-pill-bg: #2196F3;
+    --color-pill-text: #FFFFFF;
+    --color-skeleton: #2C2C2C;
+}
+
+.segmented-control {
+    position: relative;
+    display: flex;
+    background-color: var(--color-border-light);
+    border-radius: var(--radius-md);
+    padding: 4px;
+}
+
+.segmented-pill {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    height: calc(100% - 8px);
+    background-color: var(--color-primary);
+    border-radius: calc(var(--radius-md) - 4px);
+    transition: transform var(--transition-normal);
+    z-index: 0;
+    pointer-events: none;
+}
+
+.segmented-option {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 0;
+    border: none;
+    background: transparent;
+    padding: 10px 8px;
+    margin: 0 2px;
+    border-radius: calc(var(--radius-md) - 4px);
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--transition-normal);
+}
+
+    .segmented-option.selected {
+        color: #FFFFFF;
+    }
 
 *, *::before, *::after {
     box-sizing: border-box;
@@ -107,6 +185,105 @@ html, body {
     overflow: hidden;
     min-height: 0;
 }
+
+.page-shell.no-bottom-nav {
+    padding-bottom: var(--system-nav-inset, 0px);
+}
+
+.onboarding-shell {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding-top: var(--system-top-inset, 0px);
+    padding-bottom: var(--system-nav-inset, 0px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background-color: var(--color-bg);
+}
+
+.onboarding-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 20px;
+}
+
+.onboarding-step-header {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 10px 0 20px 0;
+}
+
+.onboarding-step-title {
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    color: var(--color-text);
+}
+
+.onboarding-step-desc {
+    font-size: 14px;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.onboarding-step-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 20px;
+}
+
+.stepper-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+}
+
+.stepper-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
+    border: none;
+    background-color: var(--color-primary);
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.stepper-value {
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--color-primary);
+    min-width: 90px;
+    text-align: center;
+}
+
+.onboarding-nav-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    padding-top: 15px;
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+}
+
+    .checkbox-row input[type="checkbox"] {
+        width: 22px;
+        height: 22px;
+        accent-color: var(--color-primary);
+    }
 
 /* Bottom Navigation Bar */
 .nav-bar {
@@ -370,7 +547,7 @@ html, body {
     overflow: hidden;
     box-shadow: var(--shadow-sm);
     cursor: pointer;
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
 }
 
 .recipe-card:active {
@@ -830,6 +1007,36 @@ html, body {
     font-weight: bold;
 }
 
+.ingredient-suggestions {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    overflow: hidden;
+    margin-bottom: 8px;
+    background-color: var(--color-surface);
+}
+
+.ingredient-suggestion-item {
+    text-align: left;
+    padding: 10px 12px;
+    border: none;
+    background: transparent;
+    color: var(--color-text);
+    font-size: 13px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+    .ingredient-suggestion-item + .ingredient-suggestion-item {
+        border-top: 1px solid var(--color-border-light);
+    }
+
+    .ingredient-suggestion-item:active {
+        background-color: var(--color-surface-hover);
+    }
+
 .price-source-note {
     font-size: 11px;
     opacity: 0.75;
@@ -1075,7 +1282,7 @@ html, body {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    transition: transform var(--transition-fast);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .bookmark-card:active {
@@ -1310,6 +1517,20 @@ html, body {
     margin: 0;
     font-weight: bold;
     font-size: 15px;
+}
+
+.progress-bar-track {
+    width: 100%;
+    height: 8px;
+    background-color: var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background-color: var(--color-primary);
+    transition: width var(--transition-fast);
 }
 
 /* Skeleton Loading */

@@ -4,8 +4,6 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
 {
     public class SharedRecipeData
     {
-        // Značka a verze formátu - appka podle nich hned pozná, jestli soubor vůbec je (nebo NENÍ)
-        // recept Mobilní Kuchařky, než se ho pokusí zpracovat.
         public string FormatMarker { get; set; } = "MobilniKucharkaRecipe";
         public int FormatVersion { get; set; } = 1;
 
@@ -13,6 +11,7 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
         public string Name_EN { get; set; } = "";
         public string DescriptionText { get; set; } = "";
         public string IngredientsRaw { get; set; } = "";
+        public string ContentLanguage { get; set; } = "cs";
         public string StepsJson_CS { get; set; } = "";
         public string StepsJson_EN { get; set; } = "";
         public string EquipmentJson { get; set; } = "";
@@ -50,6 +49,7 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
                 Name_EN = recipe.Name_EN,
                 DescriptionText = recipe.DescriptionText,
                 IngredientsRaw = recipe.IngredientsRaw,
+                ContentLanguage = recipe.ContentLanguage,
                 StepsJson_CS = recipe.StepsJson_CS,
                 StepsJson_EN = recipe.StepsJson_EN,
                 EquipmentJson = recipe.EquipmentJson,
@@ -105,11 +105,9 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
                         photoDestPath = Path.Combine(FileSystem.AppDataDirectory, $"{Guid.NewGuid()}_json_recept.jpg");
                         await File.WriteAllBytesAsync(photoDestPath, bytes);
                     }
-                    // Přes limit -> recept se naimportuje bez obrázku, ne s chybou.
                 }
                 catch (FormatException)
                 {
-                    // Poškozený base64 - recept naimportujeme i tak, jen bez obrázku.
                 }
             }
 
@@ -119,6 +117,7 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
                 Name_EN = shared.Name_EN,
                 DescriptionText = shared.DescriptionText,
                 IngredientsRaw = shared.IngredientsRaw,
+                ContentLanguage = string.IsNullOrWhiteSpace(shared.ContentLanguage) ? "cs" : shared.ContentLanguage,
                 StepsJson_CS = SanitizeNestedJson(shared.StepsJson_CS),
                 StepsJson_EN = SanitizeNestedJson(shared.StepsJson_EN),
                 EquipmentJson = SanitizeNestedJson(shared.EquipmentJson),
@@ -169,8 +168,6 @@ namespace MobilniKucharka.Classes.Recipe.Sharing
                 throw new InvalidOperationException("Cena receptu není platná hodnota.");
         }
 
-        // Ověří, že vnořený JSON (kroky/pomůcky/diety) je platné pole řetězců, než se uloží do DB -
-        // jinak by appka spadla později, kdykoliv by se tenhle recept zobrazil (viz Recipe.cs Steps_CS/EN gettery).
         private static string SanitizeNestedJson(string? rawJson)
         {
             if (string.IsNullOrWhiteSpace(rawJson)) return "[]";

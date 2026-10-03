@@ -25,6 +25,7 @@
         }
 
         <button type="button" class="btn-action btn-primary" @onclick="OnViewOnGitHubClicked">View this file on GitHub</button>
+        <button type="button" class="btn-action" style="background-color:#607D8B;" @onclick="OnViewSourceCodeClicked">View source code on GitHub</button>
     </div>
 </div>
 
@@ -53,6 +54,11 @@
     private async Task OnViewOnGitHubClicked()
     {
         await Launcher.Default.OpenAsync(LegalContent.LicenseFileUrl);
+    }
+
+    private async Task OnViewSourceCodeClicked()
+    {
+        await Launcher.Default.OpenAsync(LegalContent.SourceCodeUrl);
     }
 
     private async Task NavigateBackAsync()

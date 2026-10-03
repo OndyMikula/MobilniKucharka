@@ -20,10 +20,6 @@ namespace MobilniKucharka.Classes
 
         public string Unit { get; set; } = "g";
 
-        public bool IsVegetarian { get; set; }
-        public bool IsVegan { get; set; }
-        public bool IsLactoseFree { get; set; }
-
         [Ignore]
         public double EffectivePrice => HasManualPrice ? ManualPrice : PriceAverage;
     }

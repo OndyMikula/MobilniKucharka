@@ -44,6 +44,7 @@
         <div class="dev-tools-row">
             <button type="button" class="btn-dev" @onclick="OnResetDatabaseClicked">@Tr("🔄 Resetovat testovací databázi")</button>
             <button type="button" class="btn-dev" @onclick="OnRepairStepsClicked">@Tr("🔧 Opravit formátování kroků")</button>
+            <button type="button" class="btn-dev" @onclick='() => NavigationManager.NavigateTo("/dev-export")'>@Tr("📤 Export dat pro vývojáře")</button>
         </div>
     }
 
@@ -103,10 +104,70 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (!Preferences.Default.Get("IsOnboardingComplete", false))
+        {
+            NavigationManager.NavigateTo("/onboarding", replace: true);
+            return;
+        }
+
         BlazorShellPage.ShellAppeared += OnShellAppeared;
         await LoadPageDataAsync();
         _ = CheckForUpdatesAsync();
         CheckPendingImport();
+        _ = RunProductCleanupAsync();
+        _ = RunRecipeLanguageFixAsync();
+    }
+
+    // Jednorázově doplní ContentLanguage receptům založeným před zavedením tohohle pole - bez
+    // toho aplikace u starých receptů nikdy nezkusí přeložit suroviny/popis (viz Kuřecí tacos apod.).
+    private async Task RunRecipeLanguageFixAsync()
+    {
+        try
+        {
+            int fixedCount = await App.Database.EnsureContentLanguageMigrationAsync();
+
+            if (fixedCount > 0)
+            {
+                await DialogService.ShowAlertAsync(
+                    Tr("Opraveny starší recepty"),
+                    string.Format(Tr("U {0} starších receptů aplikace teď poprvé pozná, ve kterém jazyce jsou napsané suroviny a popis - při dalším otevření se ti zobrazí přeložené do aktuálního jazyka, pokud je potřeba."), fixedCount),
+                    "OK");
+
+                await LoadPageDataAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Chyba při opravě jazyka receptů: {ex.Message}");
+        }
+    }
+
+    // Na pozadí, při každém spuštění, sloučí duplicitní suroviny (jiná diakritika/velikost
+    // písmen, nebo stejná surovina zapsaná zvlášť česky a anglicky). GetOrCreateLocalProductByNameAsync
+    // teď duplicitám aktivně předchází při vzniku, takže tohle běží hlavně jako pojistka pro vzácný
+    // okrajový případ (DeepL dočasně nedostupné přesně ve chvíli založení nové suroviny) - žádné
+    // ruční tlačítko není potřeba, oprava se sama zopakuje při dalším spuštění aplikace. Uživatele
+    // vyruší jen tehdy, když se skutečně něco sloučilo.
+    private async Task RunProductCleanupAsync()
+    {
+        try
+        {
+            int mergedCount = await App.Database.MergeDuplicateProductsAsync();
+
+            if (mergedCount > 0)
+            {
+                await DialogService.ShowAlertAsync(
+                    Tr("Vyčištěny duplicitní suroviny"),
+                    string.Format(Tr("Některé suroviny byly v appce zapsané vícekrát (např. jednou česky, jednou anglicky, nebo s jiným velkým písmenem). Sloučili jsme {0} takových duplicit - tvoje recepty ani ceny se tím nezměnily, jen se sjednotily záznamy surovin."), mergedCount),
+                    "OK");
+
+                await LoadPageDataAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Chyba při čištění surovin: {ex.Message}");
+        }
     }
 
     private async void OnShellAppeared()
@@ -170,8 +231,7 @@
         try
         {
             var userDiets = ParseUserDiets();
-            var mealDbService = new TheMealDbService();
-            var found = await mealDbService.GetRandomRecipeMatchingDietAsync(userDiets);
+            var found = await TheMealDbService.GetRandomRecipeMatchingDietAsync(userDiets);
 
             if (found == null)
             {
@@ -213,14 +273,12 @@
 
     private void OpenSettings()
     {
-        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-        nav?.PushAsync(new SettingsPage());
+        NavigationManager.NavigateTo("/settings");
     }
 
     private void OpenOnboarding()
     {
-        var nav = Application.Current?.Windows.FirstOrDefault()?.Page?.Navigation;
-        nav?.PushAsync(new OnboardingPage());
+        NavigationManager.NavigateTo("/onboarding");
     }
 
     private void OpenCreateRecipe()
@@ -272,8 +330,7 @@
 
     private async Task CheckForUpdatesAsync()
     {
-        var updateService = new UpdateCheckService();
-        var info = await updateService.CheckForUpdateAsync();
+        var info = await UpdateCheckService.CheckForUpdateAsync();
 
         if (info != null && info.IsUpdateAvailable)
         {
