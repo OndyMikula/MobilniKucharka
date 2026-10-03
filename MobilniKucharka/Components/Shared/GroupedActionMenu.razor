@@ -1,16 +1,24 @@
-﻿@namespace MobilniKucharka.Components.Shared
+@namespace MobilniKucharka.Components.Shared
 
 @if (IsOpen)
 {
     <div class="modal-overlay" @onclick="CloseAsync">
         <div class="action-menu-card" @onclick:stopPropagation="true">
+            @if (!string.IsNullOrWhiteSpace(Title))
+            {
+                <div class="action-menu-title">@Title</div>
+            }
             @foreach (var group in Groups)
             {
-                <div class="action-menu-group">
+                <div class="action-menu-group @(group.Scrollable ? "scrollable" : "")">
                     @foreach (var item in group.Items)
                     {
                         <button type="button" class="action-menu-item @(item.IsDestructive ? "destructive" : "")" @onclick="() => OnItemClickedAsync(item)">
-                            @item.Label
+                            @if (!string.IsNullOrEmpty(item.Icon))
+                            {
+                                <span class="action-menu-icon">@item.Icon</span>
+                            }
+                            <span>@item.Label</span>
                         </button>
                     }
                 </div>
@@ -23,6 +31,7 @@
 @code {
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
     [Parameter] public string CancelLabel { get; set; } = "Zrušit";
     [Parameter] public List<ActionMenuGroup> Groups { get; set; } = [];
 

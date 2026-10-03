@@ -38,5 +38,6 @@ public partial class App : Application
     public static void ResetDatabase()
     {
         _database = null;
+        RecipeListCache.Invalidate();
     }
 }

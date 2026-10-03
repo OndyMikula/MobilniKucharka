@@ -17,6 +17,9 @@ namespace MobilniKucharka.Platforms.Android
         AutoVerify = true)]
     public class MainActivity : MauiAppCompatActivity
     {
+        private int _rawTopPx, _rawBottomPx;
+        private global::Android.Webkit.WebView? _webView;
+
         protected override void OnResume()
         {
             base.OnResume();
@@ -53,24 +56,65 @@ namespace MobilniKucharka.Platforms.Android
             var decorView = Window?.DecorView;
             if (decorView == null) return;
 
-            ViewCompat.SetOnApplyWindowInsetsListener(decorView, new SystemBarsInsetsListener());
+            ViewCompat.SetOnApplyWindowInsetsListener(decorView, new SystemBarsInsetsListener(OnRawInsets));
+
+            var observer = decorView.ViewTreeObserver;
+            observer?.GlobalLayout += (_, _) => ReportInsets();
         }
 
-        private class SystemBarsInsetsListener : Java.Lang.Object, IOnApplyWindowInsetsListener
+        private void OnRawInsets(int topPx, int bottomPx)
+        {
+            _rawTopPx = topPx;
+            _rawBottomPx = bottomPx;
+            Window?.DecorView?.Post(ReportInsets);
+        }
+
+        // Nahlásí jen skutečný překryv WebView se system bary
+        private void ReportInsets()
+        {
+            var decor = Window?.DecorView;
+            if (decor == null) return;
+
+            if (_webView == null || !_webView.IsShown)
+                _webView = FindVisibleWebView(decor);
+
+            int topPx = 0, bottomPx = 0;
+            if (_webView != null)
+            {
+                var loc = new int[2];
+                _webView.GetLocationInWindow(loc);
+                topPx = Math.Max(0, _rawTopPx - loc[1]);
+                bottomPx = Math.Max(0, loc[1] + _webView.Height - (decor.Height - _rawBottomPx));
+            }
+
+            double density = decor.Resources?.DisplayMetrics?.Density ?? 1.0;
+            SystemInsets.SetBottom(bottomPx / density);
+            SystemInsets.SetTop(topPx / density);
+        }
+
+        private static global::Android.Webkit.WebView? FindVisibleWebView(global::Android.Views.View? view)
+        {
+            if (view is global::Android.Webkit.WebView web && web.IsShown) return web;
+            if (view is ViewGroup group)
+            {
+                for (int i = 0; i < group.ChildCount; i++)
+                {
+                    var found = FindVisibleWebView(group.GetChildAt(i));
+                    if (found != null) return found;
+                }
+            }
+            return null;
+        }
+
+        private class SystemBarsInsetsListener(Action<int, int> onInsets) : Java.Lang.Object, IOnApplyWindowInsetsListener
         {
             public WindowInsetsCompat? OnApplyWindowInsets(global::Android.Views.View? v, WindowInsetsCompat? insets)
             {
                 if (insets == null) return insets;
 
-                double density = v?.Resources?.DisplayMetrics?.Density ?? 1.0;
-
-                var navBarInsets = insets.GetInsets(WindowInsetsCompat.Type.NavigationBars());
-                double bottomDp = (navBarInsets?.Bottom ?? 0) / density;
-                SystemInsets.SetBottom(bottomDp);
-
-                var statusBarInsets = insets.GetInsets(WindowInsetsCompat.Type.StatusBars());
-                double topDp = (statusBarInsets?.Top ?? 0) / density;
-                SystemInsets.SetTop(topDp);
+                var statusBars = insets.GetInsets(WindowInsetsCompat.Type.StatusBars());
+                var navBars = insets.GetInsets(WindowInsetsCompat.Type.NavigationBars());
+                onInsets(statusBars?.Top ?? 0, navBars?.Bottom ?? 0);
 
                 return insets;
             }

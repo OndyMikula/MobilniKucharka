@@ -72,6 +72,9 @@
         @Tr("Vytvořit záložku")
     </button>
 
+    <GroupedActionMenu @bind-IsOpen="_showBookmarkOptionsMenu" Groups="_bookmarkOptionsMenuGroups" Title="@_bookmarkMenuTitle" CancelLabel="@Tr("Zrušit")" />
+    <GroupedActionMenu @bind-IsOpen="_showPageOptionsMenu" Groups="_pageOptionsMenuGroups" Title="@Tr("Možnosti")" CancelLabel="@Tr("Zrušit")" />
+
     <!-- Overlay: Upravit recepty ve složce -->
     @if (_showEditRecipesOverlay)
     {
@@ -144,6 +147,11 @@
     private string _editingCategoryName = string.Empty;
     private List<BookmarkedRecipeSelectionModel> _recipeSelectionList = [];
     private List<BookmarkReorderItem> _reorderItems = [];
+    private bool _showBookmarkOptionsMenu;
+    private bool _showPageOptionsMenu;
+    private string _bookmarkMenuTitle = string.Empty;
+    private List<ActionMenuGroup> _bookmarkOptionsMenuGroups = [];
+    private List<ActionMenuGroup> _pageOptionsMenuGroups = [];
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
@@ -202,52 +210,72 @@
         NavigationManager.NavigateTo($"/bookmark/edit?name={Uri.EscapeDataString(categoryName)}");
     }
 
-    private async Task OnBookmarkOptionsClicked(Bookmark bookmark)
+    private void OnBookmarkOptionsClicked(Bookmark bookmark)
     {
         bool isProtected = BudgetPlannerService.ProtectedBookmarkNames.Contains(bookmark.Name);
+        _bookmarkMenuTitle = TranslateCategoryName(bookmark.Name);
+
         string pinLabel = bookmark.IsPinned ? Tr("Odepnout") : Tr("Připnout");
-        string editBookmarkLabel = Tr("Upravit záložku");
+        string pinIcon = bookmark.IsPinned ? "📌" : "📍";
 
-        string? action = isProtected
-            ? await DialogService.ShowActionSheetAsync(TranslateCategoryName(bookmark.Name), Tr("Zrušit"), null, Tr("Upravit recepty ve složce"), editBookmarkLabel, pinLabel)
-            : await DialogService.ShowActionSheetAsync(TranslateCategoryName(bookmark.Name), Tr("Zrušit"), null, Tr("Upravit recepty ve složce"), editBookmarkLabel, pinLabel, Tr("Smazat záložku"));
-
-        if (action == Tr("Upravit recepty ve složce"))
-        {
-            await OpenEditRecipesOverlayAsync(bookmark.Name);
-        }
-        else if (action == editBookmarkLabel)
-        {
-            OpenEditBookmark(bookmark.Name);
-        }
-        else if (action == pinLabel)
-        {
-            await App.Database.TogglePinAsync(bookmark.Name);
-            await LoadBookmarksAsync();
-        }
-        else if (action == Tr("Smazat záložku"))
-        {
-            bool confirm = await DialogService.ShowConfirmAsync(
-                Tr("Smazat záložku"),
-                string.Format(Tr("Opravdu chceš smazat záložku \"{0}\"? Recepty samotné zůstanou zachované."), TranslateCategoryName(bookmark.Name)),
-                Tr("Smazat"),
-                Tr("Zrušit"));
-
-            if (confirm)
+        _bookmarkOptionsMenuGroups =
+        [
+            new ActionMenuGroup
             {
-                await App.Database.DeleteBookmarkAsync(bookmark.Name);
-                await LoadBookmarksAsync();
+                Items =
+                [
+                    new() { Icon = "🍲", Label = Tr("Upravit recepty ve složce"), OnClick = EventCallback.Factory.Create(this, () => OpenEditRecipesOverlayAsync(bookmark.Name)) },
+                    new() { Icon = "✏️", Label = Tr("Upravit záložku"), OnClick = EventCallback.Factory.Create(this, () => OpenEditBookmark(bookmark.Name)) },
+                ]
+            },
+            new ActionMenuGroup
+            {
+                Items = [new() { Icon = pinIcon, Label = pinLabel, OnClick = EventCallback.Factory.Create(this, () => OnTogglePinClickedAsync(bookmark.Name)) }]
             }
+        ];
+
+        if (!isProtected)
+        {
+            _bookmarkOptionsMenuGroups.Add(new ActionMenuGroup
+            {
+                Items = [new() { Icon = "🗑️", Label = Tr("Smazat záložku"), IsDestructive = true, OnClick = EventCallback.Factory.Create(this, () => OnDeleteBookmarkClickedAsync(bookmark)) }]
+            });
+        }
+
+        _showBookmarkOptionsMenu = true;
+    }
+
+    private async Task OnTogglePinClickedAsync(string bookmarkName)
+    {
+        await App.Database.TogglePinAsync(bookmarkName);
+        await LoadBookmarksAsync();
+    }
+
+    private async Task OnDeleteBookmarkClickedAsync(Bookmark bookmark)
+    {
+        bool confirm = await DialogService.ShowConfirmAsync(
+            Tr("Smazat záložku"),
+            string.Format(Tr("Opravdu chceš smazat záložku \"{0}\"? Recepty samotné zůstanou zachované."), TranslateCategoryName(bookmark.Name)),
+            Tr("Smazat"),
+            Tr("Zrušit"));
+
+        if (confirm)
+        {
+            await App.Database.DeleteBookmarkAsync(bookmark.Name);
+            await LoadBookmarksAsync();
         }
     }
 
-    private async Task OnPageOptionsClicked()
+    private void OnPageOptionsClicked()
     {
-        string? action = await DialogService.ShowActionSheetAsync(Tr("Možnosti"), Tr("Zrušit"), null, Tr("Upravit pořadí záložek"));
-        if (action == Tr("Upravit pořadí záložek"))
-        {
-            OpenReorderOverlay();
-        }
+        _pageOptionsMenuGroups =
+        [
+            new ActionMenuGroup
+            {
+                Items = [new() { Icon = "↕️", Label = Tr("Upravit pořadí záložek"), OnClick = EventCallback.Factory.Create(this, OpenReorderOverlay) }]
+            }
+        ];
+        _showPageOptionsMenu = true;
     }
 
     private async Task OpenEditRecipesOverlayAsync(string categoryName)

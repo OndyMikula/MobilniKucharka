@@ -1105,6 +1105,13 @@ html, body {
 }
 
 /* Action Menu */
+.action-menu-title {
+    text-align: center;
+    font-size: 13px;
+    color: var(--color-text-muted);
+    padding: 4px 0;
+}
+
 .action-menu-card {
     width: 100%;
     max-width: 400px;
@@ -1122,6 +1129,10 @@ html, body {
 }
 
 .action-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
     padding: 14px;
     border: none;
     background: transparent;
@@ -1140,6 +1151,10 @@ html, body {
         color: var(--color-danger);
     }
 
+.action-menu-icon {
+    font-size: 18px;
+}
+
 .action-menu-cancel {
     background-color: var(--color-surface);
     border-radius: var(--radius-md);
@@ -1150,6 +1165,11 @@ html, body {
     color: var(--color-primary);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+}
+
+.action-menu-group.scrollable {
+    max-height: 45vh;
+    overflow-y: auto;
 }
 
 /* Action Buttons Grid */

@@ -1,4 +1,4 @@
-﻿@page "/settings/ingredients"
+@page "/settings/ingredients"
 @namespace MobilniKucharka.Components.Pages.Settings
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
@@ -77,7 +77,7 @@
     <div class="sticky-action-footer">
         @if (_selectMode && _selectedIds.Count >= 2)
         {
-            <button type="button" class="btn-action btn-primary" style="height:55px;" @onclick="OnMergeSelectedClickedAsync">
+            <button type="button" class="btn-action btn-primary" style="height:55px;" @onclick="OnMergeSelectedClicked">
                 @string.Format(Tr("Sloučit vybrané ({0})"), _selectedIds.Count)
             </button>
         }
@@ -201,6 +201,8 @@
     </div>
 }
 
+<GroupedActionMenu @bind-IsOpen="_showMergeMenu" Groups="_mergeMenuGroups" Title="@Tr("Který název zůstane?")" CancelLabel="@Tr("Zrušit")" />
+
 @code {
     private List<LocalProduct> _allProducts = [];
     private bool _isLoading = true;
@@ -224,6 +226,9 @@
 
     private bool _showDeleteConfirm;
     private int _deleteRecipeCount;
+
+    private bool _showMergeMenu;
+    private List<ActionMenuGroup> _mergeMenuGroups = [];
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
@@ -363,22 +368,31 @@
         await LoadProductsAsync();
     }
 
-    private async Task OnMergeSelectedClickedAsync()
+    private void OnMergeSelectedClicked()
     {
         var selected = _allProducts.Where(p => _selectedIds.Contains(p.Id)).ToList();
         if (selected.Count < 2) return;
 
-        string[] names = [.. selected.Select(p => p.Name_CS)];
-        string? chosenCanonical = await DialogService.ShowActionSheetAsync(
-            Tr("Který název zůstane?"), Tr("Zrušit"), null, names);
+        _mergeMenuGroups =
+        [
+            new ActionMenuGroup
+            {
+                Scrollable = true,
+                Items = [.. selected.Select(p => new ActionMenuItem
+                {
+                    Icon = "🥕",
+                    Label = p.Name_CS,
+                    OnClick = EventCallback.Factory.Create(this, () => MergeIntoAsync(p.Id, selected))
+                })]
+            }
+        ];
+        _showMergeMenu = true;
+    }
 
-        if (string.IsNullOrEmpty(chosenCanonical) || chosenCanonical == Tr("Zrušit")) return;
-
-        var canonical = selected.FirstOrDefault(p => p.Name_CS == chosenCanonical);
-        if (canonical == null) return;
-
-        var duplicateIds = selected.Where(p => p.Id != canonical.Id).Select(p => p.Id).ToList();
-        int mergedCount = await App.Database.MergeSelectedProductsAsync(canonical.Id, duplicateIds);
+    private async Task MergeIntoAsync(int canonicalId, List<LocalProduct> selected)
+    {
+        var duplicateIds = selected.Where(p => p.Id != canonicalId).Select(p => p.Id).ToList();
+        int mergedCount = await App.Database.MergeSelectedProductsAsync(canonicalId, duplicateIds);
 
         await DialogService.ShowAlertAsync(Tr("Hotovo"), string.Format(Tr("Sloučeno surovin: {0}"), mergedCount), "OK");
 
