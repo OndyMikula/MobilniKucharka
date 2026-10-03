@@ -198,7 +198,10 @@
             var savedRecipe = await ResolveAndSaveRecipeAsync(result);
             if (savedRecipe == null)
             {
-                await DialogService.ShowAlertAsync(Tr("Chyba"), Tr("Recept se nepodařilo načíst. Zkontroluj internetové připojení."), "OK");
+                string message = result.Source == ExternalRecipeSource.Spoonacular && !SpoonacularQuotaService.HasSearchQuota()
+                    ? Tr("Denní limit pro stahování receptů z tohoto zdroje byl vyčerpán. Zkus to znovu zítra, nebo vyber jiný recept.")
+                    : Tr("Recept se nepodařilo načíst. Zkontroluj internetové připojení.");
+                await DialogService.ShowAlertAsync(Tr("Chyba"), message, "OK");
                 return;
             }
 
@@ -238,7 +241,7 @@
 
         if (result.Source == ExternalRecipeSource.MealDb && result.MealDbData != null)
         {
-            var completed = await _searchService.CompleteMealDbResultAsync(result);
+            var completed = await RecipeSearchService.CompleteMealDbResultAsync(result);
             if (completed == null) return null;
             return await App.Database.SaveExternalRecipeAsync(completed, result.NameCs);
         }
