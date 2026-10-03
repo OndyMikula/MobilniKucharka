@@ -620,6 +620,7 @@
             await _db.UpdateAsync(_recipe);
         }
 
+        RecipeListCache.Invalidate();
         ShowSavedIndicator();
     }
 
@@ -758,6 +759,7 @@
             await App.Database.AddRecipeToCategoryAsync(_currentRecipeId.Value, "Vytvořené recepty");
             await App.Database.RemoveRecipeFromCategoryAsync(_currentRecipeId.Value, "Koncepty");
 
+            RecipeListCache.Invalidate();
             await NavigateBackAsync();
         }
         catch (Exception ex)

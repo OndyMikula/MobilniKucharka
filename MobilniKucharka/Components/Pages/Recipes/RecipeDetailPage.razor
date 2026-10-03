@@ -468,9 +468,16 @@
                 if (manualResult == null) return;
 
                 if (string.IsNullOrWhiteSpace(manualResult))
+                {
                     await App.Database.ClearManualPriceAsync(ingredient.ProductId);
+                    RecipeListCache.Invalidate();
+                }
                 else if (double.TryParse(manualResult.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture, out var unitPrice))
+                {
                     await App.Database.SetManualPriceAsync(ingredient.ProductId, unitPrice);
+                    RecipeListCache.Invalidate();
+                }
+                
 
                 await LoadIngredientsAndStepsAsync();
                 return;
@@ -582,9 +589,13 @@
         await PromoteFromSearchTempAsync();
 
         if (isChecked)
+        {
             await App.Database.AddRecipeToCategoryAsync(_recipe.Id, model.CategoryName);
+        }
         else
+        {
             await App.Database.RemoveRecipeFromCategoryAsync(_recipe.Id, model.CategoryName);
+        }
     }
 
     private async Task CloseBookmarkOverlayAsync()
@@ -760,6 +771,7 @@
         if (_recipe == null) return;
         _showDeleteOverlay = false;
         await App.Database.DeleteRecipeAsync(_recipe.Id);
+        RecipeListCache.Invalidate();
         NavigationManager.NavigateTo("/recipes");
     }
 
@@ -874,6 +886,7 @@
         if (_recipe == null) return;
         await PromoteFromSearchTempAsync();
         await App.Database.AddRecipeToCategoryAsync(_recipe.Id, "Vyhledané recepty");
+        RecipeListCache.Invalidate();
     }
 
     private async Task OnSourceLinkClickedAsync()

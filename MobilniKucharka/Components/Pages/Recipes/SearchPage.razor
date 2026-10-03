@@ -108,6 +108,11 @@
     {
         string dbPath = Path.Combine(FileSystem.AppDataDirectory, "kucharka.db3");
         _searchService = new RecipeSearchService(dbPath);
+
+        _query = SearchPageState.LastQuery;
+        _filterByPreferences = SearchPageState.LastFilterByPreferences;
+        _results = SearchPageState.LastResults;
+        _hasSearched = SearchPageState.HasSearched;
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
@@ -139,6 +144,12 @@
             if (_searchService != null)
             {
                 _results = await _searchService.SearchAsync(query, _filterByPreferences, _searchCts.Token);
+
+                SearchPageState.LastQuery = query;
+                SearchPageState.LastFilterByPreferences = _filterByPreferences;
+                SearchPageState.LastResults = _results;
+                SearchPageState.HasSearched = true;
+
                 if (_results.Count == 0)
                 {
                     await DialogService.ShowAlertAsync(Tr("Nic se nenašlo"), Tr("Nepodařilo se najít žádný recept odpovídající zadání."), "OK");
@@ -187,7 +198,10 @@
             var savedRecipe = await ResolveAndSaveRecipeAsync(result);
             if (savedRecipe == null)
             {
-                await DialogService.ShowAlertAsync(Tr("Chyba"), Tr("Recept se nepodařilo načíst. Zkontroluj internetové připojení."), "OK");
+                string message = result.Source == ExternalRecipeSource.Spoonacular && !SpoonacularQuotaService.HasSearchQuota()
+                    ? Tr("Denní limit pro stahování receptů z tohoto zdroje byl vyčerpán. Zkus to znovu zítra, nebo vyber jiný recept.")
+                    : Tr("Recept se nepodařilo načíst. Zkontroluj internetové připojení.");
+                await DialogService.ShowAlertAsync(Tr("Chyba"), message, "OK");
                 return;
             }
 
@@ -227,7 +241,7 @@
 
         if (result.Source == ExternalRecipeSource.MealDb && result.MealDbData != null)
         {
-            var completed = await _searchService.CompleteMealDbResultAsync(result);
+            var completed = await RecipeSearchService.CompleteMealDbResultAsync(result);
             if (completed == null) return null;
             return await App.Database.SaveExternalRecipeAsync(completed, result.NameCs);
         }

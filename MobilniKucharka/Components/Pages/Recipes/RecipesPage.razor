@@ -45,6 +45,8 @@
             <button type="button" class="btn-dev" @onclick="OnResetDatabaseClicked">@Tr("🔄 Resetovat testovací databázi")</button>
             <button type="button" class="btn-dev" @onclick="OnRepairStepsClicked">@Tr("🔧 Opravit formátování kroků")</button>
             <button type="button" class="btn-dev" @onclick="OnCheckDeepLQuotaClickedAsync">@Tr("📊 Zkontrolovat DeepL kvótu")</button>
+            <button type="button" class="btn-dev" @onclick="OnGenerateTestRecipesClickedAsync">@Tr("🧪 Vygenerovat 200 testovacích receptů")</button>
+            <button type="button" class="btn-dev" @onclick="OnDeleteTestRecipesClickedAsync">@Tr("↩️ Vrátit testovací recepty zpět")</button>
         </div>
     }
 
@@ -66,10 +68,9 @@
         }
         else
         {
-            @foreach (var recipeWithCost in _recipes)
-            {
+            <Virtualize Items="_recipes!" Context="recipeWithCost" ItemSize="140">
                 <RecipeCard @key="recipeWithCost.Recipe.Id" Item="recipeWithCost" />
-            }
+            </Virtualize>
         }
     </div>
 
@@ -118,7 +119,7 @@
         await LoadPageDataAsync();
         CheckPendingImport();
 
-        // Údržba jen jednou za spuštění
+        // Údržba jen jednou za spuštění appky, ne při každé navigaci na stránku.
         if (!_startupTasksStarted)
         {
             _startupTasksStarted = true;
@@ -307,7 +308,8 @@
         if (!confirm) return;
 
         await App.Database.ResetDatabaseAsync();
-        await LoadPageDataAsync(forceReload: true);
+        RecipeListCache.Invalidate();
+        await LoadPageDataAsync();
         await DialogService.ShowAlertAsync(Tr("Hotovo"), Tr("Databáze byla resetována na testovací data."), "OK");
     }
 
@@ -337,7 +339,6 @@
             RecipeListCache.Invalidate();
             await DialogService.ShowAlertAsync(Tr("Recept naimportován"), string.Format(Tr("\"{0}\" byl přidán do tvých receptů."), recipe.Name), "OK");
             await LoadPageDataAsync(forceReload: true);
-            await InvokeAsync(StateHasChanged);
         }
         else
         {
@@ -379,6 +380,26 @@
         long remaining = limit - used;
         await DialogService.ShowAlertAsync(Tr("DeepL kvóta"),
             $"{used:N0} / {limit:N0} znaků\n{Tr("Zbývá")}: {remaining:N0}", "OK");
+    }
+
+    private async Task OnGenerateTestRecipesClickedAsync()
+    {
+        bool confirm = await DialogService.ShowConfirmAsync(
+            Tr("Vygenerovat testovací recepty"),
+            Tr("Vytvoří 200 prázdných testovacích receptů pro ověření výkonu seznamu. Pokračovat?"),
+            Tr("Ano"), Tr("Zrušit"));
+        if (!confirm) return;
+
+        await App.Database.GenerateTestRecipesAsync(200);
+        await LoadPageDataAsync(forceReload: true);
+        await DialogService.ShowAlertAsync(Tr("Hotovo"), Tr("Testovací recepty byly vygenerovány."), "OK");
+    }
+
+    private async Task OnDeleteTestRecipesClickedAsync()
+    {
+        int removed = await App.Database.DeleteTestRecipesAsync();
+        await LoadPageDataAsync(forceReload: true);
+        await DialogService.ShowAlertAsync(Tr("Hotovo"), string.Format(Tr("Odstraněno testovacích receptů: {0}"), removed), "OK");
     }
 
     public void Dispose()

@@ -6,10 +6,10 @@ namespace MobilniKucharka.Services
 {
     public static class ImageResizeService
     {
-        private const int MaxDimensionPx = 800;
-        private const int JpegQuality = 85;
+        private const int DefaultMaxDimensionPx = 800;
+        private const int DefaultJpegQuality = 85;
 
-        public static async Task SaveResizedAsync(Stream sourceStream, string destinationPath)
+        public static async Task SaveResizedAsync(Stream sourceStream, string destinationPath, int maxDimensionPx = DefaultMaxDimensionPx, int jpegQuality = DefaultJpegQuality)
         {
 #if ANDROID
             // Načte celý stream do paměti nejdřív - MediaPicker.OpenReadAsync() stream nemusí
@@ -32,7 +32,7 @@ namespace MobilniKucharka.Services
 
                 int width = original.Width;
                 int height = original.Height;
-                double scale = Math.Min(1.0, (double)MaxDimensionPx / Math.Max(width, height));
+                double scale = Math.Min(1.0, (double)maxDimensionPx / Math.Max(width, height));
 
                 // "resized" je buď nová bitmapa (scale < 1.0), nebo přesně tentýž objekt jako
                 // "original" (scale >= 1.0) - v tom druhém případě smí Dispose() proběhnout jen
@@ -44,7 +44,7 @@ namespace MobilniKucharka.Services
                 try
                 {
                     using var destStream = File.Create(destinationPath);
-                    resized.Compress(Bitmap.CompressFormat.Jpeg!, JpegQuality, destStream);
+                    resized.Compress(Bitmap.CompressFormat.Jpeg!, jpegQuality, destStream);
                 }
                 finally
                 {

@@ -1,6 +1,7 @@
 ﻿using MobilniKucharka.Classes.Recipe;
 using SQLite;
 using System.Text.Json;
+using static Android.App.DownloadManager;
 
 namespace MobilniKucharka.Services.Api
 {
@@ -22,10 +23,13 @@ namespace MobilniKucharka.Services.Api
                 return cached;
             }
 
+            if (!SpoonacularQuotaService.HasSearchQuota()) return null;
+
             string url = $"https://api.spoonacular.com/recipes/{spoonacularId}/information?apiKey={ApiKey}&includeNutrition=true";
             try
             {
                 var response = await _httpClient.GetAsync(url);
+                SpoonacularQuotaService.UpdateFromResponseHeaders(response);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -93,12 +97,15 @@ namespace MobilniKucharka.Services.Api
         // dotáhnou (a rovnou uloží do DB, viz GetRecipeWithCacheAsync) až po výběru receptu.
         public static async Task<List<ExternalRecipeSearchResult>> SearchRecipesAsync(string query, string? diet, CancellationToken cancellationToken)
         {
+            if (!SpoonacularQuotaService.HasSearchQuota()) return [];
+
             string dietParam = string.IsNullOrWhiteSpace(diet) ? "" : $"&diet={Uri.EscapeDataString(diet)}";
-            string url = $"https://api.spoonacular.com/recipes/complexSearch?apiKey={ApiKey}&query={Uri.EscapeDataString(query)}&number=10{dietParam}";
+            string url = $"https://api.spoonacular.com/recipes/complexSearch?apiKey={ApiKey}&query={Uri.EscapeDataString(query)}&number=100{dietParam}";
 
             try
             {
                 var response = await _httpClient.GetAsync(url, cancellationToken);
+                SpoonacularQuotaService.UpdateFromResponseHeaders(response);
                 if (!response.IsSuccessStatusCode) return [];
 
                 var contentString = await response.Content.ReadAsStringAsync(cancellationToken);
