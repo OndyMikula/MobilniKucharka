@@ -1,6 +1,7 @@
 ﻿using MobilniKucharka.Classes.UserData;
 using MobilniKucharka.Services;
-using MobilniKucharka.Translation;
+using MobilniKucharka.Services.Cache;
+using MobilniKucharka.Translation.UI;
 
 namespace MobilniKucharka;
 
