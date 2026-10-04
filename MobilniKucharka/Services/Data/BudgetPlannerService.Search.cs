@@ -3,7 +3,7 @@ using MobilniKucharka.Classes.UserData.Bookmark;
 using MobilniKucharka.Services.Cache;
 using MobilniKucharka.Translation.Content;
 
-namespace MobilniKucharka.Services
+namespace MobilniKucharka.Services.Data
 {
     // Správa dočasných receptů ze SearchPage - recept zobrazený jen přes "Detail" (bez importu)
     // se uloží do DB jako dočasný (IsSearchTemp = true), aby fungovaly detail stránka, cena a

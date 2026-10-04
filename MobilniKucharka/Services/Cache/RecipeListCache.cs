@@ -1,4 +1,6 @@
-﻿namespace MobilniKucharka.Services.Cache
+﻿using MobilniKucharka.Services.Data;
+
+namespace MobilniKucharka.Services.Cache
 {
     // Cache posledního seznamu na RecipesPage (celý plán, nebo lokální hledání podle CachedKey).
     // Přežije navigaci, ne restart appky. Invaliduje se centrálně v BudgetPlannerService a v

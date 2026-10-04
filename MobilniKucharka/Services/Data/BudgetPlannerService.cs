@@ -1,7 +1,7 @@
 using MobilniKucharka.Classes;
 using MobilniKucharka.Classes.Recipe;
 using MobilniKucharka.Classes.UserData.Bookmark;
-using MobilniKucharka.Services.Api;
+using MobilniKucharka.Services.API;
 using MobilniKucharka.Services.Cache;
 using MobilniKucharka.Services.Recipes;
 using MobilniKucharka.Services.Utilities;
@@ -12,7 +12,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace MobilniKucharka.Services
+namespace MobilniKucharka.Services.Data
 {
     public partial class BudgetPlannerService(string dbPath)
     {

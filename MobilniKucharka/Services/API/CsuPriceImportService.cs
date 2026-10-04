@@ -1,4 +1,6 @@
-﻿namespace MobilniKucharka.Services
+﻿using MobilniKucharka.Services;
+
+namespace MobilniKucharka.Services.API
 {
     public class CsuPriceEntry
     {

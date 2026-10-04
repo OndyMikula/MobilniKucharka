@@ -1,7 +1,7 @@
 ﻿using MobilniKucharka.Classes.Recipe;
 using MobilniKucharka.Services.Cache;
 
-namespace MobilniKucharka.Services
+namespace MobilniKucharka.Services.Data
 {
     // Vývojářské nástroje pro zátěžové testování (virtualizovaný seznam při velkém počtu
     // receptů) - nikdy se nespouští automaticky, jen ručně z dev-tools řádku na RecipesPage.

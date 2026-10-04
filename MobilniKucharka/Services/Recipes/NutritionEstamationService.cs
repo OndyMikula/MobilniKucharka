@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace MobilniKucharka.Services
+namespace MobilniKucharka.Services.Recipes
 {
     public static partial class NutritionEstimationService
     {

@@ -5,7 +5,7 @@ using MobilniKucharka.Services.Utilities;
 using MobilniKucharka.Translation;
 using MobilniKucharka.Translation.Content;
 
-namespace MobilniKucharka.Services
+namespace MobilniKucharka.Services.Data
 {
     public partial class BudgetPlannerService
     {

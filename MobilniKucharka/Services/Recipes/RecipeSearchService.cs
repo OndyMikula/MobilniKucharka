@@ -1,5 +1,5 @@
 ﻿using MobilniKucharka.Classes.Recipe;
-using MobilniKucharka.Services.Api;
+using MobilniKucharka.Services.API;
 using MobilniKucharka.Translation;
 
 namespace MobilniKucharka.Services.Recipes
@@ -26,7 +26,7 @@ namespace MobilniKucharka.Services.Recipes
     {
         private readonly SpoonacularService _spoonacularService = new(dbPath);
 
-        public async Task<List<ExternalRecipeSearchResult>> SearchAsync(string rawQuery, bool applyDietFilter, CancellationToken cancellationToken)
+        public static async Task<List<ExternalRecipeSearchResult>> SearchAsync(string rawQuery, bool applyDietFilter, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(rawQuery)) return [];
 

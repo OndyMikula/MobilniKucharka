@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
+using MobilniKucharka.Services.Recipes;
 
-namespace MobilniKucharka.Services.Api
+namespace MobilniKucharka.Services.API
 {
     public static class TheMealDbService
     {

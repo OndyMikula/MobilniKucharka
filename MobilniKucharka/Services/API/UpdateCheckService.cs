@@ -1,7 +1,8 @@
 ﻿using System.Text.Json;
 using System.Text.RegularExpressions;
+using MobilniKucharka.Services;
 
-namespace MobilniKucharka.Services
+namespace MobilniKucharka.Services.API
 {
     public class UpdateInfo
     {

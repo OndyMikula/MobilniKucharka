@@ -1,4 +1,6 @@
-﻿namespace MobilniKucharka.Services
+﻿using MobilniKucharka.Services;
+
+namespace MobilniKucharka.Services.API
 {
     // Sleduje denní kvótu Spoonacular podle hlaviček, které API vrací v KAŽDÉ odpovědi
     // (X-API-Quota-Left) - žádné volání navíc není potřeba. Appka sama přestane Spoonacular volat,

@@ -2,6 +2,8 @@
 @namespace MobilniKucharka.Components.Pages.Feedback
 @inject IDialogService DialogService
 
+@using MobilniKucharka.Services
+
 <div class="create-recipe-page">
     <div class="create-recipe-header">
         <button type="button" class="icon-btn" @onclick="NavigateBackAsync">←</button>
@@ -46,6 +48,7 @@
             <div class="detail-card" style="font-size:13px; color:var(--color-text-secondary);">
                 <div>@Tr("Jazyk aplikace"): @_languageName</div>
                 <div>@string.Format(Tr("Verze {0}"), _appVersion)</div>
+                <div>@Tr("Zařízení"): @_deviceSummary</div>
             </div>
         </div>
 
@@ -75,6 +78,7 @@
     private string _userEmail = string.Empty;
     private string _appVersion = string.Empty;
     private string _languageName = string.Empty;
+    private string _deviceSummary = string.Empty;
     private bool _isSending = false;
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
@@ -83,6 +87,7 @@
     {
         _appVersion = AppInfo.Current.VersionString;
         _languageName = Preferences.Default.Get("AppLanguageName", "Čeština");
+        _deviceSummary = $"{DeviceInfo.Current.Manufacturer} {DeviceInfo.Current.Model}, {DeviceInfo.Current.Platform} {DeviceInfo.Current.VersionString}";
     }
 
     // Prázdný nadpis -> místo useknuté (a matoucí) ukázky popisu se do e-mailu pošle verze
@@ -97,7 +102,7 @@
         string reproPart = string.IsNullOrWhiteSpace(_reproSteps) ? "(nevyplněno)" : _reproSteps;
         string emailPart = string.IsNullOrWhiteSpace(_userEmail) ? "(neuvedeno)" : _userEmail;
 
-        return $"Verze aplikace: {_appVersion}\nJazyk aplikace: {_languageName} ({languageCode})\nE-mail uživatele: {emailPart}\n\nPopis chyby:\n{descriptionPart}\n\nJak problém zopakovat:\n{reproPart}";
+        return $"Verze aplikace: {_appVersion}\nJazyk aplikace: {_languageName} ({languageCode})\nE-mail uživatele: {emailPart}\n\nPopis chyby:\n{descriptionPart}\n\nJak problém zopakovat:\n{reproPart}\n\nZařízení a systém:\n{DeviceInfoCollector.Collect()}";
     }
 
     private async Task<bool> ValidateAsync()
@@ -118,8 +123,7 @@
         try
         {
             string languageCode = Preferences.Default.Get("AppLanguageCode", "cs");
-            var service = new FeedbackDispatchService();
-            var result = await service.SendFeedbackAsync(
+            var result = await FeedbackDispatchService.SendFeedbackAsync(
                 type: "Nahlásit chybu",
                 title: ResolveTitle(),
                 description: string.IsNullOrWhiteSpace(_description) ? "(nevyplněno)" : _description,

@@ -4,6 +4,8 @@
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 
+@using MobilniKucharka.Services
+
 <div class="hub-page">
     <div class="hub-header">
         <h1 class="hub-title">@Tr("Hledat recept")</h1>
@@ -143,7 +145,7 @@
         {
             if (_searchService != null)
             {
-                _results = await _searchService.SearchAsync(query, _filterByPreferences, _searchCts.Token);
+                _results = await RecipeSearchService.SearchAsync(query, _filterByPreferences, _searchCts.Token);
 
                 SearchPageState.LastQuery = query;
                 SearchPageState.LastFilterByPreferences = _filterByPreferences;

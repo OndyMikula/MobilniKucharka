@@ -2,7 +2,7 @@
 using MobilniKucharka.Services.Recipes;
 using System.Text.Json;
 
-namespace MobilniKucharka.Services
+namespace MobilniKucharka.Services.Data
 {
     public partial class BudgetPlannerService
     {

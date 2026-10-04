@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using MobilniKucharka.Services;
 using System.Text;
 using System.Text.Json;
 
@@ -25,7 +26,7 @@ namespace MobilniKucharka.Services.Feedback
         private static readonly HttpClient _httpClient = new();
         private static readonly string DispatchUrl = "https://api.github.com/repos/OndyMikula/MobilniKucharka-Feedback/dispatches";
 
-        public async Task<FeedbackDispatchResult> SendFeedbackAsync(string type, string title, string description, string reproSteps, string appVersion, string language, string userEmail)
+        public static async Task<FeedbackDispatchResult> SendFeedbackAsync(string type, string title, string description, string reproSteps, string appVersion, string language, string userEmail)
         {
             if (string.IsNullOrWhiteSpace(Secrets.FeedbackDispatchToken) ||
                 Secrets.FeedbackDispatchToken.Contains("paste_your", StringComparison.OrdinalIgnoreCase))
@@ -39,7 +40,7 @@ namespace MobilniKucharka.Services.Feedback
                 var payload = new
                 {
                     event_type = "feedback",
-                    client_payload = new { type, title, description, reproSteps, appVersion, language, userEmail }
+                    client_payload = new { type, title, description, reproSteps, appVersion, language, userEmail, deviceInfo = DeviceInfoCollector.Collect() }
                 };
 
                 using var request = new HttpRequestMessage(HttpMethod.Post, DispatchUrl)

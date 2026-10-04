@@ -1,7 +1,8 @@
 ﻿using System.Globalization;
 using System.Text.Json;
+using MobilniKucharka.Services;
 
-namespace MobilniKucharka.Services.Api
+namespace MobilniKucharka.Services.API
 {
     //Open Food Facts API v aplikaci zobrazujenutricni hodnoty, vyuziva moznosti nacteni carovych kodu ze primo v aplikaci
     //text Je toto ten sýr ? Button Načíst čárový kód ktery kdyz to najde v databazi tak rekne Jo to je presne on

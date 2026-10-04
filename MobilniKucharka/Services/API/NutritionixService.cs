@@ -1,7 +1,8 @@
 ﻿using System.Text;
 using System.Text.Json;
+using MobilniKucharka.Services;
 
-namespace MobilniKucharka.Services.Api
+namespace MobilniKucharka.Services.API
 {
     //Nutritionix API "Bezplatný vývojářský tarif (Development Tier)" nabízí přístup k databázi
     //běžných potravin i restauračních menu a obsahuje pokročilé NLP (přirozené zpracování jazyka) pro analýzu textu

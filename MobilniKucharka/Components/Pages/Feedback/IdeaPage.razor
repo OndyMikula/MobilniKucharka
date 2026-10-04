@@ -1,5 +1,6 @@
 ﻿@page "/idea"
 @namespace MobilniKucharka.Components.Pages.Feedback
+@using MobilniKucharka.Translation.UI
 @inject IDialogService DialogService
 
 <div class="create-recipe-page">
@@ -33,6 +34,8 @@
                    value="@_userEmail" disabled="@_isSending"
                    @oninput="(e) => _userEmail = e.Value?.ToString() ?? string.Empty" />
         </div>
+
+        <span style="font-size:12px; color:var(--color-text-muted);">@Tr("Spolu s nápadem se odešlou i základní technické údaje o zařízení (model, verze Androidu).")</span>
 
         <button type="button" class="btn-action btn-success" style="height:55px; margin-top:6px;" @onclick="OnSendAsync" disabled="@_isSending">
             @if (_isSending)
@@ -69,7 +72,7 @@
         string titlePart = string.IsNullOrWhiteSpace(_title) ? "(bez názvu)" : _title;
         string descriptionPart = string.IsNullOrWhiteSpace(_description) ? "(nevyplněno)" : _description;
         string emailPart = string.IsNullOrWhiteSpace(_userEmail) ? "(neuvedeno)" : _userEmail;
-        return $"E-mail uživatele: {emailPart}\n\n{titlePart}\n\n{descriptionPart}";
+        return $"E-mail uživatele: {emailPart}\n\n{titlePart}\n\n{descriptionPart}\n\nZařízení a systém:\n{DeviceInfoCollector.Collect()}";
     }
 
     private async Task<bool> ValidateAsync()
@@ -91,8 +94,7 @@
         {
             string languageCode = Preferences.Default.Get("AppLanguageCode", "cs");
             string languageName = Preferences.Default.Get("AppLanguageName", "Čeština");
-            var service = new FeedbackDispatchService();
-            var result = await service.SendFeedbackAsync(
+            var result = await FeedbackDispatchService.SendFeedbackAsync(
                 type: "Nápad na vylepšení",
                 title: BuildPreview(),
                 description: string.IsNullOrWhiteSpace(_description) ? "(nevyplněno)" : _description,

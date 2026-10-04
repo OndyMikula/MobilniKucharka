@@ -1,10 +1,11 @@
 ﻿using MobilniKucharka.Classes.Recipe;
+using MobilniKucharka.Services;
 using MobilniKucharka.Services.Recipes;
 using SQLite;
 using System.Text.Json;
 using static Android.App.DownloadManager;
 
-namespace MobilniKucharka.Services.Api
+namespace MobilniKucharka.Services.API
 {
     //spoonacular - "stahovat si recepty ze Spoonacularu
     public class SpoonacularService(string dbPath)
