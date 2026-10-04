@@ -114,6 +114,7 @@
 
   "Bílkoviny": "Protein",
   "Cukry": "Sugars",
+  "Nedostatek dat": "Not enough data",
   "Detail receptu": "Recipe details",
   "Ingredience": "Ingredients",
   "Kopírování": "Copying",
@@ -163,7 +164,6 @@
   "Zkopírováno": "Copied",
   "Celkem za jídlo: {0:N0} Kč": "Total for this meal: {0:N0} CZK",
   "Cena nákupu není k dispozici": "Purchase price not available",
-  "Importovat": "Import",
   "Tuto surovinu se nepodařilo přiřadit k produktu. Zkus recept znovu otevřít.": "This ingredient couldn't be linked to a product. Try opening the recipe again.",
   "Zadat vlastní cenu": "Enter custom price",
   "Propojit s existující surovinou": "Link to an existing ingredient",

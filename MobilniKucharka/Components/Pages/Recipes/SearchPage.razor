@@ -49,7 +49,7 @@
             @foreach (var result in _results!)
             {
                 <!-- Celá karta je teď klikatelná (stejný vzor jako RecipeCard.razor na Recepty) -
-                     klepnutí kamkoliv na kartu otevře náhled bez importu, "Importovat" zůstává
+                     klepnutí kamkoliv na kartu otevře náhled bez importu, "Uložit" zůstává
                      samostatné tlačítko s @onclick:stopPropagation, ať nespustí i klik karty pod sebou. -->
                 <div class="search-result-card" @key="result.ExternalId ?? result.Name" @onclick="() => OnCardClicked(result)">
                     <div class="search-result-img-wrap">
@@ -69,7 +69,7 @@
 
                         <div class="search-result-actions">
                             <button type="button" class="btn-sm-success" @onclick="() => OnImportClicked(result)" @onclick:stopPropagation="true">
-                                @Tr("Importovat")
+                                @Tr("Uložit")
                             </button>
                         </div>
                     </div>
@@ -212,16 +212,9 @@
 
             if (savedRecipe.ServingSize <= 0)
             {
-                string? promptResult = await DialogService.ShowPromptAsync(
-                    Tr("Pro kolik lidí by měl recept být?"),
-                    Tr("Zadej, pro kolik lidí chceš recept uvařit."),
-                    "OK", initialValue: string.Empty, keyboard: Keyboard.Numeric);
-
-                if (int.TryParse(promptResult, out var parsed) && parsed > 0)
-                {
-                    await App.Database.UpdateRecipeServingSizeAsync(savedRecipe.Id, parsed);
-                    savedRecipe.ServingSize = parsed;
-                }
+                int defaultServings = Preferences.Default.Get("PeopleCount", 2);
+                await App.Database.UpdateRecipeServingSizeAsync(savedRecipe.Id, defaultServings);
+                savedRecipe.ServingSize = defaultServings;
             }
 
             if (isImport)

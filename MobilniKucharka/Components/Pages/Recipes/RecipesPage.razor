@@ -127,6 +127,7 @@
             _ = RunProductCleanupAsync();
             _ = RunRecipeLanguageFixAsync();
             _ = App.Database.EnsureRequiredEquipmentMigrationAsync();
+            _ = Task.Run(() => App.Database.EnsureNutritionRecalcMigrationAsync());
         }
     }
 
@@ -259,16 +260,9 @@
 
             if (savedRecipe.ServingSize <= 0)
             {
-                string? result = await DialogService.ShowPromptAsync(
-                    Tr("Pro kolik lidí by měl recept být?"),
-                    Tr("Zadej, pro kolik lidí chceš recept uvařit."),
-                    "OK", initialValue: string.Empty, keyboard: Keyboard.Numeric);
-
-                if (int.TryParse(result, out var parsed) && parsed > 0)
-                {
-                    await App.Database.UpdateRecipeServingSizeAsync(savedRecipe.Id, parsed);
-                    savedRecipe.ServingSize = parsed;
-                }
+                int defaultServings = Preferences.Default.Get("PeopleCount", 2);
+                await App.Database.UpdateRecipeServingSizeAsync(savedRecipe.Id, defaultServings);
+                savedRecipe.ServingSize = defaultServings;
             }
 
             NavigationManager.NavigateTo($"/recipe/{savedRecipe.Id}");

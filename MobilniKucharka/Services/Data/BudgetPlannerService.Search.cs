@@ -13,7 +13,7 @@ namespace MobilniKucharka.Services.Data
     {
         // Zavolat TĚSNĚ PŘED spuštěním nového hledání (viz SearchPage.OnSearchButtonClicked) -
         // smaže recepty, které minulé hledání uložilo do DB přes "Detail", ale uživatel je
-        // nenaimportoval. Nikdy nemaže recepty naimportované tlačítkem "Importovat".
+        // nenaimportoval. Nikdy nemaže recepty naimportované tlačítkem "Uložit".
         public async Task DeleteSearchTempRecipesAsync()
         {
             await EnsureInitializedAsync();
@@ -38,7 +38,7 @@ namespace MobilniKucharka.Services.Data
         }
 
         // Recept uložený ze SearchPage se označí jako dočasný (isTemp:true) po zobrazení přes
-        // "Detail", nebo jako trvalý (isTemp:false) po "Importovat" - viz SearchPage.OpenRecipeAsync.
+        // "Detail", nebo jako trvalý (isTemp:false) po "Uložit" - viz SearchPage.OpenRecipeAsync.
         public async Task MarkRecipeSearchTempAsync(int recipeId, bool isTemp)
         {
             await EnsureInitializedAsync();

@@ -4,7 +4,6 @@
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
-@using System.Text.RegularExpressions
 
 <div class="recipe-detail-page">
     @if (_isLoading)
@@ -58,7 +57,7 @@
                     </div>
                     @if (_recipe.IsSearchTemp)
                     {
-                        <button type="button" class="btn-import-inline" @onclick="OnImportClickedAsync">@Tr("Importovat")</button>
+                        <button type="button" class="btn-import-inline" @onclick="OnImportClickedAsync">@Tr("Uložit")</button>
                     }
                 </div>
             </div>
@@ -67,30 +66,39 @@
         <div class="recipe-detail-body">
 
             <!-- NUTRICNI HODNOTY -->
-            <div class="detail-section">
-                <div class="nutrition-grid">
-                    <div class="nutrition-card" style="background-color: var(--color-primary-bg);">
-                        <span class="nutrition-card-label" style="color: #1565C0;">@Tr("Bílkoviny")</span>
-                        <span class="nutrition-card-value" style="color: #1565C0;">@FormatNutritionPerServing(_recipe.Protein, Math.Max(_recipe.ServingSize, 1))</span>
+            @if (HasNutritionData)
+            {
+                <div class="detail-section">
+                    <div class="nutrition-grid">
+                        <div class="nutrition-card" style="background-color: var(--color-primary-bg);">
+                            <span class="nutrition-card-label" style="color: #1565C0;">@Tr("Bílkoviny")</span>
+                            <span class="nutrition-card-value" style="color: #1565C0;">@FormatNutritionPerServing(_recipe.Protein, Math.Max(_recipe.ServingSize, 1))</span>
+                        </div>
+                        <div class="nutrition-card" style="background-color: var(--color-warning-bg);">
+                            <span class="nutrition-card-label" style="color: #EF6C00;">@Tr("Sacharidy")</span>
+                            <span class="nutrition-card-value" style="color: #EF6C00;">@FormatNutritionPerServing(_recipe.Carbs, Math.Max(_recipe.ServingSize, 1))</span>
+                        </div>
+                        <div class="nutrition-card" style="background-color: var(--color-success-bg);">
+                            <span class="nutrition-card-label" style="color: #2E7D32;">@Tr("Tuky")</span>
+                            <span class="nutrition-card-value" style="color: #2E7D32;">@FormatNutritionPerServing(_recipe.Fat, Math.Max(_recipe.ServingSize, 1))</span>
+                        </div>
+                        <div class="nutrition-card" style="background-color: var(--color-danger-bg);">
+                            <span class="nutrition-card-label" style="color: #C62828;">@Tr("Cukry")</span>
+                            <span class="nutrition-card-value" style="color: #C62828;">@FormatNutritionPerServing(_recipe.Sugar, Math.Max(_recipe.ServingSize, 1))</span>
+                        </div>
                     </div>
-                    <div class="nutrition-card" style="background-color: var(--color-warning-bg);">
-                        <span class="nutrition-card-label" style="color: #EF6C00;">@Tr("Sacharidy")</span>
-                        <span class="nutrition-card-value" style="color: #EF6C00;">@FormatNutritionPerServing(_recipe.Carbs, Math.Max(_recipe.ServingSize, 1))</span>
-                    </div>
-                    <div class="nutrition-card" style="background-color: var(--color-success-bg);">
-                        <span class="nutrition-card-label" style="color: #2E7D32;">@Tr("Tuky")</span>
-                        <span class="nutrition-card-value" style="color: #2E7D32;">@FormatNutritionPerServing(_recipe.Fat, Math.Max(_recipe.ServingSize, 1))</span>
-                    </div>
-                    <div class="nutrition-card" style="background-color: var(--color-danger-bg);">
-                        <span class="nutrition-card-label" style="color: #C62828;">@Tr("Cukry")</span>
-                        <span class="nutrition-card-value" style="color: #C62828;">@FormatNutritionPerServing(_recipe.Sugar, Math.Max(_recipe.ServingSize, 1))</span>
-                    </div>
+                    @if (_recipe.IsNutritionEstimated)
+                    {
+                        <div class="nutrition-estimate-label">@Tr("Odhad")</div>
+                    }
                 </div>
-                @if (_recipe.IsNutritionEstimated)
-                {
-                    <div class="nutrition-estimate-label">@Tr("Odhad")</div>
-                }
-            </div>
+            }
+            else
+            {
+                <div class="detail-section">
+                    <div class="nutrition-empty">@Tr("Nedostatek dat")</div>
+                </div>
+            }
 
             <!-- POPIS -->
             @if (!string.IsNullOrWhiteSpace(_recipe.DescriptionText))
@@ -284,6 +292,7 @@
     private string _peopleCountBadgeText = string.Empty;
     private bool _showBookmarkOverlay;
     private List<BookmarkSelectionModel> _bookmarkSelection = [];
+    private bool HasNutritionData => _recipe != null && _recipe.Protein + _recipe.Carbs + _recipe.Fat + _recipe.Sugar > 0;
 
     private bool _showLanguageFixOverlay;
     private string _fixIngredientsLang = "cs";
@@ -291,8 +300,6 @@
 
     private bool _showDeleteOverlay;
     private bool _isDeveloperMode;
-
-    private static readonly Regex AmountScaleNumberRegex = new(@"^(\d+(?:[.,]\d+)?)", RegexOptions.Compiled);
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
@@ -400,13 +407,10 @@
                 string displayAmount = amount;
                 if (!string.IsNullOrWhiteSpace(amount) && scaleFactor != 1.0)
                 {
-                    var numMatch = AmountScaleNumberRegex.Match(amount);
-                    if (numMatch.Success)
+                    string trimmedAmount = amount.Trim();
+                    if (NutritionEstimationService.TryReadLeadingQuantity(trimmedAmount, out double originalNum, out int numLength))
                     {
-                        double originalNum = double.Parse(numMatch.Value.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture);
-                        double scaledNum = originalNum * scaleFactor;
-                        string restOfText = amount[numMatch.Length..];
-                        displayAmount = $"{scaledNum:0.#}{restOfText}";
+                        displayAmount = $"{originalNum * scaleFactor:0.#}{trimmedAmount[numLength..]}";
                     }
                 }
 
@@ -853,20 +857,9 @@
 
         if (recipe.ServingSize <= 0)
         {
-            string? baseResult = await DialogService.ShowPromptAsync(
-                Tr("Pro kolik lidí je tento recept napsaný?"),
-                Tr("Recept neuvádí počet porcí. Zadej, pro kolik lidí jsou napsané suroviny."),
-                "OK", initialValue: string.Empty, keyboard: Keyboard.Numeric);
-
-            if (int.TryParse(baseResult, out var baseParsed) && baseParsed > 0)
-            {
-                await PromoteFromSearchTempAsync();
-
-                await App.Database.UpdateRecipeServingSizeAsync(recipe.Id, baseParsed);
-                recipe.ServingSize = baseParsed;
-                await LoadIngredientsAndStepsAsync();
-            }
-            return;
+            int defaultServings = Preferences.Default.Get("PeopleCount", 2);
+            await App.Database.UpdateRecipeServingSizeAsync(recipe.Id, defaultServings);
+            recipe.ServingSize = defaultServings;
         }
 
         string? result = await DialogService.ShowPromptAsync(
