@@ -1822,3 +1822,99 @@ html, body {
     font-weight: 800;
     color: var(--color-text);
 }
+
+/* In-app dialogs */
+.dialog-overlay {
+    z-index: 200;
+}
+
+.ios-dialog {
+    width: 100%;
+    max-width: 320px;
+    background-color: var(--color-surface);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+}
+
+.ios-dialog-body {
+    padding: 20px 16px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+}
+
+.ios-dialog-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: bold;
+    color: var(--color-text);
+}
+
+.ios-dialog-message {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    color: var(--color-text-secondary);
+}
+
+.ios-dialog-input-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.ios-dialog-input,
+.ios-dialog-select {
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-size: 15px;
+    font-family: inherit;
+    outline: none;
+}
+
+.ios-dialog-input {
+    flex: 1;
+    min-width: 0;
+}
+
+    .ios-dialog-input:focus {
+        border-color: var(--color-primary);
+    }
+
+.ios-dialog-select {
+    padding: 10px 6px;
+}
+
+.ios-dialog-actions {
+    display: flex;
+    border-top: 1px solid var(--color-border-light);
+}
+
+.ios-dialog-btn {
+    flex: 1;
+    padding: 14px 8px;
+    border: none;
+    background: transparent;
+    color: var(--color-primary);
+    font-size: 16px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+    .ios-dialog-btn + .ios-dialog-btn {
+        border-left: 1px solid var(--color-border-light);
+    }
+
+    .ios-dialog-btn.primary {
+        font-weight: bold;
+    }
+
+    .ios-dialog-btn:active {
+        background-color: var(--color-surface-hover);
+    }

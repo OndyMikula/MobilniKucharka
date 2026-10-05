@@ -1,0 +1,133 @@
+﻿@namespace MobilniKucharka.Components.Shared
+@implements IDialogHost
+@implements IDisposable
+@inject IDialogService DialogService
+
+@if (_current != null)
+{
+    <div class="modal-overlay dialog-overlay">
+        <div class="ios-dialog">
+            <div class="ios-dialog-body">
+                <h2 class="ios-dialog-title">@_current.Title</h2>
+                @if (!string.IsNullOrWhiteSpace(_current.Message))
+                {
+                    <p class="ios-dialog-message">@_current.Message</p>
+                }
+
+                @if (_current.Kind is DialogKind.Prompt or DialogKind.Amount)
+                {
+                    <div class="ios-dialog-input-row">
+                        <input type="text" @ref="_inputRef" class="ios-dialog-input"
+                               inputmode="@(_current.Numeric ? "decimal" : "text")"
+                               placeholder="@_current.Placeholder"
+                               maxlength="@(_current.MaxLength > 0 ? _current.MaxLength : 524288)"
+                               @bind="_inputValue" @bind:event="oninput" @onkeydown="OnInputKeyDown" />
+                        @if (_current.Kind == DialogKind.Amount)
+                        {
+                            <select class="ios-dialog-select" @bind="_selectedUnit">
+                                @foreach (var unit in _current.Units)
+                                {
+                                    <option value="@unit">@unit</option>
+                                }
+                            </select>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="ios-dialog-actions">
+                @if (_current.Kind != DialogKind.Alert)
+                {
+                    <button type="button" class="ios-dialog-btn" @onclick="OnCancelClicked">@_current.Cancel</button>
+                }
+                <button type="button" class="ios-dialog-btn primary" @onclick="OnAcceptClicked">@_current.Accept</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private DialogRequest? _current;
+    private TaskCompletionSource<DialogResponse>? _tcs;
+    private string _inputValue = string.Empty;
+    private string _selectedUnit = string.Empty;
+    private ElementReference _inputRef;
+    private bool _needsFocus;
+
+    protected override void OnInitialized()
+    {
+        DialogService.RegisterHost(this);
+    }
+
+    // Dialogy se řadí za sebou
+    public async Task<DialogResponse> ShowAsync(DialogRequest request)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            _tcs = new TaskCompletionSource<DialogResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            await InvokeAsync(() =>
+            {
+                _current = request;
+                _inputValue = request.InitialValue;
+                _selectedUnit = !string.IsNullOrEmpty(request.InitialUnit) ? request.InitialUnit : request.Units.FirstOrDefault() ?? string.Empty;
+                _needsFocus = request.Kind is DialogKind.Prompt or DialogKind.Amount;
+                StateHasChanged();
+            });
+
+            return await _tcs.Task;
+        }
+        finally
+        {
+            try
+            {
+                await InvokeAsync(() =>
+                {
+                    _current = null;
+                    StateHasChanged();
+                });
+            }
+            catch
+            {
+            }
+            _gate.Release();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_needsFocus) return;
+        _needsFocus = false;
+
+        try
+        {
+            await _inputRef.FocusAsync();
+        }
+        catch
+        {
+        }
+    }
+
+    private void OnAcceptClicked()
+    {
+        _tcs?.TrySetResult(new DialogResponse { Accepted = true, Text = _inputValue ?? string.Empty, Unit = _selectedUnit });
+    }
+
+    private void OnCancelClicked()
+    {
+        _tcs?.TrySetResult(new DialogResponse { Accepted = false });
+    }
+
+    private void OnInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") OnAcceptClicked();
+    }
+
+    public void Dispose()
+    {
+        DialogService.UnregisterHost(this);
+        _tcs?.TrySetResult(new DialogResponse { Accepted = false });
+    }
+}
