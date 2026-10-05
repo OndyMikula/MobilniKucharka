@@ -1,0 +1,148 @@
+﻿@page "/shopping-list/{Id:int}"
+@namespace MobilniKucharka.Components.Pages.Shopping
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<div class="create-recipe-page">
+    <div class="create-recipe-header">
+        <button type="button" class="icon-btn" @onclick="OnBackClickedAsync">←</button>
+        <span style="flex:1;"></span>
+        @if (_list != null)
+        {
+            <button type="button" class="icon-btn" @onclick="OnOptionsClicked">⋮</button>
+        }
+    </div>
+
+    <div class="create-recipe-body">
+        @if (_isLoading)
+        {
+            <div class="skeleton-card"></div>
+        }
+        else if (_list == null)
+        {
+            <div class="empty-state">
+                <span class="empty-icon">🛒</span>
+                <p>@Tr("Tento seznam se nepodařilo najít.")</p>
+            </div>
+        }
+        else
+        {
+            <h2 class="shopping-detail-title">@_list.Name</h2>
+
+            @if (_entries.Count == 0)
+            {
+                <p class="empty-text">@Tr("V seznamu zatím nic není. Přidej suroviny z receptu.")</p>
+            }
+            else
+            {
+                <div class="detail-card">
+                    @foreach (var entry in _entries)
+                    {
+                        <div class="ingredient-row" style="cursor:default;">
+                            <span class="ingredient-name">@entry.Name</span>
+                            <span class="ingredient-amount">@entry.AmountText</span>
+                            <span class="ingredient-cost">@FormatEntryPrice(entry)</span>
+                        </div>
+                    }
+                </div>
+                <div class="total-price-label">@_totalText</div>
+            }
+        }
+    </div>
+</div>
+
+<GroupedActionMenu @bind-IsOpen="_showOptionsMenu" Groups="_optionsMenuGroups" CancelLabel="@Tr("Zrušit")" />
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ShoppingList? _list;
+    private List<ShoppingListEntry> _entries = [];
+    private string _totalText = string.Empty;
+    private bool _isLoading = true;
+    private int _loadedId;
+    private bool _showOptionsMenu;
+    private List<ActionMenuGroup> _optionsMenuGroups = [];
+
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Id) return;
+        _loadedId = Id;
+        _isLoading = true;
+
+        _list = await App.Database.GetShoppingListAsync(Id);
+        _entries = _list == null ? [] : await App.Database.GetShoppingListEntriesAsync(Id);
+
+        double total = _entries.Sum(e => e.Price);
+        bool anyUnpriced = _entries.Any(e => e.IsUnpriced);
+        _totalText = string.Format(Tr("Celkem: {0:N0} Kč"), total) + (anyUnpriced ? "+" : "");
+
+        _isLoading = false;
+    }
+
+    private static string FormatEntryPrice(ShoppingListEntry entry)
+    {
+        if (entry.IsUnpriced) return "? Kč";
+        return entry.Price > 0 ? $"{entry.Price:N0} Kč" : string.Empty;
+    }
+
+    private void OnOptionsClicked()
+    {
+        _optionsMenuGroups =
+        [
+            new ActionMenuGroup
+            {
+                Items = [new() { Icon = "✏️", Label = Tr("Přejmenovat seznam"), OnClick = EventCallback.Factory.Create(this, OnRenameClickedAsync) }]
+            },
+            new ActionMenuGroup
+            {
+                Items = [new() { Icon = "🗑️", Label = Tr("Smazat seznam"), IsDestructive = true, OnClick = EventCallback.Factory.Create(this, OnDeleteClickedAsync) }]
+            }
+        ];
+        _showOptionsMenu = true;
+    }
+
+    private async Task OnRenameClickedAsync()
+    {
+        if (_list == null) return;
+
+        string? name = await DialogService.ShowPromptAsync(
+            Tr("Přejmenovat seznam"), Tr("Zadej název seznamu."), Tr("Uložit"), Tr("Zrušit"),
+            maxLength: 40, initialValue: _list.Name);
+
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        await App.Database.RenameShoppingListAsync(_list.Id, name);
+        _list.Name = name.Trim();
+    }
+
+    private async Task OnDeleteClickedAsync()
+    {
+        if (_list == null) return;
+
+        bool confirm = await DialogService.ShowConfirmAsync(
+            Tr("Smazat seznam"),
+            string.Format(Tr("Opravdu chceš smazat seznam \"{0}\"?"), _list.Name),
+            Tr("Smazat"), Tr("Zrušit"));
+
+        if (!confirm) return;
+
+        await App.Database.DeleteShoppingListAsync(_list.Id);
+        NavigationManager.NavigateTo("/shopping-list", replace: true);
+    }
+
+    private async Task OnBackClickedAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("mkNavigateBack");
+        }
+        catch
+        {
+            NavigationManager.NavigateTo("/shopping-list");
+        }
+    }
+}

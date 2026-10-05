@@ -225,6 +225,34 @@
     </div>
 }
 
+<!-- OVERLAY: PRIDAT DO NAKUPNIHO SEZNAMU -->
+@if (_showShoppingOverlay)
+{
+    <div class="modal-overlay" @onclick="CloseShoppingOverlay">
+        <div class="modal-card modal-large" @onclick:stopPropagation="true">
+            <h2 class="modal-title">@Tr("Přidat do nákupního seznamu")</h2>
+            <div class="modal-content-scroll">
+                @if (_shoppingSelection.Count == 0)
+                {
+                    <p class="empty-text">@Tr("Zatím nemáš žádné nákupní seznamy.")</p>
+                }
+                else
+                {
+                    @foreach (var item in _shoppingSelection)
+                    {
+                        <label class="modal-checkbox-row" @key="item.ListId">
+                            <input type="checkbox" checked="@item.IsInList" @onchange="(e) => OnShoppingCheckedChangeAsync(item, e)" />
+                            <span class="modal-checkbox-label">@item.Name</span>
+                        </label>
+                    }
+                }
+            </div>
+            <button type="button" class="btn-action" style="background-color:#607D8B;" @onclick="OnCreateShoppingListFromRecipeAsync">@Tr("➕ Nový seznam")</button>
+            <button type="button" class="btn-action btn-primary modal-action-btn" @onclick="CloseShoppingOverlay">@Tr("Hotovo")</button>
+        </div>
+    </div>
+}
+
 <!-- OVERLAY: SMAZAT RECEPT -->
 @if (_showDeleteOverlay)
 {
@@ -292,6 +320,10 @@
     private string _peopleCountBadgeText = string.Empty;
     private bool _showBookmarkOverlay;
     private List<BookmarkSelectionModel> _bookmarkSelection = [];
+
+    private bool _showShoppingOverlay;
+    private List<ShoppingSelectionModel> _shoppingSelection = [];
+
     private bool HasNutritionData => _recipe != null && _recipe.Protein + _recipe.Carbs + _recipe.Fat + _recipe.Sugar > 0;
 
     private bool _showLanguageFixOverlay;
@@ -607,6 +639,57 @@
         _showBookmarkOverlay = false;
         await InitializeFavoriteStateAsync();
     }
+    private async Task OpenShoppingOverlayAsync()
+    {
+        if (_recipe == null) return;
+
+        var lists = await App.Database.GetShoppingListsAsync();
+        var listsWithRecipe = await App.Database.GetShoppingListIdsForRecipeAsync(_recipe.Id);
+
+        _shoppingSelection = lists.Select(l => new ShoppingSelectionModel
+        {
+            ListId = l.Id,
+            Name = l.Name,
+            IsInList = listsWithRecipe.Contains(l.Id)
+        }).ToList();
+
+        _showShoppingOverlay = true;
+    }
+
+    private async Task OnShoppingCheckedChangeAsync(ShoppingSelectionModel model, ChangeEventArgs e)
+    {
+        if (_recipe == null) return;
+        bool isChecked = e.Value is bool b && b;
+        model.IsInList = isChecked;
+
+        await PromoteFromSearchTempAsync();
+
+        if (isChecked)
+            await App.Database.AddRecipeToShoppingListAsync(model.ListId, _recipe.Id, _ingredients);
+        else
+            await App.Database.RemoveRecipeFromShoppingListAsync(model.ListId, _recipe.Id);
+    }
+
+    private async Task OnCreateShoppingListFromRecipeAsync()
+    {
+        if (_recipe == null) return;
+
+        string? name = await DialogService.ShowPromptAsync(
+            Tr("Nový nákupní seznam"), Tr("Zadej název seznamu."), Tr("Vytvořit"), Tr("Zrušit"), maxLength: 40);
+
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        await PromoteFromSearchTempAsync();
+
+        var list = await App.Database.CreateShoppingListAsync(name);
+        await App.Database.AddRecipeToShoppingListAsync(list.Id, _recipe.Id, _ingredients);
+        await OpenShoppingOverlayAsync();
+    }
+
+    private void CloseShoppingOverlay()
+    {
+        _showShoppingOverlay = false;
+    }
 
     private bool _showOptionsMenu;
     private List<ActionMenuGroup> _optionsMenuGroups = [];
@@ -637,8 +720,9 @@
         {
             Items =
             [
-                new() { Label = Tr("Přidat do záložky"), OnClick = EventCallback.Factory.Create(this, OpenBookmarksOverlayAsync) },
-                new() { Label = Tr("Upravit recept"), OnClick = EventCallback.Factory.Create(this, OnEditRecipeClickedAsync) },
+                new() { Icon = "🔖", Label = Tr("Přidat do záložky"), OnClick = EventCallback.Factory.Create(this, OpenBookmarksOverlayAsync) },
+                new() { Icon = "🛒", Label = Tr("Přidat do nákupního seznamu"), OnClick = EventCallback.Factory.Create(this, OpenShoppingOverlayAsync) },
+                new() { Icon = "🖋️", Label = Tr("Upravit recept"), OnClick = EventCallback.Factory.Create(this, OnEditRecipeClickedAsync) },
             ]
         };
 

@@ -1,17 +1,86 @@
 ﻿@page "/shopping-list"
-@namespace MobilniKucharka.Components.Pages.ShoppingList
+@namespace MobilniKucharka.Components.Pages.Shopping
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
 
 <div class="hub-page">
     <div class="hub-header">
         <h1 class="hub-title">@Tr("Nákupní seznam")</h1>
+        @if (!_isLoading && _lists.Count > 0)
+        {
+            <button type="button" class="icon-btn" style="font-size:28px;" title="@Tr("Vytvořit")" @onclick="OnCreateClickedAsync">+</button>
+        }
     </div>
 
-    <div class="empty-state">
-        <span class="empty-icon">🛒</span>
-        <p>@Tr("Tady bude tvůj nákupní seznam.")</p>
+    <div class="recipe-cards-container">
+        @if (_isLoading)
+        {
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+        }
+        else if (_lists.Count == 0)
+        {
+            <div class="empty-state">
+                <span class="empty-icon">🛒</span>
+                <p>@Tr("Vytvoř si svůj první nákupní seznam!")</p>
+                <button type="button" class="btn-action btn-primary" style="padding:0 28px;" @onclick="OnCreateClickedAsync">@Tr("Vytvořit")</button>
+            </div>
+        }
+        else
+        {
+            @foreach (var list in _lists)
+            {
+                <div class="shopping-card" @key="list.Id" @onclick="() => OpenList(list.Id)">
+                    <div class="shopping-card-info">
+                        <h3 class="shopping-card-title">@list.Name</h3>
+                        <span class="shopping-card-count">@string.Format(Tr("Položek: {0}"), list.ItemCount)</span>
+                    </div>
+                    <span class="shopping-card-price">@FormatPrice(list)</span>
+                </div>
+            }
+        }
     </div>
 </div>
 
 @code {
+    private List<ShoppingListSummary> _lists = [];
+    private bool _isLoading = true;
+
     private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _lists = await App.Database.GetShoppingListSummariesAsync();
+        _isLoading = false;
+    }
+
+    private async Task OnCreateClickedAsync()
+    {
+        string? name = await DialogService.ShowPromptAsync(
+            Tr("Nový nákupní seznam"), Tr("Zadej název seznamu."), Tr("Vytvořit"), Tr("Zrušit"),
+            placeholder: Tr("Např. Víkendový nákup"), maxLength: 40);
+
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        await App.Database.CreateShoppingListAsync(name);
+        await LoadAsync();
+    }
+
+    private void OpenList(int listId)
+    {
+        NavigationManager.NavigateTo($"/shopping-list/{listId}");
+    }
+
+    // "+" = některé položky nemají cenu
+    private static string FormatPrice(ShoppingListSummary list)
+    {
+        if (list.ItemCount == 0) return "0 Kč";
+        if (list.TotalPrice <= 0) return "? Kč";
+        return $"{list.TotalPrice:N0} Kč" + (list.HasUnpriced ? "+" : "");
+    }
 }
