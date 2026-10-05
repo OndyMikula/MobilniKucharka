@@ -4,6 +4,7 @@
     {
         Recipes,
         Search,
+        ShoppingList,
         Bookmarks
     }
 }

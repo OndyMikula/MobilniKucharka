@@ -5,22 +5,36 @@
     <div class="nav-bar-content">
         <div class="nav-pill" style="@PillStyle"></div>
 
-        <button type="button" class="nav-button @(ActiveTab == AppTab.Recipes ? "active" : "")" @onclick="() => SelectTab(AppTab.Recipes)">
-            @Tr("Recepty")
+        <button type="button" class="nav-button @(ActiveTab == AppTab.Recipes ? "active" : "")" aria-label="@Tr("Recepty")" @onclick="() => SelectTab(AppTab.Recipes)">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12.5 12 3l10 9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M5 13v7a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-7l-7-6.2z" fill="currentColor" />
+            </svg>
         </button>
-        <button type="button" class="nav-button @(ActiveTab == AppTab.Search ? "active" : "")" @onclick="() => SelectTab(AppTab.Search)">
-            @Tr("Hledat")
+        <button type="button" class="nav-button @(ActiveTab == AppTab.Search ? "active" : "")" aria-label="@Tr("Hledat")" @onclick="() => SelectTab(AppTab.Search)">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2.6" />
+                <path d="M14.8 14.8 21 21" fill="none" stroke="currentColor" stroke-width="3" />
+            </svg>
         </button>
-        <button type="button" class="nav-button @(ActiveTab == AppTab.Bookmarks ? "active" : "")" @onclick="() => SelectTab(AppTab.Bookmarks)">
-            @Tr("Záložky")
+        <button type="button" class="nav-button @(ActiveTab == AppTab.ShoppingList ? "active" : "")" aria-label="@Tr("Nákupní seznam")" @onclick="() => SelectTab(AppTab.ShoppingList)">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 4.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-13a2 2 0 0 0-2-2h-2" />
+                <rect x="9" y="2.5" width="6" height="4" rx="1.5" />
+                <rect x="7.6" y="9" width="2.4" height="2.4" />
+                <rect x="7.6" y="13" width="2.4" height="2.4" />
+                <rect x="7.6" y="17" width="2.4" height="2.4" />
+                <path d="M12.5 10.2h4M12.5 14.2h4M12.5 18.2h4" />
+            </svg>
+        </button>
+        <button type="button" class="nav-button @(ActiveTab == AppTab.Bookmarks ? "active" : "")" aria-label="@Tr("Záložky")" @onclick="() => SelectTab(AppTab.Bookmarks)">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 3.5h10a2 2 0 0 1 2 2v15.2l-7-4.4-7 4.4V5.5a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+            </svg>
         </button>
     </div>
 
-    <!-- Vyplní přesně tolik místa, kolik zabírá systémová navigační lišta (viz SystemInsets.cs a
-         MainActivity.cs) - stejnou barvou jako zbytek .nav-bar, takže aplikace nikdy neleží pod
-         systémovými tlačítky a tlačítka výš se přitom nijak nezmenší ani nezvětší (na rozdíl od
-         přidávání paddingu přímo do .nav-bar-content, což by pod globálním
-         box-sizing: border-box jen zmenšilo prostor pro tlačítka). -->
+    <!-- Místo pro systémovou navigační lištu -->
     <div class="nav-bar-inset-spacer"></div>
 </div>
 
@@ -30,7 +44,7 @@
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
 
-    private string PillStyle => $"transform: translateX({(int)ActiveTab * 100}%);";
+    private string PillStyle => $"--tab-index: {(int)ActiveTab};";
 
     private async Task SelectTab(AppTab tab)
     {
@@ -43,6 +57,7 @@
         {
             AppTab.Recipes => "/",
             AppTab.Search => "/search",
+            AppTab.ShoppingList => "/shopping-list",
             AppTab.Bookmarks => "/bookmarks",
             _ => "/"
         };

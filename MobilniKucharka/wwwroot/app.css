@@ -311,14 +311,16 @@ html, body {
 }
 
 .nav-pill {
+    --pill-w: 70px;
+    --pill-h: 50px;
     position: absolute;
-    top: 8px;
-    left: 8px;
-    width: calc((100% - 16px) / 3);
-    height: calc(100% - 18px);
+    top: calc(8px + (100% - 18px - var(--pill-h)) / 2);
+    left: calc(8px + (var(--tab-index, 0) + 0.5) * ((100% - 16px) / 4) - var(--pill-w) / 2);
+    width: var(--pill-w);
+    height: var(--pill-h);
     background-color: var(--color-pill-bg);
-    border-radius: 10px;
-    transition: transform var(--transition-normal);
+    border-radius: calc(var(--pill-h) / 2);
+    transition: left var(--transition-normal);
     z-index: 0;
     pointer-events: none;
 }
@@ -343,14 +345,20 @@ html, body {
     justify-content: center;
 }
 
-.nav-button:focus,
-.nav-button:active {
-    outline: none;
-    background: transparent;
-}
+    .nav-button:focus,
+    .nav-button:active {
+        outline: none;
+        background: transparent;
+    }
 
-.nav-button.active {
-    color: var(--color-pill-text);
+    .nav-button.active {
+        color: var(--color-pill-text);
+    }
+
+.nav-icon {
+    width: 26px;
+    height: 26px;
+    display: block;
 }
 
 /* Hub Pages Layout */

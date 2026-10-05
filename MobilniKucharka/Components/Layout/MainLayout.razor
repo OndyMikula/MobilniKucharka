@@ -82,6 +82,10 @@
         {
             _activeTab = AppTab.Search;
         }
+        else if (relative.StartsWith("shopping", StringComparison.OrdinalIgnoreCase))
+        {
+            _activeTab = AppTab.ShoppingList;
+        }
         else if (relative.StartsWith("bookmarks", StringComparison.OrdinalIgnoreCase))
         {
             _activeTab = AppTab.Bookmarks;

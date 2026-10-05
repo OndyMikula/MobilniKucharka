@@ -1,0 +1,17 @@
+﻿@page "/shopping-list"
+@namespace MobilniKucharka.Components.Pages.ShoppingList
+
+<div class="hub-page">
+    <div class="hub-header">
+        <h1 class="hub-title">@Tr("Nákupní seznam")</h1>
+    </div>
+
+    <div class="empty-state">
+        <span class="empty-icon">🛒</span>
+        <p>@Tr("Tady bude tvůj nákupní seznam.")</p>
+    </div>
+</div>
+
+@code {
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
+}
