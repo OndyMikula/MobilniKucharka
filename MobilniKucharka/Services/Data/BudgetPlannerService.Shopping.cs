@@ -134,6 +134,32 @@ namespace MobilniKucharka.Services.Data
             await _db.ExecuteAsync("DELETE FROM ShoppingListItem WHERE ListId = ? AND RecipeId = ?", listId, recipeId);
         }
 
+        public async Task AddManualShoppingItemAsync(int listId, LocalProduct product, string name, double amountInProductUnit, string amountText, double displayAmount = 0, string displayUnit = "")
+        {
+            await EnsureShoppingReadyAsync();
+
+            bool hasAmount = amountInProductUnit > 0;
+
+            await _db.InsertAsync(new ShoppingListItem
+            {
+                ListId = listId,
+                RecipeId = 0,
+                ProductId = product.Id,
+                Name = name,
+                Amount = hasAmount ? amountInProductUnit : 0,
+                Unit = hasAmount ? product.Unit : string.Empty,
+                AmountText = hasAmount ? string.Empty : amountText,
+                DisplayAmount = hasAmount ? displayAmount : 0,
+                DisplayUnit = hasAmount ? displayUnit : string.Empty
+            });
+        }
+
+        public async Task RemoveShoppingEntryAsync(int listId, int productId, string unit)
+        {
+            await EnsureShoppingReadyAsync();
+            await _db.ExecuteAsync("DELETE FROM ShoppingListItem WHERE ListId = ? AND ProductId = ? AND Unit = ?", listId, productId, unit);
+        }
+
         // Spojí stejnou surovinu z více receptů do jednoho řádku
         private static List<ShoppingListEntry> BuildShoppingEntries(IEnumerable<ShoppingListItem> items, Dictionary<int, LocalProduct> products)
         {
@@ -150,18 +176,29 @@ namespace MobilniKucharka.Services.Data
 
                 double amount = group.Sum(i => i.Amount);
 
+                // Stejná zadaná jednotka u všech položek = ukázat ji tak, jak byla zadána
+                bool sameEnteredUnit = amount > 0 && group.All(i => i.Amount > 0 && !string.IsNullOrEmpty(i.DisplayUnit) && i.DisplayUnit == first.DisplayUnit);
+                double shownAmount = sameEnteredUnit ? group.Sum(i => i.DisplayAmount) : amount;
+                string shownUnit = sameEnteredUnit ? first.DisplayUnit : first.Unit;
+
                 string amountText = amount > 0
-                    ? $"{amount:0.#} {first.Unit}"
+                    ? $"{shownAmount:0.##} {shownUnit}"
                     : string.Join(", ", group.Select(i => i.AmountText).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct());
 
                 double price = amount > 0 && product != null ? Math.Round(amount * product.EffectivePrice, 0) : 0;
+                double editPrice = amount > 0 && product is { HasManualPrice: true } ? Math.Round(amount * product.ManualPrice, 2) : 0;
 
                 entries.Add(new ShoppingListEntry
                 {
+                    ProductId = first.ProductId,
+                    Unit = first.Unit,
                     Name = name,
                     AmountText = amountText,
                     Price = price,
-                    IsUnpriced = amount > 0 && price <= 0
+                    IsUnpriced = amount > 0 && price <= 0,
+                    EditAmount = amount > 0 ? shownAmount : 0,
+                    EditUnit = amount > 0 ? shownUnit : string.Empty,
+                    EditPrice = editPrice
                 });
             }
 

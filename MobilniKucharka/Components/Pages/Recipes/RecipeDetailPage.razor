@@ -280,18 +280,12 @@
 
             <div class="form-group">
                 <label class="form-label">@Tr("Popis je napsaný:")</label>
-                <select class="form-select" @bind="_fixDescriptionLang">
-                    <option value="cs">Čeština</option>
-                    <option value="en">English</option>
-                </select>
+                <OptionPicker CssClass="block" Options="LanguageOptions" Value="@_fixDescriptionLang" ValueChanged="@((string v) => _fixDescriptionLang = v)" />
             </div>
 
             <div class="form-group">
                 <label class="form-label">@Tr("Suroviny jsou napsané:")</label>
-                <select class="form-select" @bind="_fixIngredientsLang">
-                    <option value="cs">Čeština</option>
-                    <option value="en">English</option>
-                </select>
+                <OptionPicker CssClass="block" Options="LanguageOptions" Value="@_fixIngredientsLang" ValueChanged="@((string v) => _fixIngredientsLang = v)" />
             </div>
 
             <div style="display:flex; gap:10px;">
@@ -304,6 +298,9 @@
 
 
 <GroupedActionMenu @bind-IsOpen="_showOptionsMenu" Groups="_optionsMenuGroups" CancelLabel="@Tr("Zrušit")" />
+<GroupedActionMenu @bind-IsOpen="_showIngredientMenu" Groups="_ingredientMenuGroups" Title="@_ingredientMenuTitle" CancelLabel="@Tr("Zrušit")" />
+<GroupedActionMenu @bind-IsOpen="_showUnitMenu" Groups="_unitMenuGroups" Title="@Tr("Vyber jednotku")" CancelLabel="@Tr("Zrušit")" />
+<GroupedActionMenu @bind-IsOpen="_showLinkMenu" Groups="_linkMenuGroups" Title="@Tr("Propojit s...")" CancelLabel="@Tr("Zrušit")" />
 
 @code {
     [Parameter] public int Id { get; set; }
@@ -329,11 +326,20 @@
     private bool _showLanguageFixOverlay;
     private string _fixIngredientsLang = "cs";
     private string _fixDescriptionLang = "cs";
+    private static readonly List<(string Value, string Label)> LanguageOptions = [("cs", "Čeština"), ("en", "English")];
+    private static string Tr(string csText) => UiTranslator.Tr(csText);
 
     private bool _showDeleteOverlay;
-    private bool _isDeveloperMode;
+    private bool _showIngredientMenu;
+    private bool _showUnitMenu;
+    private bool _showLinkMenu;
 
-    private static string Tr(string csText) => UiTranslator.Tr(csText);
+    private string _ingredientMenuTitle = string.Empty;
+    private List<ActionMenuGroup> _ingredientMenuGroups = [];
+    private List<ActionMenuGroup> _unitMenuGroups = [];
+    private List<ActionMenuGroup> _linkMenuGroups = [];
+
+    private bool _isDeveloperMode;    
 
     protected override void OnInitialized()
     {
@@ -485,102 +491,178 @@
             return;
         }
 
-        string? action = await DialogService.ShowActionSheetAsync(ingredient.Name, Tr("Zrušit"), null,
-            Tr("Zadat vlastní cenu"), Tr("Propojit s existující surovinou"), Tr("Změnit jednotku"));
+        _ingredientMenuTitle = ingredient.Name;
+        _ingredientMenuGroups =
+        [
+            new ActionMenuGroup
+            {
+                Items =
+                [
+                    new() { Icon = "🛒", Label = Tr("Přidat do nákupního seznamu"), OnClick = EventCallback.Factory.Create(this, () => OnAddIngredientToShoppingAsync(ingredient)) },
+                    new() { Icon = "💰", Label = Tr("Zadat vlastní cenu"), OnClick = EventCallback.Factory.Create(this, () => OnSetCustomPriceAsync(ingredient)) },
+                ]
+            },
+            new ActionMenuGroup
+            {
+                Items =
+                [
+                    new() { Icon = "🔗", Label = Tr("Propojit s existující surovinou"), OnClick = EventCallback.Factory.Create(this, () => OnLinkIngredientAsync(ingredient)) },
+                    new() { Icon = "📏", Label = Tr("Změnit jednotku"), OnClick = EventCallback.Factory.Create(this, () => OnChangeUnitAsync(ingredient)) },
+                ]
+            }
+        ];
+        _showIngredientMenu = true;
+    }
 
-        if (string.IsNullOrEmpty(action) || action == Tr("Zrušit")) return;
-
+    private async Task OnSetCustomPriceAsync(DisplayIngredient ingredient)
+    {
         await PromoteFromSearchTempAsync();
 
-        if (action == Tr("Zadat vlastní cenu"))
+        if (ingredient.RawAmount <= 0)
         {
-            if (ingredient.RawAmount <= 0)
-            {
-                string? manualResult = await DialogService.ShowPromptAsync(
-                    Tr("Vlastní cena suroviny"),
-                    string.Format(Tr("Množství pro \"{0}\" nejde rozeznat, zadej rovnou cenu za jednotku (Kč), nebo nech prázdné pro průměrnou cenu."), ingredient.Name),
-                    Tr("Uložit"), Tr("Zrušit"), keyboard: Keyboard.Numeric);
-
-                if (manualResult == null) return;
-
-                if (string.IsNullOrWhiteSpace(manualResult))
-                {
-                    await App.Database.ClearManualPriceAsync(ingredient.ProductId);
-                    RecipeListCache.Invalidate();
-                }
-                else if (double.TryParse(manualResult.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture, out var unitPrice))
-                {
-                    await App.Database.SetManualPriceAsync(ingredient.ProductId, unitPrice);
-                    RecipeListCache.Invalidate();
-                }
-                
-
-                await LoadIngredientsAndStepsAsync();
-                return;
-            }
-
-            string? result = await DialogService.ShowPromptAsync(
+            string? manualResult = await DialogService.ShowPromptAsync(
                 Tr("Vlastní cena suroviny"),
-                string.Format(Tr("Kolik jsi celkem zaplatil/a za {0} suroviny \"{1}\"? (Kč)\nCena se přepočítá na jednotku a použije se i v ostatních receptech s jiným množstvím."), ingredient.AmountText, ingredient.Name),
-                Tr("Uložit"), Tr("Zrušit"), keyboard: Keyboard.Numeric);
+                string.Format(Tr("Množství pro \"{0}\" nejde rozeznat, zadej rovnou cenu za jednotku (Kč), nebo nech prázdné pro průměrnou cenu."), ingredient.Name),
+                Tr("Uložit"), Tr("Zrušit"), keyboard: Keyboard.Numeric, suffix: "CZK");
 
-            if (result == null) return;
+            if (manualResult == null) return;
 
-            if (string.IsNullOrWhiteSpace(result))
-            {
+            if (string.IsNullOrWhiteSpace(manualResult))
                 await App.Database.ClearManualPriceAsync(ingredient.ProductId);
-            }
-            else if (double.TryParse(result.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture, out var totalPrice))
-            {
-                double pricePerUnit = totalPrice / ingredient.RawAmount;
-                await App.Database.SetManualPriceAsync(ingredient.ProductId, pricePerUnit);
-            }
-            else
-            {
-                await DialogService.ShowAlertAsync(Tr("Neplatná hodnota"), string.Format(Tr("\"{0}\" se nepodařilo rozpoznat jako číslo. Zkus to znovu, jen s číslicemi (např. 25 nebo 25.50)."), result), "OK");
-                return;
-            }
+            else if (double.TryParse(manualResult.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture, out var unitPrice))
+                await App.Database.SetManualPriceAsync(ingredient.ProductId, unitPrice);
 
             await LoadIngredientsAndStepsAsync();
+            return;
         }
-        else if (action == Tr("Propojit s existující surovinou"))
-        {
-            var allProducts = await App.Database.GetAllLocalProductsAsync();
 
-            // Podobné/pravděpodobné shody (jeden název je součástí druhého) nahoru seznamu - u
-            // víceslovných variant (např. "Voda" vs "voda podle potřeby") tak stačí jeden tap.
-            string normalizedTarget = TextNormalizationHelper.NormalizeForComparison(ingredient.Name);
-            var sortedProducts = allProducts
-                .OrderByDescending(p =>
+        string? result = await DialogService.ShowPromptAsync(
+            Tr("Vlastní cena suroviny"),
+            string.Format(Tr("Kolik jsi celkem zaplatil/a za {0} suroviny \"{1}\"? (Kč)\nCena se přepočítá na jednotku a použije se i v ostatních receptech s jiným množstvím."), ingredient.AmountText, ingredient.Name),
+            Tr("Uložit"), Tr("Zrušit"), keyboard: Keyboard.Numeric, suffix: "CZK");
+
+        if (result == null) return;
+
+        if (string.IsNullOrWhiteSpace(result))
+        {
+            await App.Database.ClearManualPriceAsync(ingredient.ProductId);
+        }
+        else if (double.TryParse(result.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture, out var totalPrice))
+        {
+            double pricePerUnit = totalPrice / ingredient.RawAmount;
+            await App.Database.SetManualPriceAsync(ingredient.ProductId, pricePerUnit);
+        }
+        else
+        {
+            await DialogService.ShowAlertAsync(Tr("Neplatná hodnota"), string.Format(Tr("\"{0}\" se nepodařilo rozpoznat jako číslo. Zkus to znovu, jen s číslicemi (např. 25 nebo 25.50)."), result), "OK");
+            return;
+        }
+
+        await LoadIngredientsAndStepsAsync();
+    }
+
+    private async Task OnLinkIngredientAsync(DisplayIngredient ingredient)
+    {
+        await PromoteFromSearchTempAsync();
+
+        var allProducts = await App.Database.GetAllLocalProductsAsync();
+        string currentLang = Preferences.Default.Get("AppLanguageCode", "cs");
+        string DisplayName(LocalProduct p) => currentLang == "cs" ? p.Name_CS : p.Name_EN;
+
+        // Podobné názvy nahoru
+        string normalizedTarget = TextNormalizationHelper.NormalizeForComparison(ingredient.Name);
+        var sortedProducts = allProducts
+            .OrderByDescending(p =>
+            {
+                string normalizedName = TextNormalizationHelper.NormalizeForComparison(DisplayName(p));
+                return normalizedName.Length > 0 && (normalizedName.Contains(normalizedTarget) || normalizedTarget.Contains(normalizedName));
+            })
+            .ThenBy(p => DisplayName(p))
+            .ToList();
+
+        _linkMenuGroups =
+        [
+            new ActionMenuGroup
+            {
+                Scrollable = true,
+                Items = [.. sortedProducts.Select(p => new ActionMenuItem
                 {
-                    string normalizedName = TextNormalizationHelper.NormalizeForComparison(p.Name_CS);
-                    return normalizedName.Contains(normalizedTarget) || normalizedTarget.Contains(normalizedName);
-                })
-                .ThenBy(p => p.Name_CS)
-                .ToList();
-
-            string[] names = [.. sortedProducts.Select(p => p.Name_CS)];
-
-            string? chosen = await DialogService.ShowActionSheetAsync(Tr("Propojit s..."), Tr("Zrušit"), null, names);
-            var match = sortedProducts.FirstOrDefault(p => p.Name_CS == chosen);
-
-            if (match != null)
-            {
-                await App.Database.LinkIngredientNameToProductAsync(ingredient.Name, match.Id);
-                await LoadIngredientsAndStepsAsync();
+                    Icon = "🥕",
+                    Label = DisplayName(p),
+                    OnClick = EventCallback.Factory.Create(this, () => LinkToProductAsync(ingredient, p.Id))
+                })]
             }
-        }
-        else if (action == Tr("Změnit jednotku"))
+        ];
+        _showLinkMenu = true;
+    }
+
+    private async Task LinkToProductAsync(DisplayIngredient ingredient, int productId)
+    {
+        await App.Database.LinkIngredientNameToProductAsync(ingredient.Name, productId);
+        await LoadIngredientsAndStepsAsync();
+    }
+
+    private async Task OnChangeUnitAsync(DisplayIngredient ingredient)
+    {
+        await PromoteFromSearchTempAsync();
+
+        (string Unit, string Icon)[] units = [("g", "⚖️"), ("ml", "💧"), ("ks", "🔢")];
+
+        _unitMenuGroups =
+        [
+            new ActionMenuGroup
+            {
+                Items = [.. units.Select(u => new ActionMenuItem
+                {
+                    Icon = u.Icon,
+                    Label = u.Unit,
+                    OnClick = EventCallback.Factory.Create(this, () => SetUnitAsync(ingredient, u.Unit))
+                })]
+            }
+        ];
+        _showUnitMenu = true;
+    }
+
+    private async Task SetUnitAsync(DisplayIngredient ingredient, string unit)
+    {
+        await App.Database.SetProductUnitAsync(ingredient.ProductId, unit);
+        await LoadIngredientsAndStepsAsync();
+    }
+
+    private async Task OnAddIngredientToShoppingAsync(DisplayIngredient ingredient)
+    {
+        await PromoteFromSearchTempAsync();
+
+        var lists = await App.Database.GetShoppingListsAsync();
+        string newListLabel = Tr("➕ Nový seznam");
+
+        // Stejná jména seznamů by se pletla, proto číslování
+        string[] labels = [.. lists.Select((l, i) => lists.Count(x => x.Name == l.Name) > 1 ? $"{l.Name} ({i + 1})" : l.Name), newListLabel];
+
+        string? chosen = await DialogService.ShowActionSheetAsync(Tr("Přidat do nákupního seznamu"), Tr("Zrušit"), null, labels);
+        if (string.IsNullOrEmpty(chosen)) return;
+
+        int listId;
+        if (chosen == newListLabel)
         {
-            string[] unitOptions = ["g", "ml", "ks"];
-            string? chosenUnit = await DialogService.ShowActionSheetAsync(Tr("Vyber jednotku"), Tr("Zrušit"), null, unitOptions);
+            string? name = await DialogService.ShowPromptAsync(
+                Tr("Nový nákupní seznam"), Tr("Zadej název seznamu."), Tr("Vytvořit"), Tr("Zrušit"), maxLength: 40);
+            if (string.IsNullOrWhiteSpace(name)) return;
 
-            if (chosenUnit != null && unitOptions.Contains(chosenUnit))
-            {
-                await App.Database.SetProductUnitAsync(ingredient.ProductId, chosenUnit);
-                await LoadIngredientsAndStepsAsync();
-            }
+            listId = (await App.Database.CreateShoppingListAsync(name)).Id;
         }
+        else
+        {
+            int index = Array.IndexOf(labels, chosen);
+            if (index < 0 || index >= lists.Count) return;
+            listId = lists[index].Id;
+        }
+
+        var product = await App.Database.GetProductByIdAsync(ingredient.ProductId);
+        if (product == null) return;
+
+        await App.Database.AddManualShoppingItemAsync(listId, product, ingredient.Name, ingredient.RawAmount, ingredient.AmountText);
+        await DialogService.ShowAlertAsync(Tr("Hotovo"), Tr("Surovina byla přidána do nákupního seznamu."), "OK");
     }
 
     private async Task OnFavoriteToggledAsync()

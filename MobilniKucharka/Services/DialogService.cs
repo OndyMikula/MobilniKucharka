@@ -1,6 +1,6 @@
 namespace MobilniKucharka.Services
 {
-    public enum DialogKind { Alert, Confirm, Prompt, Amount }
+    public enum DialogKind { Alert, Confirm, Prompt, Amount, ActionSheet }
 
     public class DialogRequest
     {
@@ -15,6 +15,12 @@ namespace MobilniKucharka.Services
         public string InitialValue { get; init; } = string.Empty;
         public IReadOnlyList<string> Units { get; init; } = [];
         public string InitialUnit { get; init; } = string.Empty;
+        public string? SecondPlaceholder { get; init; }
+        public string SecondInitialValue { get; init; } = string.Empty;
+        public IReadOnlyList<string> Buttons { get; init; } = [];
+        public string? Destruction { get; init; }
+        public string? Suffix { get; init; }
+        public string? SecondSuffix { get; init; }
     }
 
     public class DialogResponse
@@ -22,6 +28,8 @@ namespace MobilniKucharka.Services
         public bool Accepted { get; init; }
         public string Text { get; init; } = string.Empty;
         public string Unit { get; init; } = string.Empty;
+        public string SecondText { get; init; } = string.Empty;
+        public string Choice { get; init; } = string.Empty;
     }
 
     // Implementuje DialogHost.razor
@@ -35,8 +43,8 @@ namespace MobilniKucharka.Services
         Task ShowAlertAsync(string title, string message, string cancel = "OK");
         Task<bool> ShowConfirmAsync(string title, string message, string accept, string cancel);
         Task<string?> ShowActionSheetAsync(string title, string cancel, string? destruction, params string[] buttons);
-        Task<string?> ShowPromptAsync(string title, string message, string accept = "OK", string cancel = "Zrušit", string? placeholder = null, int maxLength = -1, Keyboard? keyboard = null, string initialValue = "");
-        Task<(string Text, string Unit)?> ShowAmountPromptAsync(string title, string message, string[] units, string accept = "OK", string cancel = "Zrušit", string? placeholder = null, string initialValue = "", string initialUnit = "");
+        Task<string?> ShowPromptAsync(string title, string message, string accept = "OK", string cancel = "Zrušit", string? placeholder = null, int maxLength = -1, Keyboard? keyboard = null, string initialValue = "", string? suffix = null);
+        Task<(string Text, string Unit, string SecondText)?> ShowAmountPromptAsync(string title, string message, string[] units, string accept = "OK", string cancel = "Zrušit", string? placeholder = null, string initialValue = "", string initialUnit = "", string? secondPlaceholder = null, string secondInitialValue = "", string? secondSuffix = null);
         void RegisterHost(IDialogHost host);
         void UnregisterHost(IDialogHost host);
     }
@@ -44,7 +52,7 @@ namespace MobilniKucharka.Services
     public class DialogService : IDialogService
     {
         private readonly List<IDialogHost> _hosts = [];
-        private readonly object _lock = new();
+        private readonly Lock _lock = new();
 
         public void RegisterHost(IDialogHost host)
         {
@@ -67,7 +75,9 @@ namespace MobilniKucharka.Services
 
         private static Page? GetCurrentPage()
         {
-            var window = Application.Current?.Windows.FirstOrDefault();
+            var windows = Application.Current?.Windows;
+            var window = windows is { Count: > 0 } ? windows[0] : null;
+
             if (window?.Page is NavigationPage navPage)
                 return navPage.CurrentPage;
             return window?.Page;
@@ -106,8 +116,23 @@ namespace MobilniKucharka.Services
             return false;
         }
 
+        // Vrací text vybraného tlačítka, při zrušení null
         public async Task<string?> ShowActionSheetAsync(string title, string cancel, string? destruction, params string[] buttons)
         {
+            var host = CurrentHost;
+            if (host != null)
+            {
+                var response = await host.ShowAsync(new DialogRequest
+                {
+                    Kind = DialogKind.ActionSheet,
+                    Title = title,
+                    Cancel = cancel,
+                    Destruction = destruction,
+                    Buttons = buttons
+                });
+                return response.Accepted ? response.Choice : null;
+            }
+
             var page = GetCurrentPage();
             if (page != null)
             {
@@ -116,7 +141,7 @@ namespace MobilniKucharka.Services
             return null;
         }
 
-        public async Task<string?> ShowPromptAsync(string title, string message, string accept = "OK", string cancel = "Zrušit", string? placeholder = null, int maxLength = -1, Keyboard? keyboard = null, string initialValue = "")
+        public async Task<string?> ShowPromptAsync(string title, string message, string accept = "OK", string cancel = "Zrušit", string? placeholder = null, int maxLength = -1, Keyboard? keyboard = null, string initialValue = "", string? suffix = null)
         {
             var host = CurrentHost;
             if (host != null)
@@ -131,7 +156,8 @@ namespace MobilniKucharka.Services
                     Placeholder = placeholder,
                     MaxLength = maxLength,
                     Numeric = keyboard == Keyboard.Numeric,
-                    InitialValue = initialValue
+                    InitialValue = initialValue,
+                    Suffix = suffix
                 });
                 return response.Accepted ? response.Text : null;
             }
@@ -144,7 +170,7 @@ namespace MobilniKucharka.Services
             return null;
         }
 
-        public async Task<(string Text, string Unit)?> ShowAmountPromptAsync(string title, string message, string[] units, string accept = "OK", string cancel = "Zrušit", string? placeholder = null, string initialValue = "", string initialUnit = "")
+        public async Task<(string Text, string Unit, string SecondText)?> ShowAmountPromptAsync(string title, string message, string[] units, string accept = "OK", string cancel = "Zrušit", string? placeholder = null, string initialValue = "", string initialUnit = "", string? secondPlaceholder = null, string secondInitialValue = "", string? secondSuffix = null)
         {
             var host = CurrentHost;
             if (host == null) return null;
@@ -160,11 +186,14 @@ namespace MobilniKucharka.Services
                 Numeric = true,
                 InitialValue = initialValue,
                 Units = units,
-                InitialUnit = initialUnit
+                InitialUnit = initialUnit,
+                SecondPlaceholder = secondPlaceholder,
+                SecondInitialValue = secondInitialValue,
+                SecondSuffix = secondSuffix
             });
 
             if (!response.Accepted) return null;
-            return (response.Text, response.Unit);
+            return (response.Text, response.Unit, response.SecondText);
         }
     }
 }

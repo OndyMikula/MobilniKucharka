@@ -25,12 +25,7 @@
         </div>
 
         <div class="search-bar-row">
-            <select class="form-select" style="flex:1;" value="@_sortField" @onchange="OnSortFieldChangedAsync">
-                <option value="@SortField.NameCs">@Tr("Název (česky)")</option>
-                <option value="@SortField.NameEn">@Tr("Název (anglicky)")</option>
-                <option value="@SortField.Unit">@Tr("Jednotka")</option>
-                <option value="@SortField.Price">@Tr("Cena")</option>
-            </select>
+            <OptionPicker CssClass="block" Options="SortOptions" Value="@_sortField.ToString()" ValueChanged="OnSortFieldPicked" Title="@Tr("Řadit podle")" />
             <button type="button" class="btn-search-icon" style="width:44px;" @onclick="ToggleSortDirection">
                 @(_sortDescending ? "↓" : "↑")
             </button>
@@ -105,11 +100,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">@Tr("Jednotka")</label>
-                    <select class="form-select" @bind="_editUnit">
-                        <option value="g">g</option>
-                        <option value="ml">ml</option>
-                        <option value="ks">ks</option>
-                    </select>
+                    <OptionPicker Options="IngredientUnits" Value="@_editUnit" ValueChanged="@((string v) => _editUnit = v)" Title="@Tr("Vyber jednotku")" />
                 </div>
 
                 <label class="checkbox-row">
@@ -168,11 +159,7 @@
             </div>
             <div class="form-group">
                 <label class="form-label">@Tr("Jednotka")</label>
-                <select class="form-select" @bind="_newUnit">
-                    <option value="g">g</option>
-                    <option value="ml">ml</option>
-                    <option value="ks">ks</option>
-                </select>
+                <OptionPicker Options="IngredientUnits" Value="@_newUnit" ValueChanged="@((string v) => _newUnit = v)" Title="@Tr("Vyber jednotku")" />
             </div>
 
             <div style="display:flex; gap:10px;">
@@ -263,11 +250,20 @@
         }
     }
 
-    private Task OnSortFieldChangedAsync(ChangeEventArgs e)
+    private List<(string Value, string Label)> SortOptions =>
+    [
+        (nameof(SortField.NameCs), Tr("Název (česky)")),
+        (nameof(SortField.NameEn), Tr("Název (anglicky)")),
+        (nameof(SortField.Unit), Tr("Jednotka")),
+        (nameof(SortField.Price), Tr("Cena"))
+    ];
+
+    private static readonly List<(string Value, string Label)> IngredientUnits = [("g", "g"), ("ml", "ml"), ("ks", "ks")];
+
+    private void OnSortFieldPicked(string value)
     {
-        if (Enum.TryParse<SortField>(e.Value?.ToString(), out var field))
+        if (Enum.TryParse<SortField>(value, out var field))
             _sortField = field;
-        return Task.CompletedTask;
     }
 
     private void ToggleSortDirection() => _sortDescending = !_sortDescending;

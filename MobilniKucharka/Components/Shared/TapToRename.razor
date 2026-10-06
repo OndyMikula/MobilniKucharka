@@ -1,0 +1,77 @@
+﻿@namespace MobilniKucharka.Components.Shared
+@inject IJSRuntime JSRuntime
+
+@if (_editing)
+{
+    <input type="text" @ref="_inputRef" class="@CssClass tap-rename-input"
+           maxlength="@(MaxLength > 0 ? MaxLength : 524288)"
+           @bind="_text" @bind:event="oninput" @onkeydown="OnKeyDownAsync" @onblur="CommitAsync" />
+}
+else
+{
+    <h2 class="@CssClass" @onclick="OnTapped">@Value</h2>
+}
+
+@code {
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public int MaxLength { get; set; } = -1;
+    [Parameter] public int TapsRequired { get; set; } = 3;
+
+    private static readonly TimeSpan TapWindow = TimeSpan.FromMilliseconds(600);
+
+    private bool _editing;
+    private bool _needsFocus;
+    private string _text = string.Empty;
+    private int _tapCount;
+    private DateTime _lastTapUtc = DateTime.MinValue;
+    private ElementReference _inputRef;
+
+    private void OnTapped()
+    {
+        var now = DateTime.UtcNow;
+        _tapCount = now - _lastTapUtc <= TapWindow ? _tapCount + 1 : 1;
+        _lastTapUtc = now;
+
+        if (_tapCount < TapsRequired) return;
+
+        _tapCount = 0;
+        _text = Value;
+        _editing = true;
+        _needsFocus = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_needsFocus) return;
+        _needsFocus = false;
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("mkSelectInput", _inputRef);
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await CommitAsync();
+        else if (e.Key == "Escape")
+            _editing = false;
+    }
+
+    private async Task CommitAsync()
+    {
+        if (!_editing) return;
+        _editing = false;
+
+        string trimmed = _text?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0 || trimmed == Value) return;
+
+        await ValueChanged.InvokeAsync(trimmed);
+    }
+}

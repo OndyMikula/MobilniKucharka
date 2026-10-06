@@ -1,5 +1,6 @@
 ﻿@page "/shopping-list/{Id:int}"
 @namespace MobilniKucharka.Components.Pages.Shopping
+@using System.Globalization
 @inject IDialogService DialogService
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
@@ -28,18 +29,65 @@
         }
         else
         {
-            <h2 class="shopping-detail-title">@_list.Name</h2>
+            <TapToRename CssClass="shopping-detail-title" Value="@_list.Name" ValueChanged="OnTitleRenamedAsync" MaxLength="40" />
+
+            @if (_entries.Count > 0)
+            {
+                <div class="search-bar-row">
+                    <input type="text" class="search-input" placeholder="@Tr("Hledat v seznamu...")"
+                           @bind="_searchText" @bind:event="oninput" />
+                </div>
+            }
+
+            <!-- Přidání suroviny -->
+            <div class="form-group">
+                <div class="shopping-add-row">
+                    <input type="text" class="form-input" placeholder="@Tr("Název ingredience")"
+                           value="@_addName"
+                           @oninput="(e) => _addName = e.Value?.ToString() ?? string.Empty"
+                           @onfocus="() => _showSuggestions = true"
+                           @onblur="OnNameBlurredAsync" />
+                    <button type="button" class="form-input shopping-amount-btn @(_hasAmount ? "" : "empty")" @onclick="OnPickAmountClickedAsync">@AmountButtonText</button>
+                    <input type="text" inputmode="decimal" class="form-input" placeholder="@Tr("Cena (Kč)")"
+                           value="@_addPriceText"
+                           @oninput="(e) => _addPriceText = e.Value?.ToString() ?? string.Empty" />
+                </div>
+
+                @if (_showSuggestions)
+                {
+                    var suggestions = GetFilteredSuggestions();
+                    if (suggestions.Count > 0)
+                    {
+                        <div class="ingredient-suggestions">
+                            @foreach (var suggestion in suggestions)
+                            {
+                                <button type="button" class="ingredient-suggestion-item" @onclick="() => OnSuggestionPicked(suggestion)">
+                                    @suggestion
+                                </button>
+                            }
+                        </div>
+                    }
+                }
+
+                <button type="button" class="btn-action btn-success" style="margin-top:6px;" @onclick="OnAddIngredientClickedAsync">
+                    @Tr("➕ Přidat ingredienci")
+                </button>
+            </div>
 
             @if (_entries.Count == 0)
             {
                 <p class="empty-text">@Tr("V seznamu zatím nic není. Přidej suroviny z receptu.")</p>
             }
+            else if (FilteredEntries.Count == 0)
+            {
+                <p class="empty-text">@Tr("Žádná surovina neodpovídá hledání.")</p>
+            }
             else
             {
                 <div class="detail-card">
-                    @foreach (var entry in _entries)
+                    @foreach (var entry in FilteredEntries)
                     {
-                        <div class="ingredient-row" style="cursor:default;">
+                        <div class="ingredient-row" @onclick="() => OnEntryClicked(entry)">
                             <span class="ingredient-name">@entry.Name</span>
                             <span class="ingredient-amount">@entry.AmountText</span>
                             <span class="ingredient-cost">@FormatEntryPrice(entry)</span>
@@ -53,19 +101,60 @@
 </div>
 
 <GroupedActionMenu @bind-IsOpen="_showOptionsMenu" Groups="_optionsMenuGroups" CancelLabel="@Tr("Zrušit")" />
+<GroupedActionMenu @bind-IsOpen="_showEntryMenu" Groups="_entryMenuGroups" Title="@_entryMenuTitle" CancelLabel="@Tr("Zrušit")" />
 
 @code {
     [Parameter] public int Id { get; set; }
+
+    private static readonly string[] ShoppingUnits = ["g", "kg", "ml", "l", "lžíce", "lžička", "ks"];
 
     private ShoppingList? _list;
     private List<ShoppingListEntry> _entries = [];
     private string _totalText = string.Empty;
     private bool _isLoading = true;
     private int _loadedId;
+    private string _searchText = string.Empty;
+
+    private string _addName = string.Empty;
+    private string _addPriceText = string.Empty;
+    private double _addAmount;
+    private string _addUnit = "g";
+    private bool _hasAmount;
+    private bool _showSuggestions;
+    private List<string> _nameSuggestions = [];
+
     private bool _showOptionsMenu;
     private List<ActionMenuGroup> _optionsMenuGroups = [];
+    private bool _showEntryMenu;
+    private string _entryMenuTitle = string.Empty;
+    private List<ActionMenuGroup> _entryMenuGroups = [];
 
     private static string Tr(string csText) => UiTranslator.Tr(csText);
+
+    private string AmountButtonText => _hasAmount ? $"{_addAmount:0.##} {_addUnit}" : Tr("Množství");
+
+    private List<ShoppingListEntry> FilteredEntries
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_searchText)) return _entries;
+
+            string normalized = TextNormalizationHelper.NormalizeForComparison(_searchText);
+            return [.. _entries.Where(e => TextNormalizationHelper.NormalizeForComparison(e.Name).Contains(normalized))];
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _nameSuggestions = await App.Database.GetAllProductNameSuggestionsAsync();
+        }
+        catch
+        {
+            _nameSuggestions = [];
+        }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -74,19 +163,253 @@
         _isLoading = true;
 
         _list = await App.Database.GetShoppingListAsync(Id);
-        _entries = _list == null ? [] : await App.Database.GetShoppingListEntriesAsync(Id);
+        await ReloadEntriesAsync();
+
+        _isLoading = false;
+    }
+
+    private async Task ReloadEntriesAsync()
+    {
+        _entries = _list == null ? [] : await App.Database.GetShoppingListEntriesAsync(_list.Id);
 
         double total = _entries.Sum(e => e.Price);
         bool anyUnpriced = _entries.Any(e => e.IsUnpriced);
         _totalText = string.Format(Tr("Celkem: {0:N0} Kč"), total) + (anyUnpriced ? "+" : "");
-
-        _isLoading = false;
     }
 
     private static string FormatEntryPrice(ShoppingListEntry entry)
     {
         if (entry.IsUnpriced) return "? Kč";
         return entry.Price > 0 ? $"{entry.Price:N0} Kč" : string.Empty;
+    }
+
+    private static bool TryParseNumber(string text, out double value)
+    {
+        return double.TryParse(text.Trim().Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out value) && value > 0;
+    }
+
+    private static string BaseUnitFor(string unit) => unit switch
+    {
+        "kg" => "g",
+        "l" or "lžíce" or "lžička" or "ml" => "ml",
+        "ks" => "ks",
+        _ => "g"
+    };
+
+    private Task ShowInvalidNumberAsync(string text) =>
+        DialogService.ShowAlertAsync(Tr("Neplatná hodnota"), string.Format(Tr("\"{0}\" se nepodařilo rozpoznat jako číslo. Zkus to znovu, jen s číslicemi (např. 25 nebo 25.50)."), text), "OK");
+
+    private List<string> GetFilteredSuggestions()
+    {
+        string typed = _addName.Trim();
+        if (typed.Length == 0) return [];
+
+        string normalizedTyped = TextNormalizationHelper.NormalizeForComparison(typed);
+
+        return _nameSuggestions
+            .Where(s => TextNormalizationHelper.NormalizeForComparison(s).Contains(normalizedTyped)
+                        && !string.Equals(TextNormalizationHelper.NormalizeForComparison(s), normalizedTyped, StringComparison.Ordinal))
+            .OrderByDescending(s => TextNormalizationHelper.NormalizeForComparison(s).StartsWith(normalizedTyped, StringComparison.Ordinal))
+            .ThenBy(s => s)
+            .Take(8)
+            .ToList();
+    }
+
+    // Prodleva, aby klepnutí na návrh stihlo proběhnout před skrytím
+    private async Task OnNameBlurredAsync()
+    {
+        await Task.Delay(150);
+        _showSuggestions = false;
+    }
+
+    private void OnSuggestionPicked(string suggestion)
+    {
+        _addName = suggestion;
+        _showSuggestions = false;
+    }
+
+    private async Task OnPickAmountClickedAsync()
+    {
+        var result = await DialogService.ShowAmountPromptAsync(
+            Tr("Množství"), Tr("Zadej množství suroviny a vyber jednotku."), ShoppingUnits,
+            Tr("Uložit"), Tr("Zrušit"), placeholder: Tr("Např. 400"),
+            initialValue: _hasAmount ? _addAmount.ToString("0.##", CultureInfo.InvariantCulture) : string.Empty,
+            initialUnit: _addUnit);
+
+        if (result == null) return;
+
+        string text = result.Value.Text.Trim();
+        if (text.Length == 0)
+        {
+            _hasAmount = false;
+            return;
+        }
+
+        if (!TryParseNumber(text, out double value))
+        {
+            await ShowInvalidNumberAsync(text);
+            return;
+        }
+
+        _addAmount = value;
+        _addUnit = result.Value.Unit;
+        _hasAmount = true;
+    }
+
+    // Převede množství na jednotku produktu (pro cenu), zadanou jednotku si ponechá pro zobrazení
+    private async Task<bool> CommitAsync(LocalProduct product, string name, bool hasAmount, double amount, string unit, bool hasPrice, double price, ShoppingListEntry? replacing, string fallbackText = "")
+    {
+        if (_list == null) return false;
+
+        double amountInProductUnit = 0;
+        if (hasAmount)
+        {
+            double pieceWeight = product.TypicalUnitWeightGrams > 0 ? product.TypicalUnitWeightGrams : 60;
+            double? converted = NutritionEstimationService.ConvertToProductUnit(
+                $"{amount.ToString(CultureInfo.InvariantCulture)} {unit}", product.Unit, pieceWeight);
+
+            if (converted != null && converted > 0)
+            {
+                amountInProductUnit = converted.Value;
+            }
+            else if (hasPrice)
+            {
+                await DialogService.ShowAlertAsync(Tr("Upozornění"), string.Format(Tr("Množství nejde převést na jednotku této suroviny ({0}). Zvol jinou jednotku."), product.Unit), "OK");
+                return false;
+            }
+        }
+
+        // Cena za množství -> cena za jednotku, použije se ve všech receptech
+        if (hasPrice && amountInProductUnit > 0)
+            await App.Database.SetManualPriceAsync(product.Id, price / amountInProductUnit);
+
+        if (replacing != null)
+            await App.Database.RemoveShoppingEntryAsync(_list.Id, replacing.ProductId, replacing.Unit);
+
+        string amountText = hasAmount ? $"{amount:0.##} {unit}" : fallbackText;
+        await App.Database.AddManualShoppingItemAsync(_list.Id, product, name, amountInProductUnit, amountText,
+            hasAmount ? amount : 0, hasAmount ? unit : string.Empty);
+
+        return true;
+    }
+
+    private async Task OnAddIngredientClickedAsync()
+    {
+        if (_list == null) return;
+
+        string name = _addName.Trim();
+        if (name.Length == 0)
+        {
+            await DialogService.ShowAlertAsync(Tr("Upozornění"), Tr("Zadej prosím název suroviny."), "OK");
+            return;
+        }
+
+        bool hasPrice = !string.IsNullOrWhiteSpace(_addPriceText);
+        double price = 0;
+
+        if (hasPrice && !TryParseNumber(_addPriceText, out price))
+        {
+            await ShowInvalidNumberAsync(_addPriceText.Trim());
+            return;
+        }
+
+        if (hasPrice && !_hasAmount)
+        {
+            await DialogService.ShowAlertAsync(Tr("Upozornění"), Tr("Pro zadání ceny vyplň i množství."), "OK");
+            return;
+        }
+
+        string lang = Preferences.Default.Get("AppLanguageCode", "cs");
+        var product = await App.Database.GetOrCreateLocalProductByNameAsync(name, BaseUnitFor(_hasAmount ? _addUnit : "g"), lang);
+
+        if (!await CommitAsync(product, name, _hasAmount, _addAmount, _addUnit, hasPrice, price, null)) return;
+
+        _addName = string.Empty;
+        _addPriceText = string.Empty;
+        _hasAmount = false;
+        _showSuggestions = false;
+
+        _nameSuggestions = await App.Database.GetAllProductNameSuggestionsAsync();
+        await ReloadEntriesAsync();
+    }
+
+    private void OnEntryClicked(ShoppingListEntry entry)
+    {
+        _entryMenuTitle = entry.Name;
+        _entryMenuGroups =
+        [
+            new ActionMenuGroup
+            {
+                Items = [new() { Icon = "✏️", Label = Tr("Upravit"), OnClick = EventCallback.Factory.Create(this, () => OnEditEntryAsync(entry)) }]
+            },
+            new ActionMenuGroup
+            {
+                Items = [new() { Icon = "🗑️", Label = Tr("Odebrat ze seznamu"), IsDestructive = true, OnClick = EventCallback.Factory.Create(this, () => RemoveEntryAsync(entry)) }]
+            }
+        ];
+        _showEntryMenu = true;
+    }
+
+    // Úprava nahradí řádek jednou ruční položkou
+    private async Task OnEditEntryAsync(ShoppingListEntry entry)
+    {
+        if (_list == null) return;
+
+        string priceBefore = entry.EditPrice > 0 ? entry.EditPrice.ToString("0.##", CultureInfo.InvariantCulture) : string.Empty;
+
+        var result = await DialogService.ShowAmountPromptAsync(
+            entry.Name, Tr("Uprav množství a cenu."), ShoppingUnits,
+            Tr("Uložit"), Tr("Zrušit"), placeholder: Tr("Množství"),
+            initialValue: entry.EditAmount > 0 ? entry.EditAmount.ToString("0.##", CultureInfo.InvariantCulture) : string.Empty,
+            initialUnit: string.IsNullOrEmpty(entry.EditUnit) ? entry.Unit : entry.EditUnit,
+            secondPlaceholder: Tr("Cena (Kč)"),
+            secondInitialValue: priceBefore,
+            secondSuffix: "CZK");
+
+        if (result == null) return;
+
+        string amountText = result.Value.Text.Trim();
+        string priceText = result.Value.SecondText.Trim();
+
+        bool hasAmount = amountText.Length > 0;
+        double amount = 0;
+        if (hasAmount && !TryParseNumber(amountText, out amount))
+        {
+            await ShowInvalidNumberAsync(amountText);
+            return;
+        }
+
+        // Cena se přepíše jen když ji uživatel změnil
+        bool priceChanged = priceText != priceBefore;
+        bool hasPrice = priceChanged && priceText.Length > 0;
+        double price = 0;
+        if (hasPrice && !TryParseNumber(priceText, out price))
+        {
+            await ShowInvalidNumberAsync(priceText);
+            return;
+        }
+
+        if (hasPrice && !hasAmount)
+        {
+            await DialogService.ShowAlertAsync(Tr("Upozornění"), Tr("Pro zadání ceny vyplň i množství."), "OK");
+            return;
+        }
+
+        var product = await App.Database.GetProductByIdAsync(entry.ProductId);
+        if (product == null) return;
+
+        string fallbackText = entry.EditAmount > 0 ? string.Empty : entry.AmountText;
+        if (!await CommitAsync(product, entry.Name, hasAmount, amount, result.Value.Unit, hasPrice, price, entry, fallbackText)) return;
+
+        await ReloadEntriesAsync();
+    }
+
+    private async Task RemoveEntryAsync(ShoppingListEntry entry)
+    {
+        if (_list == null) return;
+
+        await App.Database.RemoveShoppingEntryAsync(_list.Id, entry.ProductId, entry.Unit);
+        await ReloadEntriesAsync();
     }
 
     private void OnOptionsClicked()
@@ -117,6 +440,14 @@
 
         await App.Database.RenameShoppingListAsync(_list.Id, name);
         _list.Name = name.Trim();
+    }
+
+    private async Task OnTitleRenamedAsync(string name)
+    {
+        if (_list == null) return;
+
+        await App.Database.RenameShoppingListAsync(_list.Id, name);
+        _list.Name = name;
     }
 
     private async Task OnDeleteClickedAsync()

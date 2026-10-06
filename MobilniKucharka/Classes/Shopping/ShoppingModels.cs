@@ -22,10 +22,14 @@ namespace MobilniKucharka.Classes.Shopping
         public int ProductId { get; set; }
         public string Name { get; set; } = string.Empty;
 
-        // Množství v jednotce produktu, 0 = nerozpoznané (pak AmountText)
+        // Množství v jednotce produktu (pro cenu), 0 = nerozpoznané (pak AmountText)
         public double Amount { get; set; }
         public string Unit { get; set; } = string.Empty;
         public string AmountText { get; set; } = string.Empty;
+
+        // Množství tak, jak ho uživatel zadal (např. 50 l)
+        public double DisplayAmount { get; set; }
+        public string DisplayUnit { get; set; } = string.Empty;
     }
 
     public class ShoppingListSummary
@@ -39,10 +43,17 @@ namespace MobilniKucharka.Classes.Shopping
 
     public class ShoppingListEntry
     {
+        public int ProductId { get; set; }
+        public string Unit { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string AmountText { get; set; } = string.Empty;
         public double Price { get; set; }
         public bool IsUnpriced { get; set; }
+
+        // Předvyplnění úpravy
+        public double EditAmount { get; set; }
+        public string EditUnit { get; set; } = string.Empty;
+        public double EditPrice { get; set; }
     }
 
     public class ShoppingSelectionModel

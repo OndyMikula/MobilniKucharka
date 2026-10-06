@@ -38,6 +38,13 @@
             }
         };
     </script>
+    <script>
+        window.mkSelectInput = function (el) {
+            if (!el) return;
+            el.focus();
+            el.select();
+        };
+    </script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
 </body>
 </html>

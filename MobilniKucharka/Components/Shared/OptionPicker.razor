@@ -1,0 +1,33 @@
+﻿@namespace MobilniKucharka.Components.Shared
+@inject IDialogService DialogService
+
+<button type="button" class="option-picker @CssClass" @onclick="OpenAsync">
+    <span class="option-picker-text">@CurrentLabel</span>
+    <svg class="option-picker-chevron" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+</button>
+
+@code {
+    [Parameter] public List<(string Value, string Label)> Options { get; set; } = [];
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? CancelLabel { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+
+    private string CurrentLabel => Options.FirstOrDefault(o => o.Value == Value).Label ?? Value;
+
+    private async Task OpenAsync()
+    {
+        string[] labels = [.. Options.Select(o => o.Label)];
+        string? chosen = await DialogService.ShowActionSheetAsync(Title, CancelLabel ?? UiTranslator.Tr("Zrušit"), null, labels);
+        if (string.IsNullOrEmpty(chosen)) return;
+
+        var match = Options.FirstOrDefault(o => o.Label == chosen);
+        if (match.Value == null || match.Value == Value) return;
+
+        Value = match.Value;
+        await ValueChanged.InvokeAsync(match.Value);
+    }
+}

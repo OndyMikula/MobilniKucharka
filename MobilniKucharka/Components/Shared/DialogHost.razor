@@ -5,52 +5,118 @@
 
 @if (_current != null)
 {
-    <div class="modal-overlay dialog-overlay">
-        <div class="ios-dialog">
-            <div class="ios-dialog-body">
-                <h2 class="ios-dialog-title">@_current.Title</h2>
-                @if (!string.IsNullOrWhiteSpace(_current.Message))
+    <div class="modal-overlay dialog-overlay" @onclick="OnOverlayClicked">
+        @if (_current.Kind == DialogKind.ActionSheet)
+        {
+            <div class="action-menu-card" @onclick:stopPropagation="true">
+                @if (!string.IsNullOrWhiteSpace(_current.Title))
                 {
-                    <p class="ios-dialog-message">@_current.Message</p>
+                    <div class="action-menu-title">@_current.Title</div>
                 }
-
-                @if (_current.Kind is DialogKind.Prompt or DialogKind.Amount)
+                <div class="action-menu-group @(_current.Buttons.Count > 7 ? "scrollable" : "")">
+                    @foreach (var button in _current.Buttons)
+                    {
+                        <button type="button" class="action-menu-item" @onclick="() => OnSheetButtonClicked(button)">@button</button>
+                    }
+                </div>
+                @if (!string.IsNullOrEmpty(_current.Destruction))
                 {
-                    <div class="ios-dialog-input-row">
-                        <input type="text" @ref="_inputRef" class="ios-dialog-input"
-                               inputmode="@(_current.Numeric ? "decimal" : "text")"
-                               placeholder="@_current.Placeholder"
-                               maxlength="@(_current.MaxLength > 0 ? _current.MaxLength : 524288)"
-                               @bind="_inputValue" @bind:event="oninput" @onkeydown="OnInputKeyDown" />
-                        @if (_current.Kind == DialogKind.Amount)
-                        {
-                            <select class="ios-dialog-select" @bind="_selectedUnit">
-                                @foreach (var unit in _current.Units)
-                                {
-                                    <option value="@unit">@unit</option>
-                                }
-                            </select>
-                        }
+                    <div class="action-menu-group">
+                        <button type="button" class="action-menu-item destructive" @onclick="() => OnSheetButtonClicked(_current!.Destruction!)">@_current.Destruction</button>
                     </div>
                 }
+                <button type="button" class="action-menu-cancel" @onclick="OnCancelClicked">@_current.Cancel</button>
             </div>
+        }
+        else
+        {
+            <div class="ios-dialog" @onclick:stopPropagation="true">
+                <div class="ios-dialog-body">
+                    <h2 class="ios-dialog-title">@_current.Title</h2>
+                    @if (!string.IsNullOrWhiteSpace(_current.Message))
+                    {
+                        <p class="ios-dialog-message">@_current.Message</p>
+                    }
 
-            <div class="ios-dialog-actions">
-                @if (_current.Kind != DialogKind.Alert)
-                {
-                    <button type="button" class="ios-dialog-btn" @onclick="OnCancelClicked">@_current.Cancel</button>
-                }
-                <button type="button" class="ios-dialog-btn primary" @onclick="OnAcceptClicked">@_current.Accept</button>
+                    @if (_current.Kind is DialogKind.Prompt or DialogKind.Amount)
+                    {
+                        <div class="ios-dialog-input-row">
+                            <input type="text" @ref="_inputRef" class="ios-dialog-input"
+                                   inputmode="@(_current.Numeric ? "decimal" : "text")"
+                                   placeholder="@_current.Placeholder"
+                                   maxlength="@(_current.MaxLength > 0 ? _current.MaxLength : 524288)"
+                                   @bind="_inputValue" @bind:event="oninput" @onkeydown="OnFirstInputKeyDown" />
+                            @if (_current.Kind == DialogKind.Amount)
+                            {
+                                <button type="button" class="option-picker" @onclick="OpenUnitPicker">
+                                    <span>@_selectedUnit</span>
+                                    <ChevronIcon />
+                                </button>
+                            }
+                            else if (!string.IsNullOrEmpty(_current.Suffix))
+                            {
+                                <button type="button" class="option-picker" @onclick="() => OpenCurrencyPicker(_current!.Suffix!)">
+                                    <span>@_current.Suffix</span>
+                                    <ChevronIcon />
+                                </button>
+                            }
+                        </div>
+
+                        @if (_current.SecondPlaceholder != null)
+                        {
+                            <div class="ios-dialog-input-row">
+                                <input type="text" class="ios-dialog-input" inputmode="decimal"
+                                       placeholder="@_current.SecondPlaceholder"
+                                       @bind="_secondValue" @bind:event="oninput" @onkeydown="OnSecondInputKeyDown" />
+                                @if (!string.IsNullOrEmpty(_current.SecondSuffix))
+                                {
+                                    <button type="button" class="option-picker" @onclick="() => OpenCurrencyPicker(_current!.SecondSuffix!)">
+                                        <span>@_current.SecondSuffix</span>
+                                        <ChevronIcon />
+                                    </button>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="ios-dialog-actions">
+                    @if (_current.Kind != DialogKind.Alert)
+                    {
+                        <button type="button" class="ios-dialog-btn" @onclick="OnCancelClicked">@_current.Cancel</button>
+                    }
+                    <button type="button" class="ios-dialog-btn primary" @onclick="OnAcceptClicked">@_current.Accept</button>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (_picker != null)
+    {
+        <div class="modal-overlay dialog-overlay picker-overlay" @onclick="ClosePicker">
+            <div class="action-menu-card" @onclick:stopPropagation="true">
+                <div class="action-menu-title">@_picker.Title</div>
+                <div class="action-menu-group @(_picker.Options.Length > 7 ? "scrollable" : "")">
+                    @foreach (var option in _picker.Options)
+                    {
+                        <button type="button" class="action-menu-item" @onclick="() => OnPickerChosen(option)">@option</button>
+                    }
+                </div>
+                <button type="button" class="action-menu-cancel" @onclick="ClosePicker">@_current.Cancel</button>
             </div>
         </div>
-    </div>
+    }
 }
 
 @code {
+    private sealed record PickerState(string Title, string[] Options, Action<string> OnChosen);
+
     private readonly SemaphoreSlim _gate = new(1, 1);
     private DialogRequest? _current;
+    private PickerState? _picker;
     private TaskCompletionSource<DialogResponse>? _tcs;
     private string _inputValue = string.Empty;
+    private string _secondValue = string.Empty;
     private string _selectedUnit = string.Empty;
     private ElementReference _inputRef;
     private bool _needsFocus;
@@ -71,8 +137,10 @@
             await InvokeAsync(() =>
             {
                 _current = request;
+                _picker = null;
                 _inputValue = request.InitialValue;
-                _selectedUnit = !string.IsNullOrEmpty(request.InitialUnit) ? request.InitialUnit : request.Units.FirstOrDefault() ?? string.Empty;
+                _secondValue = request.SecondInitialValue;
+                _selectedUnit = !string.IsNullOrEmpty(request.InitialUnit) ? request.InitialUnit : (request.Units.Count > 0 ? request.Units[0] : string.Empty);
                 _needsFocus = request.Kind is DialogKind.Prompt or DialogKind.Amount;
                 StateHasChanged();
             });
@@ -86,6 +154,7 @@
                 await InvokeAsync(() =>
                 {
                     _current = null;
+                    _picker = null;
                     StateHasChanged();
                 });
             }
@@ -110,9 +179,38 @@
         }
     }
 
+    private void OpenUnitPicker()
+    {
+        if (_current == null) return;
+        _picker = new PickerState(UiTranslator.Tr("Vyber jednotku"), [.. _current.Units], unit => _selectedUnit = unit);
+    }
+
+    // Zatím jediná měna, seznam je kvůli stejnému vzhledu jako u jednotek
+    private void OpenCurrencyPicker(string currency)
+    {
+        _picker = new PickerState(UiTranslator.Tr("Měna"), [currency], _ => { });
+    }
+
+    private void OnPickerChosen(string option)
+    {
+        _picker?.OnChosen(option);
+        _picker = null;
+    }
+
+    private void ClosePicker()
+    {
+        _picker = null;
+    }
+
     private void OnAcceptClicked()
     {
-        _tcs?.TrySetResult(new DialogResponse { Accepted = true, Text = _inputValue ?? string.Empty, Unit = _selectedUnit });
+        _tcs?.TrySetResult(new DialogResponse
+        {
+            Accepted = true,
+            Text = _inputValue ?? string.Empty,
+            Unit = _selectedUnit,
+            SecondText = _secondValue ?? string.Empty
+        });
     }
 
     private void OnCancelClicked()
@@ -120,7 +218,23 @@
         _tcs?.TrySetResult(new DialogResponse { Accepted = false });
     }
 
-    private void OnInputKeyDown(KeyboardEventArgs e)
+    private void OnSheetButtonClicked(string button)
+    {
+        _tcs?.TrySetResult(new DialogResponse { Accepted = true, Choice = button });
+    }
+
+    // Klepnutí vedle sheetu = zrušit
+    private void OnOverlayClicked()
+    {
+        if (_current?.Kind == DialogKind.ActionSheet) OnCancelClicked();
+    }
+
+    private void OnFirstInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && _current?.SecondPlaceholder == null) OnAcceptClicked();
+    }
+
+    private void OnSecondInputKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") OnAcceptClicked();
     }
