@@ -69,7 +69,7 @@ namespace MobilniKucharka.Platforms.Android
             Window?.DecorView?.Post(ReportInsets);
         }
 
-        // Nahlásí jen skutečný překryv WebView se system bary
+        // Nahlásí jen skutečný překryv WebView se system bary (souřadnice obrazovky)
         private void ReportInsets()
         {
             var decor = Window?.DecorView;
@@ -82,14 +82,30 @@ namespace MobilniKucharka.Platforms.Android
             if (_webView != null)
             {
                 var loc = new int[2];
-                _webView.GetLocationInWindow(loc);
+                _webView.GetLocationOnScreen(loc);
+
+                int screenHeight = GetRealScreenHeight();
                 topPx = Math.Max(0, _rawTopPx - loc[1]);
-                bottomPx = Math.Max(0, loc[1] + _webView.Height - (decor.Height - _rawBottomPx));
+                bottomPx = screenHeight > 0
+                    ? Math.Max(0, loc[1] + _webView.Height - (screenHeight - _rawBottomPx))
+                    : 0;
             }
 
             double density = decor.Resources?.DisplayMetrics?.Density ?? 1.0;
             SystemInsets.SetBottom(bottomPx / density);
             SystemInsets.SetTop(topPx / density);
+        }
+
+        private int GetRealScreenHeight()
+        {
+            if (OperatingSystem.IsAndroidVersionAtLeast(30) && WindowManager?.MaximumWindowMetrics?.Bounds is { } bounds)
+                return bounds.Height();
+
+            var metrics = new global::Android.Util.DisplayMetrics();
+#pragma warning disable CA1422
+            WindowManager?.DefaultDisplay?.GetRealMetrics(metrics);
+#pragma warning restore CA1422
+            return metrics.HeightPixels;
         }
 
         private static global::Android.Webkit.WebView? FindVisibleWebView(global::Android.Views.View? view)
